@@ -1,0 +1,11 @@
+#local
+
+#dataset
+data/beauty
+data/books
+data/embedding
+data/ml-1m
+
+*.zip
+
+#server
