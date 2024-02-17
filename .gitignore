@@ -1,11 +1,25 @@
-#local
+#------local------
 
 #dataset
 data/beauty
 data/books
 data/embedding
 data/ml-1m
-
 *.zip
+dataset/
 
-#server
+
+#recbole results
+log/
+log_tensorboard/
+saved/
+
+
+#test ipynb
+test.ipynb
+
+# scripts
+scripts/
+
+
+#-----server------
