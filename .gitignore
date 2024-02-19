@@ -13,7 +13,10 @@ dataset/
 log/
 log_tensorboard/
 saved/
+RecBole/
 
+#dataset download
+Sequential-Recommendation-Datasets/
 
 #test ipynb
 test.ipynb
