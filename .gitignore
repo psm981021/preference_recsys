@@ -14,6 +14,7 @@ log/
 log_tensorboard/
 saved/
 RecBole/
+result/
 
 #dataset download
 Sequential-Recommendation-Datasets/
