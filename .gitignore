@@ -1,13 +1,15 @@
 #------local------
 
 #dataset
-data/beauty
-data/books
-data/embedding
-data/ml-1m
+*.json.gz
 *.zip
 dataset/
+data/embedding/
+data/ml-1m/
+data/*.txt
 
+#result log
+result_log/
 
 #recbole results
 log/
