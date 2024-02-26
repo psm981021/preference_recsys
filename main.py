@@ -3,7 +3,7 @@ import os
 import time
 import torch
 from utils import data_partition, WarpSampler, evaluate, evaluate_valid
-from models import SASRec
+from models import UPTRec
 import numpy as np
 
 def str2bool(s):
@@ -17,7 +17,7 @@ parser.add_argument('--train_dir', required=True, help = "dir where log will be 
 parser.add_argument('--batch_size', default=128, type=int)
 parser.add_argument('--lr', default=0.001, type=float)
 parser.add_argument('--maxlen', default=50, type=int)
-parser.add_argument('--hidden_units', default=50, type=int)
+#parser.add_argument('--hidden_units', default=50, type=int)
 parser.add_argument('--num_blocks', default=2, type=int)
 parser.add_argument('--num_epochs', default=200, type=int)
 parser.add_argument('--num_heads', default=2, type=int)
@@ -26,6 +26,8 @@ parser.add_argument('--l2_emb', default=0.0, type=float)
 parser.add_argument('--device', default='cpu', type=str)
 parser.add_argument('--inference_only', default=False, type=str2bool)
 parser.add_argument('--state_dict_path', default=None, type=str)
+parser.add_argument('--item_hidden_units', default= 100, type=int, help="hidden units for item embedding")
+parser.add_argument('--user_hidden_units', default= 100, help ="hidden units for user embedding")
 
 
 args = parser.parse_args()
@@ -47,11 +49,14 @@ if __name__ == '__main__':
     dataset = data_partition(args.dataset)
 
     [user_train, user_valid, user_test, usernum, itemnum] = dataset
+    
     num_batch  = len(user_train)//args.batch_size
 
     f = open(os.path.join('result_log/'+args.dataset +'_' + args.train_dir,'log.txt'), 'w')
     sampler = WarpSampler(user_train, usernum, itemnum, batch_size=args.batch_size, maxlen=args.maxlen, n_workers=3)
-    model = SASRec(usernum, itemnum, args).to(args.device)
+    
+    model = UPTRec(usernum, itemnum, args).to(args.device)
+    
 
     model.train()
 
@@ -121,5 +126,7 @@ if __name__ == '__main__':
     print("Done")
     
 
-    pass
+'''
+python main.py --dataset=Beauty_sample --train_dir=test
+'''
     
