@@ -6,6 +6,7 @@ from torch.autograd import Variable
 from utils import plot_blobs
 from kmeans_pytorch import kmeans, kmeans_predict
 from sklearn.decomposition import PCA
+from modules import Encoder
 
 class UPTRec(torch.nn.Module):
     def __init__(self, usernum, itemnum, args):
@@ -15,11 +16,15 @@ class UPTRec(torch.nn.Module):
         self.usernum = usernum
         self.dev = args.device
         self.hidden_units = args.item_hidden_units + args.user_hidden_units
-
+        
         self.item_embedding = nn.Embedding(self.itemnum+1,args.item_hidden_units)
         self.user_embedding = nn.Embedding(usernum+1,args.user_hidden_units) 
         self.position_embedding = nn.Embedding(args.maxlen, self.hidden_units)
         self.emb_dropout = nn.Dropout(p=args.dropout_rate)
+        self.layernorm = nn.LayerNorm(self.hidden_units, eps=1e-8)
+
+        self.encoder = Encoder(args)
+
 
     def forward(self,user_ids, seq, pos_seqs, neg_seqs):
         '''
@@ -69,14 +74,13 @@ class UPTRec(torch.nn.Module):
 
             batch_cluster_ids.append(seq_cluster_id.view(-1,1))
 
-
-
-        import IPython; IPython.embed(colors='Linux'); exit(1)
-        
-        #--- cluster mask ---
-
+        # --- cluster mask ---
+        attention_mask = torch.ones(seq.size(1))
+    
 
         #--- attention layer ---
+        logits = self.encoder(seq,attention_mask)
+        output_logits = logits[-1][:,-1,:]          
 
         import IPython; IPython.embed(colors='Linux'); exit(1)
 
