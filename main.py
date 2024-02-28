@@ -127,6 +127,6 @@ if __name__ == '__main__':
     
 
 '''
-python main.py --dataset=Beauty_sample --train_dir=test
+python main.py --dataset=Beauty --train_dir=test
 '''
     
