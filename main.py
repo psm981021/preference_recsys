@@ -19,7 +19,7 @@ parser.add_argument('--lr', default=0.001, type=float)
 parser.add_argument('--maxlen', default=50, type=int)
 #parser.add_argument('--hidden_units', default=50, type=int)
 parser.add_argument('--num_blocks', default=2, type=int)
-parser.add_argument('--num_epochs', default=200, type=int)
+parser.add_argument('--num_epochs', default=4, type=int)
 parser.add_argument('--num_heads', default=2, type=int)
 parser.add_argument('--dropout_rate', default=0.5, type=float)
 parser.add_argument('--l2_emb', default=0.0, type=float)
@@ -110,10 +110,10 @@ if __name__ == '__main__':
 
             loss.backward()
             adam_optimizer.step()
-            
+
             print("loss in epoch {} iteration {}: {}".format(epoch, step, loss.item())) # expected 0.4~0.6 after init few epochs
     
-        if epoch % 20 == 0:
+        if epoch % 2 == 0:
             model.eval()
             t1 = time.time() - t0
             T += t1
@@ -131,7 +131,7 @@ if __name__ == '__main__':
         if epoch == args.num_epochs:
             folder = args.dataset + '_' + args.train_dir
             fname = 'SASRec.epoch={}.lr={}.layer={}.head={}.hidden={}.maxlen={}.pth'
-            fname = fname.format(args.num_epochs, args.lr, args.num_blocks, args.num_heads, args.hidden_units, args.maxlen)
+            fname = fname.format(args.num_epochs, args.lr, args.num_blocks, args.num_heads, args.item_hidden_units,args.user_hidden_units args.maxlen)
             torch.save(model.state_dict(), os.path.join(folder, fname))
     
     f.close()

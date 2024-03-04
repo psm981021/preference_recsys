@@ -17,15 +17,14 @@ class SelfAttention(nn.Module):
         self.all_head_size = self.num_heads * self.attention_head_size
         self.sqrt_scale = math.sqrt(self.hidden_units)
 
-        # self.query = nn.Linear(self.hidden_units, self.all_head_size)
-        # self.key = nn.Linear(self.hidden_units, self.all_head_size)
-        # self.value = nn.Linear(self.hidden_units, self.all_head_size)
+        self.query = nn.Linear(self.hidden_units, self.all_head_size)
+        self.key = nn.Linear(self.hidden_units, self.all_head_size)
+        self.value = nn.Linear(self.hidden_units, self.all_head_size)
 
-        # since embedding is the output of the concatenation with user embedding and item embedding
-        # for now we do not use MHA
-        self.query = nn.Linear(self.hidden_units, self.hidden_units)
-        self.key = nn.Linear(self.hidden_units, self.hidden_units)
-        self.value = nn.Linear(self.hidden_units, self.hidden_units)
+        # reuse when MHA is not necessary
+        # self.query = nn.Linear(self.hidden_units, self.hidden_units)
+        # self.key = nn.Linear(self.hidden_units, self.hidden_units)
+        # self.value = nn.Linear(self.hidden_units, self.hidden_units)
 
         self.softmax = nn.Softmax(dim=-1)
         self.attn_dropout = nn.Dropout(args.dropout_rate)
@@ -41,29 +40,29 @@ class SelfAttention(nn.Module):
         return x.permute(0, 2, 1, 3)
     
     def forward(self, seq, attention_mask):
-        #check before
-        query = self.query(seq)
-        key= self.key(seq)
-        value = self.value(seq)
-
-        #check after
-        # query = self.transpose_for_scores(query)
-        # key = self.transpose_for_scores(key)
-        # value = self.transpose_for_scores(value)
 
         
-        attention_score = torch.matmul(query,key.transpose(-1,-2)) / self.sqrt_scale
-        attention_score = attention_score + attention_mask #modify for fit
+        mix_query = self.query(seq)
+        mix_key= self.key(seq)
+        mix_value = self.value(seq)
 
+        query = self.transpose_for_scores(mix_query)
+        key = self.transpose_for_scores(mix_key)
+        value = self.transpose_for_scores(mix_value)
+        
+        attention_score = torch.matmul(query,key.transpose(-1,-2)) / self.sqrt_scale
+        attention_score = attention_score + (attention_mask.unsqueeze(1).to(torch.int32) - 1) * 100000000 #modify for fit
+
+        
         attention_prob = self.softmax(attention_score)
         attention_prob = self.attn_dropout(attention_prob)
 
         context = torch.matmul(attention_prob, value)
         
         # not needed without using MHA
-        # context = context.permute(0,2,1,3).contiguous() # check how shape is computed
-        # new_context_layer_shape = context.size()[:-2] + (self.all_head_size,)
-        # context = context.view(*new_context_layer_shape)
+        context = context.permute(0,2,1,3).contiguous() # check how shape is computed
+        new_context_layer_shape = context.size()[:-2] + (self.all_head_size,)
+        context = context.view(*new_context_layer_shape)
 
         hidden_state = self.dense(context)
        #hidden_state = self.output_dropout(hidden_state)

@@ -27,41 +27,36 @@ class UPTRec(torch.nn.Module):
 
         self.loss_ce = nn.CrossEntropyLoss()
 
-    def forward(self,user_ids, seq, pos_seqs, neg_seqs):
-        '''
-        B : Batch
-        T : seq length
-        C : hidden_unit
-        '''
-        #--- embedding --- 
+    def UPTembedding(self,user_ids, seq):
+        # item embedding
+        seq_emb = self.item_embedding(torch.LongTensor(seq).to(self.dev))
 
-        #item embedding 
-        seq_ = self.item_embedding(torch.LongTensor(seq).to(self.dev))
+        # user embedding
+        u_latent = self.user_embedding(torch.LongTensor(user_ids).to(self.dev)).unsqueeze(1).repeat(1,seq_emb.size(1),1) 
 
-        #positional encoding
-        positions = torch.arange(seq_.size(1)).unsqueeze(0).expand(seq_.size(0),-1)
+        # position encdoing
+        positions = torch.arange(seq_emb.size(1)).unsqueeze(0).expand(seq_emb.size(0),-1)
 
-        #position embedding
+        # positon embedding
         positions = self.position_embedding(positions.to(self.dev))
 
-        #user embedding  B x C to B x T x C
-        u_latent = self.user_embedding(torch.LongTensor(user_ids).to(self.dev)).unsqueeze(1).repeat(1,seq_.size(1),1) 
-
         # concat user embedding with item embedding
-        seq_ = torch.cat([seq_,u_latent], dim =2).view(seq_.size(0),-1,self.hidden_units )
-        seq_ += positions
-        
-        #dropout
-        seq_ = self.emb_dropout(seq_)
-        
-        
-        
-        #---kmeans pytorch module--- change to class if needed
+        seq_emb_wop = seq_emb
+        seq_emb = torch.cat([seq_emb,u_latent], dim =2).view(seq_emb.size(0),-1,self.hidden_units )
+        seq_emb += positions
 
-        # In batch
+        # dropout
+        seq_emb = self.emb_dropout(seq_emb)
+
+        return seq_emb, seq_emb_wop, u_latent
+
+
+    def log2kmeans(self,seq):
+        #### ---kmeans pytorch module --- ###
         batch_cluster_ids =[]
-        for batch in range(seq_.size(0)):
-            seq_cluster = seq_[batch]
+
+        for batch in range(seq.size(0)):
+            seq_cluster = seq[batch]
             
             seq_cluster_id, cluster_centers = kmeans(
                 X=seq_cluster,
@@ -80,44 +75,89 @@ class UPTRec(torch.nn.Module):
 
             batch_cluster_ids.append(seq_cluster_id.view(-1,1))
 
-        #timeline masking
-        
+        return batch_cluster_ids
+    
+    def log2feats(self,user_ids,seq):
+        '''
+        B : Batch
+        T : seq length
+        C : hidden_unit
+        '''
+
+        seq_emb,seq_emb_wop,u_latent = self.UPTembedding(user_ids, seq)
+
+        ### --- cluster --- ###
+        batch_cluster_ids = self.log2kmeans(seq_emb)
+
+        ### --- timeline masking --- ###
         timeline_mask = torch.BoolTensor(seq == 0).to(self.dev)
-        seq_ *= ~timeline_mask.unsqueeze(-1) # Brodacast in last dim
+        seq_emb *= ~timeline_mask.unsqueeze(-1) # Brodacast in last dim
 
-        # --- cluster mask --- 
-        t1 = seq_.shape[1] #T
+        ### --- attention masking using cluster ids --- ###
+        t1 = seq_emb.shape[1] #T
 
-        #for now use torch.tril for test
-        attention_mask = ~torch.tril(torch.ones((t1,t1), dtype=torch.bool, device= self.dev))
+        #attention mask using cluster_ids
+        batch_cluster_ids_tensor = torch.stack(batch_cluster_ids) # B x T x 1
 
-
-        # --- attention layer ---
-        logits = self.encoder(seq_ ,attention_mask, timeline_mask) # logits contains in list form, length is the num_block
-        # logits[-1] has the shape of B T C
-
-        output_logits = logits[-1]#[:,-1,:] # B T C
-
-
-        # --- Loss --- 
+        # Calculate a mask where each element indicates if it belongs to the same cluster as each other element
         
-        # how negative sampling proceeds
-        pos_embs_item = self.item_embedding(torch.LongTensor(pos_seqs).to(self.dev)) # B T C
-        neg_embs_item = self.item_embedding(torch.LongTensor(neg_seqs).to(self.dev)) # B T C
+        #expand batch_cluster_ids for comparison
+        expanded_ids = batch_cluster_ids_tensor.expand(-1, -1, seq_emb.size(1))
+
+        # Compare cluster IDs across all positions in a sequence
+        same_cluster_mask = expanded_ids == expanded_ids.transpose(1, 2)
+        same_cluster_mask *= ~timeline_mask.unsqueeze(-1)
+        attention_mask = ~same_cluster_mask
+
+        ### --- attention layer --- ### 
+        logits = self.encoder(seq_emb ,attention_mask, timeline_mask) # logits contains in list form, length is the num_block
+        # logits[-1] has the shape of B x T x C
+
+        output_logits = logits[-1]#[:,-1,:] # B x T x C
+
+        return output_logits
+
+
+
+
+
+    def forward(self,user_ids, seq, pos_seqs, neg_seqs):
+
+        output_logits = self.log2feats(user_ids, seq)
+
+
+        ### --- Loss --- ###
+        seq_emb,seq_emb_wop,u_latent = self.UPTembedding(user_ids,seq)
+
+        # check how negative sampling proceeds
+        pos_embs_item = self.item_embedding(torch.LongTensor(pos_seqs).to(self.dev)) # B x T x C
+        neg_embs_item = self.item_embedding(torch.LongTensor(neg_seqs).to(self.dev)) # B x T x C
 
         # for user embedding use above variable
-        pos_embs = torch.cat([pos_embs_item,u_latent], dim =2).view(seq_.size(0),-1,self.hidden_units) 
-        neg_embs = torch.cat([neg_embs_item,u_latent], dim =2).view(seq_.size(0),-1,self.hidden_units)
+        pos_embs = torch.cat([pos_embs_item,u_latent], dim =2).view(seq_emb.size(0),-1,self.hidden_units) 
+        neg_embs = torch.cat([neg_embs_item,u_latent], dim =2).view(seq_emb.size(0),-1,self.hidden_units)
 
         # calculate loss - from STRec Backbone.py - check when loss does not change
         pos_logits = (output_logits*pos_embs).sum(dim=-1)
         neg_logits = (output_logits*neg_embs).sum(dim=-1)
 
         return pos_logits, neg_logits
+    
+    def predict(self, user_ids, seq, item_indices):
+        output_logits = self.log2feats(user_ids,seq)
+
+        seq_emb,seq_emb_wop,u_latent = self.UPTembedding(user_ids, seq)
+        final_logits = output_logits[:,-1,:]
+
+        # user embedding concat item embedding 
+        logits = seq_emb.matmul(final_logits.unsqueeze(-1)).squeeze(-1)
+
+        return logits
 
 
 
 
 
 if __name__ == '__main__':
+    #python main.py --dataset=Beauty --train_dir=test
     pass

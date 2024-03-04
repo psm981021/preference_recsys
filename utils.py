@@ -134,6 +134,7 @@ def data_partition(fname):
     return [user_train, user_valid, user_test, usernum, itemnum]
 
 
+## check
 def evaluate(model, dataset, args):
     [train, valid, test, usernum, itemnum] = copy.deepcopy(dataset)
 
