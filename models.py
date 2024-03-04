@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 from utils import plot_blobs
-from kmeans_pytorch import kmeans, kmeans_predict
+from kmeans_torch import kmeans, kmeans_predict
 from sklearn.decomposition import PCA
 from modules import Encoder
 
@@ -25,6 +25,7 @@ class UPTRec(torch.nn.Module):
 
         self.encoder = Encoder(args)
 
+        self.loss_ce = nn.CrossEntropyLoss()
 
     def forward(self,user_ids, seq, pos_seqs, neg_seqs):
         '''
@@ -35,23 +36,23 @@ class UPTRec(torch.nn.Module):
         #--- embedding --- 
 
         #item embedding 
-        seq = self.item_embedding(torch.LongTensor(seq).to(self.dev))
+        seq_ = self.item_embedding(torch.LongTensor(seq).to(self.dev))
 
         #positional encoding
-        positions = torch.arange(seq.size(1)).unsqueeze(0).expand(seq.size(0),-1)
+        positions = torch.arange(seq_.size(1)).unsqueeze(0).expand(seq_.size(0),-1)
 
         #position embedding
         positions = self.position_embedding(positions.to(self.dev))
 
         #user embedding  B x C to B x T x C
-        u_latent = self.user_embedding(torch.LongTensor(user_ids).to(self.dev)).unsqueeze(1).repeat(1,seq.size(1),1) 
+        u_latent = self.user_embedding(torch.LongTensor(user_ids).to(self.dev)).unsqueeze(1).repeat(1,seq_.size(1),1) 
 
         # concat user embedding with item embedding
-        seq = torch.cat([seq,u_latent], dim =2).view(seq.size(0),-1,self.hidden_units )
-        seq += positions
+        seq_ = torch.cat([seq_,u_latent], dim =2).view(seq_.size(0),-1,self.hidden_units )
+        seq_ += positions
         
         #dropout
-        seq = self.emb_dropout(seq)
+        seq_ = self.emb_dropout(seq_)
         
         
         
@@ -59,34 +60,64 @@ class UPTRec(torch.nn.Module):
 
         # In batch
         batch_cluster_ids =[]
-        for batch in range(seq.size(0)):
-            seq_cluster = seq[batch]
-
+        for batch in range(seq_.size(0)):
+            seq_cluster = seq_[batch]
+            
             seq_cluster_id, cluster_centers = kmeans(
                 X=seq_cluster,
                 num_clusters= 10, 
                 distance = 'euclidean', 
+                tqdm_flag=False,
                 #iter_limit = 20,
                 device = self.dev
+                
+                
             )
             seq_cluster_id = seq_cluster_id.to(self.dev)
-            cluster_centers = cluster_centers.to(self.dev) # check whether values have been change every batch
+
+            # check whether values have been change every batch
+            cluster_centers = cluster_centers.to(self.dev) 
 
             batch_cluster_ids.append(seq_cluster_id.view(-1,1))
 
-        # --- cluster mask ---
-        attention_mask = torch.ones(seq.size(1))
-    
+        #timeline masking
+        
+        timeline_mask = torch.BoolTensor(seq == 0).to(self.dev)
+        seq_ *= ~timeline_mask.unsqueeze(-1) # Brodacast in last dim
 
-        #--- attention layer ---
-        logits = self.encoder(seq,attention_mask)
-        output_logits = logits[-1][:,-1,:]          
+        # --- cluster mask --- 
+        t1 = seq_.shape[1] #T
 
-        import IPython; IPython.embed(colors='Linux'); exit(1)
+        #for now use torch.tril for test
+        attention_mask = ~torch.tril(torch.ones((t1,t1), dtype=torch.bool, device= self.dev))
+
+
+        # --- attention layer ---
+        logits = self.encoder(seq_ ,attention_mask, timeline_mask) # logits contains in list form, length is the num_block
+        # logits[-1] has the shape of B T C
+
+        output_logits = logits[-1]#[:,-1,:] # B T C
+
+
+        # --- Loss --- 
+        
+        # how negative sampling proceeds
+        pos_embs_item = self.item_embedding(torch.LongTensor(pos_seqs).to(self.dev)) # B T C
+        neg_embs_item = self.item_embedding(torch.LongTensor(neg_seqs).to(self.dev)) # B T C
+
+        # for user embedding use above variable
+        pos_embs = torch.cat([pos_embs_item,u_latent], dim =2).view(seq_.size(0),-1,self.hidden_units) 
+        neg_embs = torch.cat([neg_embs_item,u_latent], dim =2).view(seq_.size(0),-1,self.hidden_units)
+
+        # calculate loss - from STRec Backbone.py - check when loss does not change
+        pos_logits = (output_logits*pos_embs).sum(dim=-1)
+        neg_logits = (output_logits*neg_embs).sum(dim=-1)
+
+        return pos_logits, neg_logits
+
 
 
 
 
 if __name__ == '__main__':
-    # dataset
     pass

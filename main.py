@@ -28,9 +28,12 @@ parser.add_argument('--inference_only', default=False, type=str2bool)
 parser.add_argument('--state_dict_path', default=None, type=str)
 parser.add_argument('--item_hidden_units', default= 100, type=int, help="hidden units for item embedding")
 parser.add_argument('--user_hidden_units', default= 100, help ="hidden units for user embedding")
+parser.add_argument('--threshold_user', default= 1.0, help ="threshold for user embedding")
+parser.add_argument('--threshold_item', default= 1.0, help ="threshold for item embedding")
 
 
 args = parser.parse_args()
+
 
 #log
 if not os.path.isdir('result_log'):
@@ -53,7 +56,9 @@ if __name__ == '__main__':
     num_batch  = len(user_train)//args.batch_size
 
     f = open(os.path.join('result_log/'+args.dataset +'_' + args.train_dir,'log.txt'), 'w')
-    sampler = WarpSampler(user_train, usernum, itemnum, batch_size=args.batch_size, maxlen=args.maxlen, n_workers=3)
+    sampler = WarpSampler(user_train, usernum, itemnum, 
+                          batch_size=args.batch_size, maxlen=args.maxlen, n_workers=3,
+                          threshold_user = args.threshold_user, threshold_item = args.threshold_item)
     
     model = UPTRec(usernum, itemnum, args).to(args.device)
     
@@ -86,18 +91,26 @@ if __name__ == '__main__':
     for epoch in range(epoch_start_idx, args.num_epochs + 1):
         if args.inference_only: break # just to decrease identition
         for step in range(num_batch): # tqdm(range(num_batch), total=num_batch, ncols=70, leave=False, unit='b'):
+
             u, seq, pos, neg = sampler.next_batch() # tuples to ndarray
             u, seq, pos, neg = np.array(u), np.array(seq), np.array(pos), np.array(neg)
+
             pos_logits, neg_logits = model(u, seq, pos, neg)
             pos_labels, neg_labels = torch.ones(pos_logits.shape, device=args.device), torch.zeros(neg_logits.shape, device=args.device)
+
             # print("\neye ball check raw_logits:"); print(pos_logits); print(neg_logits) # check pos_logits > 0, neg_logits < 0
             adam_optimizer.zero_grad()
+
             indices = np.where(pos != 0)
+
             loss = bce_criterion(pos_logits[indices], pos_labels[indices])
             loss += bce_criterion(neg_logits[indices], neg_labels[indices])
-            for param in model.item_emb.parameters(): loss += args.l2_emb * torch.norm(param)
+
+            for param in model.item_embedding.parameters(): loss += args.l2_emb * torch.norm(param)
+
             loss.backward()
             adam_optimizer.step()
+            
             print("loss in epoch {} iteration {}: {}".format(epoch, step, loss.item())) # expected 0.4~0.6 after init few epochs
     
         if epoch % 20 == 0:

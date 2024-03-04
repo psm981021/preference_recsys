@@ -119,11 +119,12 @@ class Encoder(nn.Module):
         layer = Layer(args)
         self.layer = nn.ModuleList([copy.deepcopy(layer) for _ in range(args.num_blocks)])
     
-    def forward(self, hidden_state, attention_mask):
+    def forward(self, hidden_state, attention_mask, timeline_mask):
         all_encoder_layer = []
 
         for layer_module in self.layer:
             hidden_state = layer_module(hidden_state, attention_mask)
+            hidden_state *= ~timeline_mask.unsqueeze(-1)
             all_encoder_layer.append(hidden_state)
 
         return all_encoder_layer

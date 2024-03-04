@@ -8,7 +8,7 @@ from collections import defaultdict
 from multiprocessing import Process, Queue
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
-from kmeans_pytorch import kmeans, kmeans_predict
+from kmeans_torch import kmeans, kmeans_predict
 
 # sampler for batch generation
 def random_neq(l, r, s):
@@ -18,26 +18,41 @@ def random_neq(l, r, s):
     return t
 
 
-def sample_function(user_train, usernum, itemnum, batch_size, maxlen, result_queue, SEED):
+def sample_function(user_train, usernum, itemnum, batch_size, maxlen, result_queue, SEED,
+                    threshold_user, threshold_item):
     def sample():
-
+        
         user = np.random.randint(1, usernum + 1)
         while len(user_train[user]) <= 1: user = np.random.randint(1, usernum + 1)
 
-        seq = np.zeros([maxlen], dtype=np.int32)
-        pos = np.zeros([maxlen], dtype=np.int32)
-        neg = np.zeros([maxlen], dtype=np.int32)
+        
+        seq = np.zeros([int(maxlen)], dtype=np.int32)
+        pos = np.zeros([int(maxlen)], dtype=np.int32)
+        neg = np.zeros([int(maxlen)], dtype=np.int32)
         nxt = user_train[user][-1]
-        idx = maxlen - 1
+        idx = int(maxlen) - 1
 
         ts = set(user_train[user])
+
         for i in reversed(user_train[user][:-1]):
+
+            # SSE for user side (2 lines)
+            if random.random() > threshold_item:
+                i = np.random.randint(1, itemnum + 1)
+                nxt = np.random.randint(1, itemnum + 1)
+
             seq[idx] = i
             pos[idx] = nxt
             if nxt != 0: neg[idx] = random_neq(1, itemnum + 1, ts)
             nxt = i
             idx -= 1
             if idx == -1: break
+
+        # SSE for item side (2 lines)
+        if random.random() > threshold_user:
+            user = np.random.randint(1, usernum + 1)
+        # equivalent to hard parameter sharing
+        #user = 1
 
         return (user, seq, pos, neg)
 
@@ -51,9 +66,11 @@ def sample_function(user_train, usernum, itemnum, batch_size, maxlen, result_que
 
 #WarpSampler needs to be changed to dataloader
 class WarpSampler(object):
-    def __init__(self, User, usernum, itemnum, batch_size=64, maxlen=10, n_workers=1):
+    def __init__(self, User, usernum, itemnum, batch_size=64, maxlen=10, n_workers=1,
+                threshold_user =1.0, threshold_item = 1.0):
         self.result_queue = Queue(maxsize=n_workers * 10)
         self.processors = []
+        
         for i in range(n_workers):
             self.processors.append(
                 Process(target=sample_function, args=(User,
@@ -62,7 +79,9 @@ class WarpSampler(object):
                                                       batch_size,
                                                       maxlen,
                                                       self.result_queue,
-                                                      np.random.randint(2e9)
+                                                      np.random.randint(2e9),
+                                                      threshold_user,
+                                                      threshold_item
                                                       )))
             self.processors[-1].daemon = True
             self.processors[-1].start()
