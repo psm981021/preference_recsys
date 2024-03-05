@@ -166,10 +166,11 @@ def evaluate(model, dataset, args):
             while t in rated: t = np.random.randint(1, itemnum + 1)
             item_idx.append(t)
 
-        predictions = -model.predict(*[np.array(l) for l in [[u], [seq], item_idx]])
+        #
+        predictions = -model.predict(*[np.array(l) for l in [[u], [seq], item_idx]]) # 1 x item_idx
         predictions = predictions[0] # - for 1st argsort DESC
 
-        rank = predictions.argsort().argsort()[0].item()
+        rank = predictions.argsort().argsort()[0].item() # item_idx
 
         valid_user += 1
 
@@ -179,6 +180,8 @@ def evaluate(model, dataset, args):
         if valid_user % 100 == 0:
             print('.', end="")
             sys.stdout.flush()
+        import IPython; IPython.embed(colors='Linux');exit(1);
+        
 
     return NDCG / valid_user, HT / valid_user
 

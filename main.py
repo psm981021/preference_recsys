@@ -112,8 +112,8 @@ if __name__ == '__main__':
             adam_optimizer.step()
 
             print("loss in epoch {} iteration {}: {}".format(epoch, step, loss.item())) # expected 0.4~0.6 after init few epochs
-    
-        if epoch % 2 == 0:
+        if epoch == 1 :
+        #if epoch % 2 == 0:
             model.eval()
             t1 = time.time() - t0
             T += t1
@@ -131,7 +131,7 @@ if __name__ == '__main__':
         if epoch == args.num_epochs:
             folder = args.dataset + '_' + args.train_dir
             fname = 'SASRec.epoch={}.lr={}.layer={}.head={}.hidden={}.maxlen={}.pth'
-            fname = fname.format(args.num_epochs, args.lr, args.num_blocks, args.num_heads, args.item_hidden_units,args.user_hidden_units args.maxlen)
+            fname = fname.format(args.num_epochs, args.lr, args.num_blocks, args.num_heads, args.item_hidden_units,args.user_hidden_units, args.maxlen)
             torch.save(model.state_dict(), os.path.join(folder, fname))
     
     f.close()

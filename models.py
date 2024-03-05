@@ -27,26 +27,37 @@ class UPTRec(torch.nn.Module):
 
         self.loss_ce = nn.CrossEntropyLoss()
 
-    def UPTembedding(self,user_ids, seq):
-        # item embedding
-        seq_emb = self.item_embedding(torch.LongTensor(seq).to(self.dev))
+    def UPTembedding(self,user_ids, seq, flag=str):
 
-        # user embedding
-        u_latent = self.user_embedding(torch.LongTensor(user_ids).to(self.dev)).unsqueeze(1).repeat(1,seq_emb.size(1),1) 
+        if flag == 'predict':
+            seq_emb = self.item_embedding(torch.LongTensor(seq).to(self.dev))
+            u_latent = self.user_embedding(torch.LongTensor(user_ids).to(self.dev)).repeat(seq_emb.size(0),1)
+            #u_latent = self.user_embedding(torch.LongTensor(user_ids).to(self.dev)).unsqueeze(1).repeat(1,seq_emb.size(0),1)
+            
+            seq_emb = torch.cat([seq_emb,u_latent], dim =1)#.view(seq_emb.size(0),-1,self.hidden_units ) # item_idx x C
+            seq_emb_wop = seq_emb
+        
+        else: 
 
-        # position encdoing
-        positions = torch.arange(seq_emb.size(1)).unsqueeze(0).expand(seq_emb.size(0),-1)
+            # item embedding
+            seq_emb = self.item_embedding(torch.LongTensor(seq).to(self.dev))
 
-        # positon embedding
-        positions = self.position_embedding(positions.to(self.dev))
+            # user embedding
+            u_latent = self.user_embedding(torch.LongTensor(user_ids).to(self.dev)).unsqueeze(1).repeat(1,seq_emb.size(1),1) 
 
-        # concat user embedding with item embedding
-        seq_emb_wop = seq_emb
-        seq_emb = torch.cat([seq_emb,u_latent], dim =2).view(seq_emb.size(0),-1,self.hidden_units )
-        seq_emb += positions
+            # position encdoing
+            positions = torch.arange(seq_emb.size(1)).unsqueeze(0).expand(seq_emb.size(0),-1)
 
-        # dropout
-        seq_emb = self.emb_dropout(seq_emb)
+            # positon embedding
+            positions = self.position_embedding(positions.to(self.dev))
+
+            # concat user embedding with item embedding
+            seq_emb_wop = seq_emb
+            seq_emb = torch.cat([seq_emb,u_latent], dim =2).view(seq_emb.size(0),-1,self.hidden_units )
+            seq_emb += positions
+
+            # dropout
+            seq_emb = self.emb_dropout(seq_emb)
 
         return seq_emb, seq_emb_wop, u_latent
 
@@ -124,7 +135,7 @@ class UPTRec(torch.nn.Module):
     def forward(self,user_ids, seq, pos_seqs, neg_seqs):
 
         output_logits = self.log2feats(user_ids, seq)
-
+        
 
         ### --- Loss --- ###
         seq_emb,seq_emb_wop,u_latent = self.UPTembedding(user_ids,seq)
@@ -143,14 +154,15 @@ class UPTRec(torch.nn.Module):
 
         return pos_logits, neg_logits
     
+   
     def predict(self, user_ids, seq, item_indices):
-        output_logits = self.log2feats(user_ids,seq)
-
-        seq_emb,seq_emb_wop,u_latent = self.UPTembedding(user_ids, seq)
-        final_logits = output_logits[:,-1,:]
+        output_logits = self.log2feats(user_ids,seq) # 1 x T x C
+        
+        seq_emb,seq_emb_wop,u_latent = self.UPTembedding(user_ids, item_indices, flag='predict')
+        final_logits = output_logits[:,-1,:] # 1 x C
 
         # user embedding concat item embedding 
-        logits = seq_emb.matmul(final_logits.unsqueeze(-1)).squeeze(-1)
+        logits = seq_emb.matmul(final_logits.unsqueeze(-1)).squeeze(-1)  # 1 x item_idx
 
         return logits
 
