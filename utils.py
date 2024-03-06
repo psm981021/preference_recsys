@@ -174,7 +174,8 @@ def evaluate(model, dataset, args):
 
         valid_user += 1
 
-        if rank < 10:
+        if rank < args.k:
+        #if rank < 10:
             NDCG += 1 / np.log2(rank + 2)
             HT += 1
         if valid_user % 100 == 0:
@@ -220,8 +221,9 @@ def evaluate_valid(model, dataset, args):
         rank = predictions.argsort().argsort()[0].item()
 
         valid_user += 1
-
-        if rank < 10:
+        
+        if rank < args.k:
+        #if rank < 10:
             NDCG += 1 / np.log2(rank + 2)
             HT += 1
         if valid_user % 100 == 0:
@@ -229,23 +231,3 @@ def evaluate_valid(model, dataset, args):
             sys.stdout.flush()
 
     return NDCG / valid_user, HT / valid_user
-
-
-def plot_blobs(x,cluster_ids_x):
-    pca = PCA(2)
-    y_2d = pca.fit_transform(y)
-    x_2d = pca.transform(x)
-    
-    plt.figure(figsize=(4, 3), dpi=160)
-    plt.scatter(x_2d[:, 0], x_2d[:, 1], c=cluster_ids_x, cmap='cool')
-    plt.scatter(y_2d[:, 0], y_2d[:, 1], c=cluster_ids_y, cmap='cool', marker='X')
-    plt.scatter(
-        cluster_centers[:, 0], cluster_centers[:, 1],
-        c='white',
-        alpha=0.6,
-        edgecolors='black',
-        linewidths=2
-    )
-    #plt.axis([-1, 1, -1, 1])
-    plt.tight_layout()
-    plt.show()
