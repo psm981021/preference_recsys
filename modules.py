@@ -51,8 +51,10 @@ class SelfAttention(nn.Module):
         value = self.transpose_for_scores(mix_value)
         
         attention_score = torch.matmul(query,key.transpose(-1,-2)) / self.sqrt_scale
-        attention_score = attention_score + (attention_mask.unsqueeze(1).to(torch.int32) - 1) * 100000000 #modify for fit
-
+        
+        #attention_score = attention_score + (attention_mask.unsqueeze(1).to(torch.float32) - 1) * 100000000 #modify for fit
+        attention_mask = attention_mask.unsqueeze(0).expand(attention_score.size(0), -1, -1)
+        attention_score = attention_score + (attention_mask.unsqueeze(1).to(torch.float32) - 1)
         
         attention_prob = self.softmax(attention_score)
         attention_prob = self.attn_dropout(attention_prob)

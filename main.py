@@ -19,17 +19,20 @@ parser.add_argument('--lr', default=0.001, type=float)
 parser.add_argument('--maxlen', default=50, type=int)
 #parser.add_argument('--hidden_units', default=50, type=int)
 parser.add_argument('--num_blocks', default=2, type=int)
-parser.add_argument('--num_epochs', default=4, type=int)
+parser.add_argument('--num_epochs', default=200, type=int)
 parser.add_argument('--num_heads', default=2, type=int)
 parser.add_argument('--dropout_rate', default=0.5, type=float)
 parser.add_argument('--l2_emb', default=0.0, type=float)
 parser.add_argument('--device', default='cpu', type=str)
 parser.add_argument('--inference_only', default=False, type=str2bool)
 parser.add_argument('--state_dict_path', default=None, type=str)
-parser.add_argument('--item_hidden_units', default= 100, type=int, help="hidden units for item embedding")
-parser.add_argument('--user_hidden_units', default= 100, help ="hidden units for user embedding")
+parser.add_argument('--item_hidden_units', default= 50, type=int, help="hidden units for item embedding")
+parser.add_argument('--user_hidden_units', default= 50, help ="hidden units for user embedding")
 parser.add_argument('--threshold_user', default= 1.0, help ="threshold for user embedding")
 parser.add_argument('--threshold_item', default= 1.0, help ="threshold for item embedding")
+parser.add_argument('--attention_mask', default='base',type=str)
+parser.add_argument('--SSE', default = False, type= str2bool, help="Stochastic Shared Embedding")
+
 
 
 args = parser.parse_args()
@@ -112,8 +115,8 @@ if __name__ == '__main__':
             adam_optimizer.step()
 
             print("loss in epoch {} iteration {}: {}".format(epoch, step, loss.item())) # expected 0.4~0.6 after init few epochs
-        if epoch == 1 :
-        #if epoch % 2 == 0:
+        #if epoch == 1 :
+        if epoch % 20 == 0:
             model.eval()
             t1 = time.time() - t0
             T += t1
@@ -132,7 +135,7 @@ if __name__ == '__main__':
             folder = args.dataset + '_' + args.train_dir
             fname = 'SASRec.epoch={}.lr={}.layer={}.head={}.hidden={}.maxlen={}.pth'
             fname = fname.format(args.num_epochs, args.lr, args.num_blocks, args.num_heads, args.item_hidden_units,args.user_hidden_units, args.maxlen)
-            torch.save(model.state_dict(), os.path.join(folder, fname))
+            torch.save(model.state_dict(), os.path.join('result_log/'+folder, fname))
     
     f.close()
     sampler.close()

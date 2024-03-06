@@ -180,7 +180,7 @@ def evaluate(model, dataset, args):
         if valid_user % 100 == 0:
             print('.', end="")
             sys.stdout.flush()
-        import IPython; IPython.embed(colors='Linux');exit(1);
+        
         
 
     return NDCG / valid_user, HT / valid_user

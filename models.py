@@ -96,7 +96,7 @@ class UPTRec(torch.nn.Module):
         '''
 
         seq_emb,seq_emb_wop,u_latent = self.UPTembedding(user_ids, seq)
-
+        tl = seq_emb.shape[1] #T
         ### --- cluster --- ###
         batch_cluster_ids = self.log2kmeans(seq_emb)
 
@@ -105,11 +105,12 @@ class UPTRec(torch.nn.Module):
         seq_emb *= ~timeline_mask.unsqueeze(-1) # Brodacast in last dim
 
         ### --- attention masking using cluster ids --- ###
-        t1 = seq_emb.shape[1] #T
-
+        
+        attention_mask_base = ~torch.tril(torch.ones((tl, tl), dtype=torch.bool, device=self.dev))
+        
         #attention mask using cluster_ids
         batch_cluster_ids_tensor = torch.stack(batch_cluster_ids) # B x T x 1
-
+        
         # Calculate a mask where each element indicates if it belongs to the same cluster as each other element
         
         #expand batch_cluster_ids for comparison
@@ -121,7 +122,7 @@ class UPTRec(torch.nn.Module):
         attention_mask = ~same_cluster_mask
 
         ### --- attention layer --- ### 
-        logits = self.encoder(seq_emb ,attention_mask, timeline_mask) # logits contains in list form, length is the num_block
+        logits = self.encoder(seq_emb ,attention_mask_base, timeline_mask) # logits contains in list form, length is the num_block
         # logits[-1] has the shape of B x T x C
 
         output_logits = logits[-1]#[:,-1,:] # B x T x C
