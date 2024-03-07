@@ -2,7 +2,7 @@ import argparse
 import os
 import time
 import torch
-from utils import data_partition, WarpSampler, evaluate, evaluate_valid
+from utils import data_partition, WarpSampler, evaluate, evaluate_valid, early_stopping
 from models import UPTRec
 import numpy as np
 
@@ -11,6 +11,13 @@ def str2bool(s):
         raise ValueError('Not a valid boolean string')
     return s == 'true'
 
+def ndcg_k_type(value):
+    try:
+        k_values = list(map(int, value.split(',')))
+        return k_values
+    except ValueError:
+        raise argparse.ArgumentTypeError("Invalid NDCG@K values. Please provide a comma-separated list of integers.")
+    
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', required=True, help ="name of the dataset name")
 parser.add_argument('--train_dir', required=True, help = "dir where log will be stored")
@@ -32,7 +39,9 @@ parser.add_argument('--threshold_user', default= 1.0, help ="threshold for user 
 parser.add_argument('--threshold_item', default= 1.0, help ="threshold for item embedding")
 parser.add_argument('--attention_mask', default='base',type=str)
 parser.add_argument('--SSE', default = False, type= str2bool, help="Stochastic Shared Embedding")
-
+parser.add_argument('--k', default = 10, type=ndcg_k_type , help ="Metrics@K")
+parser.add_argument('--early_stopping', default = True, type = str2bool, help ="enable early stopping")
+parser.add_argument('--patience', default= 20, type= int, help="Number of epochs with no improvement after training will be stopped")
 
 
 args = parser.parse_args()
@@ -90,6 +99,10 @@ if __name__ == '__main__':
 
     T = 0.0
     t0 = time.time()
+
+    best_valid_ndcg = 0.0
+    cur_step = 0
+    update_epoch = 0
     
     for epoch in range(epoch_start_idx, args.num_epochs + 1):
         if args.inference_only: break # just to decrease identition
@@ -120,11 +133,13 @@ if __name__ == '__main__':
             model.eval()
             t1 = time.time() - t0
             T += t1
-            print('Evaluating', end='')
-            t_test = evaluate(model, dataset, args)
-            t_valid = evaluate_valid(model, dataset, args)
-            print('epoch:%d, time: %f(s), valid (NDCG@10: %.4f, HR@10: %.4f), test (NDCG@10: %.4f, HR@10: %.4f)'
-                    % (epoch, T, t_valid[0], t_valid[1], t_test[0], t_test[1]))
+
+            if args.early_stopping and update_epoch >=  args.patience:
+                print('Evaluating', end='')
+                t_test = evaluate(model, dataset, args)
+                t_valid = evaluate_valid(model, dataset, args)
+                print('epoch:%d, time: %f(s), valid (NDCG@%d: %.4f, HR@%d: %.4f), test (NDCG@%d: %.4f, HR@%d: %.4f)'
+                    % (epoch, T, args.k, t_valid[0],args.k, t_valid[1],args.k, t_test[0],args.k, t_test[1]))
     
             f.write(str(t_valid) + ' ' + str(t_test) + '\n')
             f.flush()

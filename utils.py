@@ -231,3 +231,49 @@ def evaluate_valid(model, dataset, args):
             sys.stdout.flush()
 
     return NDCG / valid_user, HT / valid_user
+
+
+def early_stopping(value, best, cur_step, max_step, bigger=True):
+    """
+    Args:
+        value (float): current result
+        best (float): best result
+        cur_step (int): the number of consecutive steps that did not exceed the best result
+        max_step (int): threshold steps for stopping
+        bigger (bool, optional): whether the bigger the better
+
+    Returns:
+        tuple:
+        - float,
+            best result after this step
+        - int,
+            the number of consecutive steps that did not exceed the best result after this step
+        - bool,
+            whether to stop
+        - bool,
+            whether to update
+    """
+
+    stop_flag = False
+    update_flag = False
+
+    if bigger:
+        if value >= best:
+            cur_step =0
+            best = value
+            update_flag = True
+        else:
+            cur_step+=1
+            if cur_step > max_step:
+                stop_flag = True
+    else:
+        if value <= best: 
+            cur_step = 0
+            best = value
+            update_flag = True
+        else:
+            cur_step += 1
+            if cur_step > max_step:
+                stop_flag = True
+    
+    return best, cur_step, stop_flag, update_flag 
