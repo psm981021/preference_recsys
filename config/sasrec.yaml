@@ -1,5 +1,6 @@
 #----enviroment settings-----
-use_gpu: false
+use_gpu: True
+gpu_id: 1
 save_dataset: True
 seed: 2020
 
@@ -8,8 +9,8 @@ seed: 2020
 data_path: dataset/
 field_seperator: "\t"
 USER_ID_FIELD: user_id
-# ITEM_ID_FIELD: item_id
-ITEM_ID_FIELD: product_id
+ITEM_ID_FIELD: item_id
+# ITEM_ID_FIELD: product_id
 TIME_FIELD: timestamp
 load_col:
     inter: [user_id, item_id, timestamp]
@@ -22,18 +23,15 @@ filter_inter_by_user_or_item: True
 user_inter_num_interval: "[5,200)"
 item_inter_num_interval: "[5,inf)"
 
-min_user_inter_num: 5
-min_item_inter_num: 5
-
 # ------Training and evaluation-------
-epochs: 3
-train_batch_size: 32
-eval_batch_size: 32
+epochs: 500
+train_batch_size: 256
+eval_batch_size: 256
 learner: adam
 learning_rate: 0.001 
 train_neg_sample_args: ~
-stopping_step: 10
-eval_step: 1
+stopping_step: 100
+eval_step: 5
 
 
 eval_args:
@@ -41,13 +39,12 @@ eval_args:
     order: TO
     split: {'RS': [0.8,0.1,0.1]}
     mode: full
-metrics: ['Recall', 'NDCG', 'Hit', 'Precision']
-topk: [1,5,10]
+metrics: ['NDCG', 'Hit']
+topk: [5,10,15,20]
 valid_metric: NDCG@10
 
 # model config
-embedding_size: 64
+embedding_size: 50
 hidden_size: 128
-num_layers: 2
-dropout_prob: 0.5
+n_layers: 3
 loss_type: 'CE'
