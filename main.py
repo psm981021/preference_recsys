@@ -101,9 +101,16 @@ if __name__ == '__main__':
     t0 = time.time()
 
     best_valid_ndcg = 0.0
+    best_valid_hit = 0.0
+
+    best_test_ndcg = 0.0
+    best_test_hit = 0.0
+
     cur_step = 0
     update_epoch = 0
     
+    flag_early_stopping = False
+
     for epoch in range(epoch_start_idx, args.num_epochs + 1):
         if args.inference_only: break # just to decrease identition
         for step in range(num_batch): # tqdm(range(num_batch), total=num_batch, ncols=70, leave=False, unit='b'):
@@ -113,7 +120,7 @@ if __name__ == '__main__':
 
             pos_logits, neg_logits = model(u, seq, pos, neg)
             pos_labels, neg_labels = torch.ones(pos_logits.shape, device=args.device), torch.zeros(neg_logits.shape, device=args.device)
-
+            
             # print("\neye ball check raw_logits:"); print(pos_logits); print(neg_logits) # check pos_logits > 0, neg_logits < 0
             adam_optimizer.zero_grad()
 
@@ -134,19 +141,43 @@ if __name__ == '__main__':
             t1 = time.time() - t0
             T += t1
 
-            if args.early_stopping and update_epoch >=  args.patience:
-                print('Evaluating', end='')
-                t_test = evaluate(model, dataset, args)
-                t_valid = evaluate_valid(model, dataset, args)
+            #if current score exceeds
+            t_test = evaluate(model, dataset, args)
+            t_valid = evaluate_valid(model, dataset, args)
+
+            print('Evaluating', end='')
+            valid_ndcg_current, valid_hit_current = t_valid[0], t_valid[1] 
+            test_ndcg_current, valid_hit_current = t_test[0], t_test[1]
+
+
+            # HIT@K will be the criteria
+            if valid_hit_current > best_valid_hit:
+                cur_step = 0
+                best_valid_hit, best_valid_ndcg = valid_hit_current, valid_ndcg_current
+                best_test_hit, best_test_ndcg = valid_hit_current, test_ndcg_current
+            
+            
+            # if HIT@K is not improved
+            else:
+                cur_step+=1
+
+            # if not improved for more than the amount of patience
+            if args.early_stopping == True and cur_step > args.patience:
+                print('Early stopping occured on epoch :%d', epoch)
+                print('time: %f(s), valid (NDCG@%d: %.4f, HR@%d: %.4f), test (NDCG@%d: %.4f, HR@%d: %.4f)'
+                      % (T, args.k, best_valid_ndcg, args.k, best_valid_hit,
+                         best_test_hit, best_test_ndcg))
+                flag_early_stopping = True
+            elif args.early_stopping == True and cur_step < args.patience:
                 print('epoch:%d, time: %f(s), valid (NDCG@%d: %.4f, HR@%d: %.4f), test (NDCG@%d: %.4f, HR@%d: %.4f)'
-                    % (epoch, T, args.k, t_valid[0],args.k, t_valid[1],args.k, t_test[0],args.k, t_test[1]))
-    
+                % (epoch, T, args.k, t_valid[0],args.k, t_valid[1],args.k, t_test[0],args.k, t_test[1]))
+
             f.write(str(t_valid) + ' ' + str(t_test) + '\n')
             f.flush()
             t0 = time.time()
             model.train()
     
-        if epoch == args.num_epochs:
+        if epoch == args.num_epochs or flag_early_stopping == True:
             folder = args.dataset + '_' + args.train_dir
             fname = 'SASRec.epoch={}.lr={}.layer={}.head={}.hidden={}.maxlen={}.pth'
             fname = fname.format(args.num_epochs, args.lr, args.num_blocks, args.num_heads, args.item_hidden_units,args.user_hidden_units, args.maxlen)
