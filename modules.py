@@ -52,7 +52,7 @@ class SelfAttention(nn.Module):
         
         attention_score = torch.matmul(query,key.transpose(-1,-2)) / self.sqrt_scale
         
-        if attention_mask.dim == 2:
+        if attention_mask.dim() == 2:
         #attention_score = attention_score + (attention_mask.unsqueeze(1).to(torch.float32) - 1) * 100000000 #modify for fit
             attention_mask = attention_mask.unsqueeze(0).expand(attention_score.size(0), -1, -1)
             attention_score = attention_score + (attention_mask.unsqueeze(1).to(torch.float32) - 1)
