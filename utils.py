@@ -169,7 +169,7 @@ def evaluate(model, dataset, args):
             item_idx.append(t)
 
         #
-        predictions = -model.predict(*[np.array(l) for l in [[u], [seq], item_idx]]) # 1 x item_idx
+        predictions = -model.predict(*[np.array(l) for l in [[u], [seq], item_idx]],args) # 1 x item_idx
         predictions = predictions[0] # - for 1st argsort DESC
 
         rank = predictions.argsort().argsort()[0].item() # item_idx
@@ -217,7 +217,8 @@ def evaluate_valid(model, dataset, args):
             while t in rated: t = np.random.randint(1, itemnum + 1)
             item_idx.append(t)
 
-        predictions = -model.predict(*[np.array(l) for l in [[u], [seq], item_idx]])
+        #predictions = -model.predict(np.array([u]), np.array([seq]), np.array(item_idx), args)
+        predictions = -model.predict(*[np.array(l) for l in [[u], [seq], item_idx]],args)
         predictions = predictions[0]
 
         rank = predictions.argsort().argsort()[0].item()

@@ -159,8 +159,8 @@ class UPTRec(torch.nn.Module):
         return pos_logits, neg_logits
     
    
-    def predict(self, user_ids, seq, item_indices):
-        output_logits = self.log2feats(user_ids,seq) # 1 x T x C
+    def predict(self, user_ids, seq, item_indices,args):
+        output_logits = self.log2feats(user_ids,seq,args) # 1 x T x C
         
         seq_emb,seq_emb_wop,u_latent = self.UPTembedding(user_ids, item_indices, flag='predict')
         final_logits = output_logits[:,-1,:] # 1 x C
