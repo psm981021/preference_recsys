@@ -18,7 +18,7 @@ def random_neq(l, r, s):
     return t
 
 
-def sample_function(user_train, usernum, itemnum, batch_size, maxlen, result_queue, SEED,
+def sample_function(user_train, usernum, itemnum,SSE, batch_size, maxlen, result_queue, SEED,
                     threshold_user, threshold_item):
     def sample():
         
@@ -35,11 +35,11 @@ def sample_function(user_train, usernum, itemnum, batch_size, maxlen, result_que
         ts = set(user_train[user])
 
         for i in reversed(user_train[user][:-1]):
-
-            # SSE for user side (2 lines)
-            if random.random() > threshold_item:
-                i = np.random.randint(1, itemnum + 1)
-                nxt = np.random.randint(1, itemnum + 1)
+            if SSE == True:
+                # SSE for user side (2 lines)
+                if random.random() > threshold_item:
+                    i = np.random.randint(1, itemnum + 1)
+                    nxt = np.random.randint(1, itemnum + 1)
 
             seq[idx] = i
             pos[idx] = nxt
@@ -48,11 +48,12 @@ def sample_function(user_train, usernum, itemnum, batch_size, maxlen, result_que
             idx -= 1
             if idx == -1: break
 
-        # SSE for item side (2 lines)
-        if random.random() > threshold_user:
-            user = np.random.randint(1, usernum + 1)
-        # equivalent to hard parameter sharing
-        #user = 1
+        if SSE == True:
+            # SSE for item side (2 lines)
+            if random.random() > threshold_user:
+                user = np.random.randint(1, usernum + 1)
+            # equivalent to hard parameter sharing
+            #user = 1
 
         return (user, seq, pos, neg)
 
@@ -66,7 +67,7 @@ def sample_function(user_train, usernum, itemnum, batch_size, maxlen, result_que
 
 #WarpSampler needs to be changed to dataloader
 class WarpSampler(object):
-    def __init__(self, User, usernum, itemnum, batch_size=64, maxlen=10, n_workers=1,
+    def __init__(self, User, usernum, itemnum,SSE, batch_size=64, maxlen=10, n_workers=1,
                 threshold_user =1.0, threshold_item = 1.0):
         self.result_queue = Queue(maxsize=n_workers * 10)
         self.processors = []
@@ -76,6 +77,7 @@ class WarpSampler(object):
                 Process(target=sample_function, args=(User,
                                                       usernum,
                                                       itemnum,
+                                                      SSE,
                                                       batch_size,
                                                       maxlen,
                                                       self.result_queue,

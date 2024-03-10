@@ -37,7 +37,7 @@ parser.add_argument('--item_hidden_units', default= 50, type=int, help="hidden u
 parser.add_argument('--user_hidden_units', default= 50, help ="hidden units for user embedding")
 parser.add_argument('--threshold_user', default= 1.0, help ="threshold for user embedding")
 parser.add_argument('--threshold_item', default= 1.0, help ="threshold for item embedding")
-parser.add_argument('--attention_mask', default='base',type=str)
+parser.add_argument('--attention_mask', default='base',type=str,help="base, cluster")
 parser.add_argument('--SSE', default = False, type= str2bool, help="Stochastic Shared Embedding")
 parser.add_argument('--k', default = 10, type=ndcg_k_type , help ="Metrics@K")
 parser.add_argument('--early_stopping', default = True, type = str2bool, help ="enable early stopping")
@@ -68,7 +68,7 @@ if __name__ == '__main__':
     num_batch  = len(user_train)//args.batch_size
 
     f = open(os.path.join('result_log/'+args.dataset +'_' + args.train_dir,'log.txt'), 'w')
-    sampler = WarpSampler(user_train, usernum, itemnum, 
+    sampler = WarpSampler(user_train, usernum, itemnum, SSE = args.SSE,
                           batch_size=args.batch_size, maxlen=args.maxlen, n_workers=3,
                           threshold_user = args.threshold_user, threshold_item = args.threshold_item)
     
