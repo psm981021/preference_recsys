@@ -179,7 +179,7 @@ if __name__ == '__main__':
                 print('epoch:%d, time: %f(s), valid (NDCG@%d: %.4f, HR@%d: %.4f), test (NDCG@%d: %.4f, HR@%d: %.4f)'
                 % (epoch, T, args.k, t_valid[0],args.k, t_valid[1],args.k, t_test[0],args.k, t_test[1]))
 
-            f.write('valid:' + str(t_valid) + ' ' + 'test: ' + str(t_test) + '\n')
+            #f.write('valid:' + str(t_valid) + ' ' + 'test: ' + str(t_test) + '\n')
             f.flush()
             t0 = time.time()
             model.train()
