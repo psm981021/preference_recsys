@@ -30,3 +30,4 @@ scripts/
 
 
 #-----server------
+config/ablation_wo.sh

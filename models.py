@@ -3,7 +3,6 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-from utils import plot_blobs
 from kmeans_torch import kmeans, kmeans_predict
 from sklearn.decomposition import PCA
 from modules import Encoder
@@ -137,9 +136,9 @@ class UPTRec(torch.nn.Module):
 
 
 
-    def forward(self,user_ids, seq, pos_seqs, neg_seqs):
+    def forward(self,user_ids, seq, pos_seqs, neg_seqs,args):
 
-        output_logits = self.log2feats(user_ids, seq)
+        output_logits = self.log2feats(user_ids, seq,args)
         
 
         ### --- Loss --- ###
