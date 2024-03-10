@@ -88,7 +88,7 @@ class UPTRec(torch.nn.Module):
 
         return batch_cluster_ids
     
-    def log2feats(self,user_ids,seq):
+    def log2feats(self, user_ids, seq, args):
         '''
         B : Batch
         T : seq length
@@ -106,23 +106,27 @@ class UPTRec(torch.nn.Module):
 
         ### --- attention masking using cluster ids --- ###
         
-        attention_mask_base = ~torch.tril(torch.ones((tl, tl), dtype=torch.bool, device=self.dev))
+        if args.attention_mask == 'base':
+            attention_mask = ~torch.tril(torch.ones((tl, tl), dtype=torch.bool, device=self.dev))
         
-        #attention mask using cluster_ids
-        batch_cluster_ids_tensor = torch.stack(batch_cluster_ids) # B x T x 1
-        
-        # Calculate a mask where each element indicates if it belongs to the same cluster as each other element
-        
-        #expand batch_cluster_ids for comparison
-        expanded_ids = batch_cluster_ids_tensor.expand(-1, -1, seq_emb.size(1))
+        elif args.attention_mask == 'cluster':
+            #attention mask using cluster_ids
+            batch_cluster_ids_tensor = torch.stack(batch_cluster_ids) # B x T x 1
+            
+            # Calculate a mask where each element indicates if it belongs to the same cluster as each other element
+            
+            #expand batch_cluster_ids for comparison
+            expanded_ids = batch_cluster_ids_tensor.expand(-1, -1, seq_emb.size(1))
 
-        # Compare cluster IDs across all positions in a sequence
-        same_cluster_mask = expanded_ids == expanded_ids.transpose(1, 2)
-        same_cluster_mask *= ~timeline_mask.unsqueeze(-1)
-        attention_mask = ~same_cluster_mask
+            # Compare cluster IDs across all positions in a sequence
+            same_cluster_mask = expanded_ids == expanded_ids.transpose(1, 2)
+            same_cluster_mask *= ~timeline_mask.unsqueeze(-1)
+            attention_mask = ~same_cluster_mask
+        else:
+            print('wrong parser for attention_mask')
 
         ### --- attention layer --- ### 
-        logits = self.encoder(seq_emb ,attention_mask_base, timeline_mask) # logits contains in list form, length is the num_block
+        logits = self.encoder(seq_emb ,attention_mask, timeline_mask) # logits contains in list form, length is the num_block
         # logits[-1] has the shape of B x T x C
 
         output_logits = logits[-1]#[:,-1,:] # B x T x C
