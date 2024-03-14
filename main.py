@@ -35,12 +35,13 @@ parser.add_argument('--inference_only', default=False, type=str2bool)
 parser.add_argument('--state_dict_path', default=None, type=str)
 parser.add_argument('--item_hidden_units', default= 50, type=int, help="hidden units for item embedding")
 parser.add_argument('--user_hidden_units', default= 50, help ="hidden units for user embedding")
+parser.add_argument('--cluster_num', default =10, help ="number of clusters")
 parser.add_argument('--threshold_user', default= 1.0, help ="threshold for user embedding")
 parser.add_argument('--threshold_item', default= 1.0, help ="threshold for item embedding")
 parser.add_argument('--attention_mask', default='base',type=str,help="base, cluster")
 parser.add_argument('--SSE', default = False, type= str2bool, help="Stochastic Shared Embedding")
 parser.add_argument('--k', default = 10, type=ndcg_k_type , help ="Metrics@K")
-parser.add_argument('--early_stopping', default = True, type = str2bool, help ="enable early stopping")
+parser.add_argument('--early_stopping', default = True, type = bool, help ="enable early stopping")
 parser.add_argument('--patience', default= 20, type= int, help="Number of epochs with no improvement after training will be stopped")
 
 
@@ -106,7 +107,7 @@ if __name__ == '__main__':
     best_test_ndcg = 0.0
     best_test_hit = 0.0
 
-    cur_step = 0
+    cur_step = 1
     update_epoch = 0
     
     flag_early_stopping = False
@@ -146,39 +147,40 @@ if __name__ == '__main__':
             t_valid = evaluate_valid(model, dataset, args)
 
             print('Evaluating', end='')
-            valid_ndcg_current, valid_hit_current = t_valid[0], t_valid[1] 
-            test_ndcg_current, valid_hit_current = t_test[0], t_test[1]
+            
+            current_valid_ndcg, current_valid_hit = t_valid[0], t_valid[1] 
+            current_test_ndcg, current_test_hit = t_test[0], t_test[1]
 
 
             # HIT@K will be the criteria
-            if valid_hit_current > best_valid_hit:
-                cur_step = 0
-                best_valid_hit, best_valid_ndcg = valid_hit_current, valid_ndcg_current
-                best_test_hit, best_test_ndcg = valid_hit_current, test_ndcg_current
+            if current_valid_hit > best_valid_hit:
+                cur_step = 1
+                best_valid_hit, best_valid_ndcg = current_valid_hit, current_valid_ndcg
+                best_test_hit, best_test_ndcg = current_test_hit, current_test_ndcg
             
             
-            # if HIT@K is not improved
-            else:
+            # if evaluation not improved
+            elif current_valid_hit < best_valid_hit or current_valid_ndcg < best_valid_ndcg:
                 cur_step+=1
 
-            # if not improved for more than the amount of patience
-            if args.early_stopping == True and cur_step > args.patience:
-                f.wirte('Early stopping occured on epoch: %d time: %f(s), valid (NDCG@%d: %.4f, HR@%d: %.4f), test (NDCG@%d: %.4f, HR@%d: %.4f)'
-                      % (epoch, T, args.k, best_valid_ndcg, args.k, best_valid_hit,
-                         best_test_hit, best_test_ndcg))
-                
-                flag_early_stopping = True
-            elif args.early_stopping == True and cur_step < args.patience:
-                f.write('epoch:%d, time: %f(s), valid (NDCG@%d: %.4f, HR@%d: %.4f), test (NDCG@%d: %.4f, HR@%d: %.4f)'
-                % (epoch, T, args.k, t_valid[0],args.k, t_valid[1],args.k, t_test[0],args.k, t_test[1]))
-   
-            #f.write('valid:' + str(t_valid) + ' ' + 'test: ' + str(t_test) + '\n')
+                if args.early_stopping == True and cur_step > args.patience:
+                    flag_early_stopping = True
+                    f.write('(Best Results HIT) Early stopping occurred on epoch: %d, time: %.4f(s), valid (NDCG@%d: %.4f, HR@%d: %.4f), test (NDCG@%d: %.4f, HR@%d: %.4f)\n'
+                    % (epoch, T, args.k, best_valid_ndcg, args.k, best_valid_hit,
+                        args.k, best_test_ndcg, args.k, best_test_hit))
+
+        
+            f.write('cur_step:%d, epoch:%d, time: %f(s), valid (NDCG@%d: %.4f, HR@%d: %.4f), test (NDCG@%d: %.4f, HR@%d: %.4f) \n'
+            % (cur_step, epoch, T, args.k, current_valid_ndcg ,args.k, current_valid_hit
+               ,args.k, current_test_ndcg,args.k, current_test_hit))
+
             f.flush()
             t0 = time.time()
             model.train()
     
-        if epoch == args.num_epochs or flag_early_stopping == True:
-            f.write('')
+        # 수정
+        if epoch == args.num_epochs and flag_early_stopping == True:
+            f.write('finished\n')
             folder = args.dataset + '_' + args.train_dir
             fname = 'SASRec.epoch={}.lr={}.layer={}.head={}.hidden={}.maxlen={}.pth'
             fname = fname.format(args.num_epochs, args.lr, args.num_blocks, args.num_heads, args.item_hidden_units,args.user_hidden_units, args.maxlen)

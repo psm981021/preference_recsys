@@ -61,7 +61,7 @@ class UPTRec(torch.nn.Module):
         return seq_emb, seq_emb_wop, u_latent
 
 
-    def log2kmeans(self,seq):
+    def log2kmeans(self, seq, args):
         #### ---kmeans pytorch module --- ###
         batch_cluster_ids =[]
 
@@ -70,10 +70,9 @@ class UPTRec(torch.nn.Module):
             
             seq_cluster_id, cluster_centers = kmeans(
                 X=seq_cluster,
-                num_clusters= 10, 
+                num_clusters= int(args.cluster_num), 
                 distance = 'euclidean', 
                 tqdm_flag=False,
-                #iter_limit = 20,
                 device = self.dev
                 
                 
@@ -97,7 +96,7 @@ class UPTRec(torch.nn.Module):
         seq_emb,seq_emb_wop,u_latent = self.UPTembedding(user_ids, seq)
         tl = seq_emb.shape[1] #T
         ### --- cluster --- ###
-        batch_cluster_ids = self.log2kmeans(seq_emb)
+        batch_cluster_ids = self.log2kmeans(seq_emb,args)
 
         ### --- timeline masking --- ###
         timeline_mask = torch.BoolTensor(seq == 0).to(self.dev)
