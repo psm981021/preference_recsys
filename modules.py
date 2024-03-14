@@ -73,7 +73,7 @@ class SelfAttention(nn.Module):
         context = context.view(*new_context_layer_shape)
 
         hidden_state = self.dense(context)
-       #hidden_state = self.output_dropout(hidden_state)
+        hidden_state = self.output_dropout(hidden_state)
         hidden_state = self.layernorm(hidden_state + seq) #residual connection
 
         return hidden_state # return attention map if needed
