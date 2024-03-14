@@ -195,3 +195,19 @@ if __name__ == '__main__':
 python main.py --dataset=Beauty --train_dir=test
 '''
     
+def convert_seconds(seconds):
+    days = seconds // (24 * 3600)
+    remaining_seconds = seconds % (24 * 3600)
+    hours = remaining_seconds // 3600
+    remaining_seconds %= 3600
+    minutes = remaining_seconds // 60
+    remaining_seconds %= 60
+
+    return days, hours, minutes, remaining_seconds
+
+
+seconds = int(input())
+
+days, hours, minutes, remaining_seconds = convert_seconds(seconds)
+
+print(f"{days} days {hours:02d}:{minutes:02d}:{remaining_seconds:02d}")
