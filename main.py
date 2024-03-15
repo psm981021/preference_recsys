@@ -39,6 +39,7 @@ parser.add_argument('--cluster_num', default =10, help ="number of clusters")
 parser.add_argument('--threshold_user', default= 1.0, help ="threshold for user embedding")
 parser.add_argument('--threshold_item', default= 1.0, help ="threshold for item embedding")
 parser.add_argument('--attention_mask', default='base',type=str,help="base, cluster")
+parser.add_argument('--attention', default='cluster',type =str, help="base: use self-attention cluster: use clustered-attention ")
 parser.add_argument('--SSE', default = False, type= str2bool, help="Stochastic Shared Embedding")
 parser.add_argument('--k', default = 10, type=ndcg_k_type , help ="Metrics@K")
 parser.add_argument('--early_stopping', default = True, type = bool, help ="enable early stopping")
@@ -178,7 +179,7 @@ if __name__ == '__main__':
             t0 = time.time()
             model.train()
     
-        # 수정
+        
         if epoch == args.num_epochs and flag_early_stopping == True:
             f.write('finished\n')
             folder = args.dataset + '_' + args.train_dir

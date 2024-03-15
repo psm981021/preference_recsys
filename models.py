@@ -124,7 +124,7 @@ class UPTRec(torch.nn.Module):
             print('wrong parser for attention_mask')
 
         ### --- attention layer --- ### 
-        logits = self.encoder(seq_emb ,attention_mask, timeline_mask) # logits contains in list form, length is the num_block
+        logits = self.encoder(seq_emb ,attention_mask, timeline_mask,args) # logits contains in list form, length is the num_block
         # logits[-1] has the shape of B x T x C
 
         output_logits = logits[-1]#[:,-1,:] # B x T x C

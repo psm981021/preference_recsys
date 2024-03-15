@@ -4,8 +4,8 @@ import torch
 import torch.nn as nn
 import copy
 import torch.nn.functional as F
-
-
+from attention import *
+from attention.clustered_attention import ClusteredAttention
 
 class SelfAttention(nn.Module):
     def __init__(self, args):
@@ -108,11 +108,17 @@ class Layer(nn.Module):
     def __init__ (self, args):
         super(Layer, self).__init__()
 
-        self.attention = SelfAttention(args)
+        self.base_attention = SelfAttention(args)
+        self.cluster_attention = ClusteredAttention(args)
         self.feedforward = FeedForward(args)
 
-    def forward(self, hidden_state, attention_mask):
-        attention_output = self.attention(hidden_state, attention_mask)
+    def forward(self, hidden_state, attention_mask, args):
+        if args.attention == 'base':
+            attention_output = self.base_attention(hidden_state, attention_mask)
+        elif args.attention == 'cluster':
+            attention_output = self.cluster_attention(hidden_state, attention_mask)
+
+            
         feedforward_output = self.feedforward(attention_output)
 
         return feedforward_output
@@ -126,13 +132,12 @@ class Encoder(nn.Module):
         layer = Layer(args)
         self.layer = nn.ModuleList([copy.deepcopy(layer) for _ in range(args.num_blocks)])
     
-    def forward(self, hidden_state, attention_mask, timeline_mask):
+    def forward(self, hidden_state, attention_mask, timeline_mask ,args):
         all_encoder_layer = []
 
         for layer_module in self.layer:
-            hidden_state = layer_module(hidden_state, attention_mask)
+            hidden_state = layer_module(hidden_state, attention_mask,args)
             hidden_state *= ~timeline_mask.unsqueeze(-1)
             all_encoder_layer.append(hidden_state)
 
         return all_encoder_layer
-        
