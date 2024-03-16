@@ -336,46 +336,34 @@ def cluster(
             group = torch.empty((N, H, L), dtype=torch.int32)
         if centroids is None:
             centroids = torch.empty((N, H, clusters), dtype=torch.int64)
-            centroids[:, :, :] = hashes[:, :, np.random.choice(L, size=[args], replace=False)]
+            centroids[:, :, :] = hashes[:, :, torch.randint(0, L, (clusters,))]
         K = centroids.shape[2]
         if counts is None:
             counts = torch.empty((N, H, K), dtype=torch.int32)
-        
-        assign_clusters_cpu(hashes, lengths, centroids, group)
-        
+
+        group, counts = kmeans_cpu(hashes, lengths, clusters, args)
+
         return group, counts
     else:
-        if groups is None:
-            groups = torch.empty((N, H, L), dtype=torch.int32, device=device)
+        if group is None:
+            group = torch.empty((N, H, L), dtype=torch.int32, device=device)
         if centroids is None:
-            centroids = torch.empty((N, H, clusters), dtype=torch.int64,
-                                    device=device)
-            centroids = hashes[:, :, np.random.choice(L, size=[clusters], replace=False)]
-
-        K = centroids.numel() // N // H
-        #K = clusters
-
+            centroids = hashes[:, :, torch.randint(0, L, (clusters,), device=device)]
+        
         if counts is None:
-            counts = torch.empty((N, H, K), dtype=torch.int32, device=device)
+            counts = torch.empty((N, H, clusters), dtype=torch.int32, device=device)
         if distances is None:
-            distances = torch.empty((N, H, L), dtype=torch.int32,
-                                    device=device)
+            distances = torch.empty((N, H, L), dtype=torch.int32, device=device)
         if bitcounts is None:
-            bitcounts = torch.empty((N, H, K, bits), dtype=torch.int32,
-                                    device=device)
-        groups = groups.view(N, H, L)
-        counts = counts.view(N, H, K)
-        centroids = centroids.view(N, H, K)
-        distances = distances.view(N, H, L)
-        bitcounts = bitcounts.view(N, H, K, -1)
+            bitcounts = torch.empty((N, H, clusters, bits), dtype=torch.int32, device=device)
 
         return kmeans_gpu(
-        hashes,
-        lengths,
-        centroids,
-        distances,
-        bitcounts,
-        groups,
-        counts,
-        iterations
-    )
+            hashes,
+            lengths,
+            centroids,
+            distances,
+            bitcounts,
+            group,
+            counts,
+            iterations
+        )
