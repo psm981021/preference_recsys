@@ -76,7 +76,54 @@ class SelfAttention(nn.Module):
 
         return hidden_state # return attention map if needed
 
-                
+class Clustered_Attention(nn.Module):
+    """
+    original code from https://github.com/idiap/fast-transformers/tree/master
+
+    Use LSH and clustering in Hamming space to group query - minimal L2 distance
+
+    Given Q, K, V cluster the Q into groups in "C" and compute the "C" query centroids Q_c
+
+    We now use to the centroids Q_c to compute the attention using:
+
+        V'_c = softmax(Q_c.mm(K.t()), dim=-1).mm(V).
+
+    Now the computed values V'_c are "broadcasted" back to the query members
+    of the corresponding cluster.
+
+    """
+    def __init__(self, args, iterations =10, bits =32):
+        super(Clustered_Attention,self).__init__()
+
+        self.clusters = args.cluster_num
+        self.bits = bits
+        self.iterations =iterations
+        self.dropout = nn.Dropout(args.dropout_rate)
+    
+    def _create_query_groups(self, Q, query_lengths):
+        """
+        B: Batch
+        H: Heads
+        T: Sequence Length
+        C: Hidden units
+        """
+        B,H,T,C = Q.shape
+
+        planes = Q.new_empty((self.bits, C+1)) # assign number of hashes for representation
+        torch.nn.init.normal_(planes) #initialize with normal distributuon
+
+        planes[:,-1] = 0
+
+        hashes = (torch.rand((B,H,T,self.bits), device = Q.device) >0.5).int()
+
+        clusters, counts = cluster(
+            
+        )
+
+
+
+
+
 class FeedForward(nn.Module):
     def __init__(self, args):
         super(FeedForward,self).__init__()
@@ -90,7 +137,7 @@ class FeedForward(nn.Module):
 
     def forward(self,seq):
         hidden_state = self.layernorm(hidden_state)
-        
+
         hidden_state = self.inner_layer(seq)
         hidden_state = self.activation(hidden_state)
         hidden_state = self.outer_layer(hidden_state)

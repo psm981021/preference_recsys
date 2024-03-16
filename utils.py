@@ -8,7 +8,8 @@ from collections import defaultdict
 from multiprocessing import Process, Queue
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
-from kmeans_torch import kmeans, kmeans_predict
+from fast_cluster import *
+from fast_cluster import kmeans_cpu, kmeans_gpu
 
 # sampler for batch generation
 def random_neq(l, r, s):
@@ -280,3 +281,101 @@ def early_stopping(value, best, cur_step, max_step, bigger=True):
                 stop_flag = True
     
     return best, cur_step, stop_flag, update_flag 
+
+
+
+
+def cluster(
+        hashes,
+        lengths,
+        args,
+        group = None,
+        counts = None,
+        centroids = None,
+        distances = None, 
+        bitcounts = None,
+        iterations = 10,
+        bits =32
+):
+    """
+    original code from https://github.com/idiap/fast-transformers/tree/master/fast_transformers/clustering
+    Cluster using hashing of Kmeans using hamming distance
+
+    Arguments
+    ---------
+        hashes: A long tensor of shape (B, T, C) containing a hashcode for each
+                query.
+        lengths: An int tensor of shape (B,) containing the sequence length for
+                 each sequence in hashes.
+        groups: An int tensor buffer of shape (B, T, C) contaning the cluster
+                in which the corresponding hash belongs to.
+        counts: An int tensor buffer of shape (B, H, K) containing the number
+                of elements in each cluster.
+        centroids: A long tensor buffer of shape (B, H, K) containing the
+                   centroid for each cluster.
+        distances: An int tensor of shape (B, H, T) containing the distance to
+                   the closest centroid for each hash.
+        bitcounts: An int tensor of shape (B, H, K, bits) containing the number
+                   of elements that have 1 for a given bit.
+        clusters: The number of clusters to use for each sequence. It is
+                  ignored if centroids is not None.
+        iterations: How many k-means iterations to perform.
+        bits: How many of the least-significant bits in hashes to consider.
+
+    Returns
+    -------
+        groups and counts as defined above.
+    """
+
+    device = hashes.device
+    N, H, L = hashes.shape
+    clusters = args.num_clusters
+
+    if device.type == "cpu":
+        if group is None:
+            group = torch.empty((N, H, L), dtype=torch.int32)
+        if centroids is None:
+            centroids = torch.empty((N, H, clusters), dtype=torch.int64)
+            centroids[:, :, :] = hashes[:, :, np.random.choice(L, size=[args], replace=False)]
+        K = centroids.shape[2]
+        if counts is None:
+            counts = torch.empty((N, H, K), dtype=torch.int32)
+        
+        assign_clusters_cpu(hashes, lengths, centroids, group)
+        
+        return group, counts
+    else:
+        if groups is None:
+            groups = torch.empty((N, H, L), dtype=torch.int32, device=device)
+        if centroids is None:
+            centroids = torch.empty((N, H, clusters), dtype=torch.int64,
+                                    device=device)
+            centroids = hashes[:, :, np.random.choice(L, size=[clusters], replace=False)]
+
+        K = centroids.numel() // N // H
+        #K = clusters
+
+        if counts is None:
+            counts = torch.empty((N, H, K), dtype=torch.int32, device=device)
+        if distances is None:
+            distances = torch.empty((N, H, L), dtype=torch.int32,
+                                    device=device)
+        if bitcounts is None:
+            bitcounts = torch.empty((N, H, K, bits), dtype=torch.int32,
+                                    device=device)
+        groups = groups.view(N, H, L)
+        counts = counts.view(N, H, K)
+        centroids = centroids.view(N, H, K)
+        distances = distances.view(N, H, L)
+        bitcounts = bitcounts.view(N, H, K, -1)
+
+        return kmeans_gpu(
+        hashes,
+        lengths,
+        centroids,
+        distances,
+        bitcounts,
+        groups,
+        counts,
+        iterations
+    )
