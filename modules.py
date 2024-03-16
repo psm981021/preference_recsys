@@ -4,8 +4,6 @@ import torch
 import torch.nn as nn
 import copy
 import torch.nn.functional as F
-from attention import *
-from attention.clustered_attention import ClusteredAttention
 
 class SelfAttention(nn.Module):
     def __init__(self, args):
@@ -52,17 +50,16 @@ class SelfAttention(nn.Module):
         
         attention_score = torch.matmul(query,key.transpose(-1,-2)) / self.sqrt_scale
         
+
         if attention_mask.dim() == 2:
-        #attention_score = attention_score + (attention_mask.unsqueeze(1).to(torch.float32) - 1) * 100000000 #modify for fit
             attention_mask = attention_mask.unsqueeze(0).expand(attention_score.size(0), -1, -1)
-            attention_score = attention_score + (attention_mask.unsqueeze(1).to(torch.float32) - 1)
+            attention_score = attention_score + (attention_mask.unsqueeze(1).to(torch.float32) - 1) * 100000000
         else:
             attention_mask = attention_mask.unsqueeze(1).expand(-1, attention_score.size(1), -1, -1)
-            attention_score = attention_score + (attention_mask.to(torch.float32) - 1)
-            
+            attention_score = attention_score + (attention_mask.to(torch.float32) - 1) * 100000000
 
-        
-        attention_prob = self.softmax(attention_score)
+        attention_prob = F.softmax(attention_score, dim=-1)
+        #attention_prob = self.softmax(attention_score)
         attention_prob = self.attn_dropout(attention_prob)
 
         context = torch.matmul(attention_prob, value)
@@ -71,6 +68,7 @@ class SelfAttention(nn.Module):
         context = context.permute(0,2,1,3).contiguous() # check how shape is computed
         new_context_layer_shape = context.size()[:-2] + (self.all_head_size,)
         context = context.view(*new_context_layer_shape)
+
 
         hidden_state = self.dense(context)
         hidden_state = self.output_dropout(hidden_state)
@@ -91,32 +89,33 @@ class FeedForward(nn.Module):
         self.dropout = nn.Dropout(args.dropout_rate)
 
     def forward(self,seq):
-
+        hidden_state = self.layernorm(hidden_state)
+        
         hidden_state = self.inner_layer(seq)
         hidden_state = self.activation(hidden_state)
         hidden_state = self.outer_layer(hidden_state)
 
         hidden_state = self.dropout(hidden_state)
-        hidden_state = self.layernorm(hidden_state)
+        
 
         return hidden_state
 
 
         
 
-class Layer(nn.Module):
+class EncoderLayer(nn.Module):
     def __init__ (self, args):
-        super(Layer, self).__init__()
+        super(EncoderLayer, self).__init__()
 
         self.base_attention = SelfAttention(args)
-        self.cluster_attention = ClusteredAttention(args)
+        #self.cluster_attention = ClusteredAttention(args)
         self.feedforward = FeedForward(args)
 
     def forward(self, hidden_state, attention_mask, args):
         if args.attention == 'base':
             attention_output = self.base_attention(hidden_state, attention_mask)
-        elif args.attention == 'cluster':
-            attention_output = self.cluster_attention(hidden_state, attention_mask)
+        # elif args.attention == 'cluster':
+        #     attention_output = self.cluster_attention(hidden_state, attention_mask)
 
             
         feedforward_output = self.feedforward(attention_output)
@@ -129,7 +128,7 @@ class Encoder(nn.Module):
     def __init__(self,args):
         super(Encoder, self).__init__()
 
-        layer = Layer(args)
+        layer = EncoderLayer(args)
         self.layer = nn.ModuleList([copy.deepcopy(layer) for _ in range(args.num_blocks)])
     
     def forward(self, hidden_state, attention_mask, timeline_mask ,args):
