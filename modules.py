@@ -172,8 +172,8 @@ class Clustered_Attention(nn.Module):
         queries to each query.
         """
 
-        q_grouped = _GroupQueries.apply(Q, *groups, lengths)
-        import IPython; IPython.embed(colors='Linux');exit(1)
+        q_grouped = _GroupQueries.apply(Q, *groups, lengths) # 128 10 50
+        
         return q_grouped
 
 
@@ -211,8 +211,9 @@ class Clustered_Attention(nn.Module):
 
         # Aggregate the re-arranged queries
         
-        Q_grouped = self._group_queries(s_queries, groups, query_lengths)
+        Q_grouped = self._group_queries(s_queries, groups, query_lengths) #128 10 50
 
+        # Compute attention
 
         import IPython; IPython.embed(colors='Linux'); exit(1)
 

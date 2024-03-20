@@ -217,10 +217,10 @@ def clustered_aggregate(X, G, F, lengths, Y=None):
     H = X.size(1)
     L = X.size(2)
     E = X.size(3)
-    C = Y.size(2) if Y is not None else F.size(1)
+    C = Y.size(1) if Y is not None else F.size(2) 
 
     if Y is None:
-        Y = torch.zeros(F.size(0), C, E, device=X.device, dtype=X.dtype)
+        Y = torch.zeros(N, C, E, device=X.device, dtype=X.dtype)
     else:
         Y.zero_()
 
@@ -231,7 +231,7 @@ def clustered_aggregate(X, G, F, lengths, Y=None):
                 f_cur = F[n][h][k_cur] # retrive factor from current group
                 y_cur = Y[n][h][k_cur]
                 for e in range(E):
-                    y_cur[e.item()] += f_cur * X[n][h][l][e.item()]  # update aggregated vector
+                    y_cur += f_cur * X[n][h][l][e].item()  # update aggregated vector
 
     return Y
 
