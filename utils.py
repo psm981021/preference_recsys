@@ -328,8 +328,9 @@ def cluster(
     """
 
     device = hashes.device
+
     N, H, L = hashes.shape
-    clusters = args.num_clusters
+    clusters = args.cluster_num
 
     if device.type == "cpu":
         if group is None:
@@ -357,7 +358,7 @@ def cluster(
         if bitcounts is None:
             bitcounts = torch.empty((N, H, clusters, bits), dtype=torch.int32, device=device)
 
-        return kmeans_gpu(
+        kmeans_gpu(
             hashes,
             lengths,
             centroids,
@@ -365,5 +366,7 @@ def cluster(
             bitcounts,
             group,
             counts,
-            iterations
-        )
+            iterations)
+        
+    
+    return group, counts

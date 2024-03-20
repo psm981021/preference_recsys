@@ -1,7 +1,7 @@
 
 import numpy as np
 import torch
-
+import time
 def assign_clusters_cpu(hashes, lengths, centroids, group):
     N = hashes.size(0)
     H = hashes.size(1)
@@ -48,9 +48,22 @@ def kmeans_cpu(hashes, lengths, clusters, args):
 ### cluster gpu
 
 def hamming_distance(a, b):
-    return (a ^ b).popcount()
+    # Perform XOR operation between tensors
+    xor_result = a ^ b
+    
+    # Count the number of set bits (i.e., 1s) in the result tensor
+    hamming_dist = xor_result.to(torch.int).sum()
+
+    return hamming_dist
+
 
 def assign_clusters_kernel(hash_codes, lengths, centroids, labels, distances, n_blocks_per_sequence, MAX=65):
+    """
+
+    Assigns each hash code to its closest centroid based on Hamming distance
+    It updates labels tensor with the assigned cluster indices and distances tensor
+
+    """
     N, H, L = hash_codes.shape
     K = centroids.shape[2]
 
@@ -77,6 +90,7 @@ def assign_clusters_kernel(hash_codes, lengths, centroids, labels, distances, n_
                 best_distance = MAX
                 best_cluster = 0
                 for cluster in range(K):
+                    
                     dist = hamming_distance(x, shared_means[cluster])
                     if dist < best_distance:
                         best_distance = dist
@@ -86,6 +100,12 @@ def assign_clusters_kernel(hash_codes, lengths, centroids, labels, distances, n_
                 distances[n, h, l] = best_distance
 
 def bit_count_kernel(labels, hash_codes, counts, cluster_bit_counts):
+    """
+
+    Computes bit counts for each cluster based on the assigned labelsand has codes
+    Updates counts and cluster_bit_counts 
+
+    """
     N, H, L = labels.shape
     K, B = cluster_bit_counts.shape[2:]
 
@@ -115,6 +135,12 @@ def bit_count_kernel(labels, hash_codes, counts, cluster_bit_counts):
         counts[n, h, best_cluster] += 1
 
 def compute_means_kernel(counts, cluster_bit_counts, centroids):
+    """
+    
+    Computes the new centroids based on the assigned labels and bit counts
+    Updates centroids tensor
+    
+    """
     N, H, K = counts.shape
     B = cluster_bit_counts.shape[3]
 
@@ -146,8 +172,118 @@ def kmeans_gpu(hash_codes, lengths, centroids, distances, cluster_bit_counts, la
     K, B = cluster_bit_counts.shape[2:]
 
     for itr in range(iterations):
+        print(f"Iteration: {itr + 1}")
+        start_time = time.time()
+
         assign_clusters_kernel(hash_codes, lengths, centroids, labels, distances, (L - 1) // 1024 + 1)
         counts.zero_()
         cluster_bit_counts.zero_()
         bit_count_kernel(labels, hash_codes, counts, cluster_bit_counts)
         compute_means_kernel(counts, cluster_bit_counts, centroids)
+
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+
+        print(f"Elapsed time for iteration {itr + 1}: {elapsed_time} seconds")
+    
+    #return centroids
+
+
+def compute_hashes(X, A, H=None):
+
+    N, D = X.size()
+    B, _ = A.size()
+    assert D + 1 == A.size(1), "Bias expected for the parameters"
+    
+    #initialize Hash
+    H = torch.zeros(N, dtype=torch.int64, device =X.device)
+
+    # Compute dot product of X with each plane in A
+    dot_products = torch.matmul(X, A[:, :-1].t()) + A[:, -1]
+    for i in range(B):
+        bit = dot_products[:, i] > 0
+        
+        H = torch.bitwise_or(H, bit << i)
+    
+    return H
+    
+def clustered_aggregate(X, G, F, lengths, Y=None):
+    # X: N H L E : input vectors
+    # G: Group indices of tensor N H L, specify group for each input vector
+    # F: Factors tensor of shape N H C, factors to multiply each input vector within groups
+    # lengths: Tensor of length N, length of each sequence in batch
+
+    N = X.size(0) 
+    H = X.size(1)
+    L = X.size(2)
+    E = X.size(3)
+    C = Y.size(2) if Y is not None else F.size(1)
+
+    if Y is None:
+        Y = torch.zeros(F.size(0), C, E, device=X.device, dtype=X.dtype)
+    else:
+        Y.zero_()
+
+    for n in range(N): # batch
+        for h in range(H): # head
+            for l in range(L): # each position
+                k_cur = G[n][h][l] # retrieve current group index
+                f_cur = F[n][h][k_cur] # retrive factor from current group
+                y_cur = Y[n][h][k_cur]
+                for e in range(E):
+                    y_cur[e.item()] += f_cur * X[n][h][l][e.item()]  # update aggregated vector
+
+    return Y
+
+def clustered_broadcast(Y, G, F, X, block_counts, group_counts):
+    # Y: Aggregated tensor N C E
+    # G: Group indices tensor N H L
+    # F: Factor tensor N H C
+    # X: Output tensor to store the broadcasted vectors
+    # block_counts: N H G
+    # group_counts: N H G
+
+    N = X.size(0)
+    H = X.size(1)
+    L = X.size(2)
+    E = X.size(3)
+    C = Y.size(2)
+
+    indx_maps = create_maps(group_counts, block_counts) #provides indices to iterate over each group in the batch
+
+    for idx in indx_maps:
+        n = idx[0]
+        h = idx[1]
+        g = idx[2]
+        q_id = idx[3]
+        n_queries = idx[4]
+        clusters_to_load = C // G.size(2) 
+        cluster_offset = g * clusters_to_load
+        shared_values = Y[n][h][cluster_offset:cluster_offset + clusters_to_load] #from current group
+        shared_factors = F[n][h][cluster_offset:cluster_offset + clusters_to_load] #from current group
+        for l in range(q_id, q_id + n_queries):
+            k = G[n][h][l]
+            k -= cluster_offset
+            factor = shared_factors[k]
+            for e in range(E):
+                # No explicit return as 'X' is updated in place
+                X[n][h][l][e] = shared_values[k][e] * factor
+                
+
+def create_maps(group_counts, block_counts):
+    # group_counts: Tensor of shape N H G number of vectors per group
+    # blcok_counts: Tensor of shape N H G number of blocks per group
+
+
+    maps = []
+    N, H, G = group_counts.size()
+    for n in range(N): # batch
+        for h in range(H): # head
+            acc_g_count = 0
+            for g in range(G): # group
+                g_count = group_counts[n][h][g] #calculate total number of vectors
+                blocks = block_counts[n][h][g] #calculate total number of blocks
+                for b in range(blocks):
+                    maps.append([n, h, g, acc_g_count, g_count])
+                    acc_g_count += g_count
+    return maps # return generated maps 

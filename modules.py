@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 import copy
 import torch.nn.functional as F
+from utils import cluster 
+from fast_cluster import compute_hashes, clustered_aggregate, clustered_broadcast
 
 class SelfAttention(nn.Module):
     def __init__(self, args):
@@ -23,7 +25,7 @@ class SelfAttention(nn.Module):
         # self.query = nn.Linear(self.hidden_units, self.hidden_units)
         # self.key = nn.Linear(self.hidden_units, self.hidden_units)
         # self.value = nn.Linear(self.hidden_units, self.hidden_units)
-
+    
         self.softmax = nn.Softmax(dim=-1)
         self.attn_dropout = nn.Dropout(args.dropout_rate)
         self.output_dropout = nn.Dropout(args.dropout_rate)
@@ -76,6 +78,24 @@ class SelfAttention(nn.Module):
 
         return hidden_state # return attention map if needed
 
+
+class _GroupQueries(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, Q, clusters, counts, lengths):
+        factors = 1./counts.float()
+        q_grouped = clustered_aggregate(Q, clusters, factors, lengths)
+        ctx.save_for_backward(clusters, counts, factors)
+
+        return q_grouped
+
+    @staticmethod
+    def backward(ctx, grad_q_grouped):
+        clusters, counts, factors = ctx.saved_tensors
+        grad_q = clustered_broadcast(grad_q_grouped, clusters, counts, factors)
+
+        return grad_q, None, None, None
+
+
 class Clustered_Attention(nn.Module):
     """
     original code from https://github.com/idiap/fast-transformers/tree/master
@@ -92,35 +112,112 @@ class Clustered_Attention(nn.Module):
     of the corresponding cluster.
 
     """
-    def __init__(self, args, iterations =10, bits =32):
-        super(Clustered_Attention,self).__init__()
+    def __init__(self, args, iterations =2, bits =32):
+        super(Clustered_Attention, self).__init__()
 
+        self.args = args
+        self.num_heads = args.num_heads
+        self.hidden_units = args.item_hidden_units + args.user_hidden_units
+        self.attention_head_size = int(self.hidden_units / self.num_heads)
+        self.all_head_size = self.num_heads * self.attention_head_size
+        
         self.clusters = args.cluster_num
         self.bits = bits
         self.iterations =iterations
         self.dropout = nn.Dropout(args.dropout_rate)
+        self.softmax = nn.Softmax(dim=-1)
+
+        self.query = nn.Linear(self.hidden_units, self.all_head_size)
+        self.key = nn.Linear(self.hidden_units, self.all_head_size)
+        self.value = nn.Linear(self.hidden_units, self.all_head_size)
+    
+    def transpose_for_scores(self,x): #not currently used due to concat of user, item embedding
+        new_x_shape = x.size()[:-1] + (self.num_heads, self.attention_head_size)
+        x = x.view(*new_x_shape)
+
+        return x.permute(0, 2, 1, 3)
     
     def _create_query_groups(self, Q, query_lengths):
-        """
-        B: Batch
-        H: Heads
-        T: Sequence Length
-        C: Hidden units
-        """
-        B,H,T,C = Q.shape
 
-        planes = Q.new_empty((self.bits, C+1)) # assign number of hashes for representation
+        N, H, L, E = Q.shape
+
+        planes = Q.new_empty((self.bits, E+1)) # assign number of hashes for representation
         torch.nn.init.normal_(planes) #initialize with normal distributuon
 
         planes[:,-1] = 0
+        
+        Q = Q.contiguous() #in order to use view, since stride is not working properly
+        Q_reshaped = Q.view(N*H*L, E)
+       
 
-        hashes = (torch.rand((B,H,T,self.bits), device = Q.device) >0.5).int()
+        hashes_ = compute_hashes(Q_reshaped, planes) # [N*H*L] shape
+        hashes = hashes_.view(N,H,L)
 
-        clusters, counts = cluster(
-            
+        clusters, counts =  cluster(
+            hashes,
+            query_lengths,
+            self.args,
+            iterations=self.iterations,
+            bits=self.bits
         )
 
+        # sorted_clusters: N, H, L
+        sorted_clusters, sorted_indx = torch.sort(clusters, dim=-1)
+        return (sorted_clusters, counts), sorted_indx
 
+    def _group_queries(self, Q, groups, lengths):
+        """
+        Aggregate the Qs based on the index of cluster they belong to. Make
+        sure to allow for gradient propagation backwards from the grouped
+        queries to each query.
+        """
+
+        q_grouped = _GroupQueries.apply(Q, *groups, lengths)
+        import IPython; IPython.embed(colors='Linux');exit(1)
+        return q_grouped
+
+
+    def forward(self, seq, attn_mask):
+        
+        # cluster attention does not use attention mask
+        
+        mix_query = self.query(seq)
+        mix_key= self.key(seq)
+        mix_value = self.value(seq)
+
+        
+        queries = self.transpose_for_scores(mix_query)
+        keys = self.transpose_for_scores(mix_key)
+        values = self.transpose_for_scores(mix_value)
+    
+        N, H, L, E = queries.shape
+        _, _, S, D = values.shape
+
+
+        # initalize query_length to match the number of queries being processed
+        query_lengths = torch.full((N * H * L,), L, dtype=torch.int64)
+        
+
+        # cluster the queries into groups
+        groups, sorted_indx = self._create_query_groups(queries, query_lengths)
+
+        # Re-organize queries so that first group belong to first cluster
+        # next to second cluster and so on. This improves kernel implementations
+        
+        q_offset = torch.arange(N*H, device=queries.device).unsqueeze(-1) * L
+        q_flat = (sorted_indx.view(N*H, -1) + q_offset).reshape(-1)
+        s_queries = queries.reshape(-1, E).index_select(0, q_flat).view(N,H,L,E)
+
+
+        # Aggregate the re-arranged queries
+        
+        Q_grouped = self._group_queries(s_queries, groups, query_lengths)
+
+
+        import IPython; IPython.embed(colors='Linux'); exit(1)
+
+
+        
 
 
 
@@ -155,14 +252,14 @@ class EncoderLayer(nn.Module):
         super(EncoderLayer, self).__init__()
 
         self.base_attention = SelfAttention(args)
-        #self.cluster_attention = ClusteredAttention(args)
+        self.cluster_attention = Clustered_Attention(args)
         self.feedforward = FeedForward(args)
 
     def forward(self, hidden_state, attention_mask, args):
         if args.attention == 'base':
             attention_output = self.base_attention(hidden_state, attention_mask)
-        # elif args.attention == 'cluster':
-        #     attention_output = self.cluster_attention(hidden_state, attention_mask)
+        elif args.attention == 'cluster':
+            attention_output = self.cluster_attention(hidden_state, attention_mask)
 
             
         feedforward_output = self.feedforward(attention_output)
