@@ -217,7 +217,7 @@ def clustered_aggregate(X, G, F, lengths, Y=None):
     H = X.size(1)
     L = X.size(2)
     E = X.size(3)
-    C = Y.size(1) if Y is not None else F.size(2) 
+    C = F.size(2)  if Y is not None else F.size(2) 
 
     if Y is None:
         Y = torch.zeros(N, C, E, device=X.device, dtype=X.dtype)
