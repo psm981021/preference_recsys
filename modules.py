@@ -98,7 +98,9 @@ class _GroupQueries(torch.autograd.Function):
 class _BroadcastValues(torch.autograd.Function):
     @staticmethod
     def forward(ctx, v_grouped, clusters, counts, lengths):
+        
         factors = torch.ones_like(counts, dtype=v_grouped.dtype)
+        import IPython; IPython.embed(colors='Linux'); exit(1)
         V = clustered_broadcast(v_grouped, clusters, counts, factors)
         ctx.save_for_backward(clusters, counts, factors, lengths)
 
@@ -157,7 +159,7 @@ class Clustered_Attention(nn.Module):
 
         N, H, L, E = Q.shape
 
-        planes = Q.new_empty((self.bits, E+1)) # assign number of hashes for representation
+        planes = Q.new_empty((self.bits, E+1)) # assign number of hashes for representation 
         torch.nn.init.normal_(planes) #initialize with normal distributuon
 
         planes[:,-1] = 0
@@ -221,7 +223,9 @@ class Clustered_Attention(nn.Module):
         softmax_temp = 1./math.sqrt(E)
 
         # initalize query_length to match the number of queries being processed
-        query_lengths = torch.full((N * H * L,), L, dtype=torch.int64)
+        query_lengths = torch.full((N * H * L,), L, dtype=torch.int64) # check for validity
+
+        # used as cluster lengths, sequence length for each sequence in hashes
         key_lengths = torch.full((N , H , L), L, dtype=torch.int64).unsqueeze(2).to(seq.device)
 
         # cluster the queries into groups
@@ -240,7 +244,7 @@ class Clustered_Attention(nn.Module):
         Q_grouped_ = self._group_queries(s_queries, groups, query_lengths) #128 10 50
         Q_grouped = Q_grouped_.view(N,H,-1,E)
 
-        import IPython; IPython.embed(colors='Linux'); exit(1)
+        
         # Compute attention
 
         QK = torch.einsum("nhle,nhse->nhls", Q_grouped, keys)
@@ -250,6 +254,7 @@ class Clustered_Attention(nn.Module):
 
         # Broadcast grouped attention
 
+        
         V_broadcast = self._broadcast_values(V, groups, query_lengths)
         
 
