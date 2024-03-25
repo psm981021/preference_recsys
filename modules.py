@@ -84,7 +84,6 @@ class _GroupQueries(torch.autograd.Function):
     def forward(ctx, Q, clusters, counts, lengths):
         factors = 1./counts.float()
         q_grouped = clustered_aggregate(Q, clusters, factors, lengths)
-        
         ctx.save_for_backward(clusters, counts, factors)
 
         return q_grouped
@@ -100,8 +99,16 @@ class _BroadcastValues(torch.autograd.Function):
     @staticmethod
     def forward(ctx, v_grouped, clusters, counts, lengths):
         
+        """
+        factors N H C
+        v_grouped N H C E
+        counts N H C
+        """
+
+        # N x H x C
         factors = torch.ones_like(counts, dtype=v_grouped.dtype)
-        import IPython; IPython.embed(colors='Linux'); exit(1)
+
+        # N x H x L x E
         V = clustered_broadcast(v_grouped, clusters, counts, factors)
         ctx.save_for_backward(clusters, counts, factors, lengths)
 
@@ -178,9 +185,11 @@ class Clustered_Attention(nn.Module):
             self.args,
             iterations=self.iterations,
             bits=self.bits
-        )
+        ) 
+        # clusters N H L
+        # counts N H C 
 
-        # sorted_clusters: N, H, L
+        # sorted_clusters, sorted_indx: N, H, L
         sorted_clusters, sorted_indx = torch.sort(clusters, dim=-1)
         return (sorted_clusters, counts), sorted_indx
 
@@ -191,7 +200,7 @@ class Clustered_Attention(nn.Module):
         queries to each query.
         """
 
-        q_grouped = _GroupQueries.apply(Q, *groups, lengths) # 128 10 50
+        q_grouped = _GroupQueries.apply(Q, *groups, lengths) 
         
         return q_grouped
     
@@ -224,8 +233,8 @@ class Clustered_Attention(nn.Module):
 
         softmax_temp = 1./math.sqrt(E)
 
-        # initalize query_length to match the number of queries being processed
-        query_lengths = torch.full((N * H * L,), L, dtype=torch.int64) # check for validity
+        # initalize query_length to match the query length
+        query_lengths = torch.full((N * H * L,), L, dtype=torch.int64)
 
         # used as cluster lengths, sequence length for each sequence in hashes
         key_lengths = torch.full((N , H , L), L, dtype=torch.int64).unsqueeze(2).to(seq.device)
@@ -244,22 +253,27 @@ class Clustered_Attention(nn.Module):
         # Aggregate the re-arranged queries
         
         Q_grouped_ = self._group_queries(s_queries, groups, query_lengths)
-        Q_grouped = Q_grouped_.view(N,H,-1,E)
+        Q_grouped = Q_grouped_.view(N,H,-1,E) # N H C E 
 
         
         # Compute attention
 
         QK = torch.einsum("nhle,nhse->nhls", Q_grouped, keys)
         
-        A = self.dropout(torch.softmax(softmax_temp * QK, dim=-1)) # N H L E
-        V = torch.einsum("nhls,nhsd->nhld", A, values) # N H L E 
+        A = self.dropout(torch.softmax(softmax_temp * QK, dim=-1)) # N H C E
+        V = torch.einsum("nhls,nhsd->nhld", A, values) # N H C E 
 
         # Broadcast grouped attention
-
-
-        V_broadcast = self._broadcast_values(V, groups, query_lengths)
+        V_broadcast = self._broadcast_values(V, groups, query_lengths) # N H L E
         
+        # Reverse the privious mapping
 
+        rev_indx = torch.argsort(sorted_indx, dim=-1)
+        q_rev_flat = (rev_indx.view(N*H, -1) + q_offset).reshape(-1)
+        V_new = V_broadcast.reshape(-1, D).index_select(0, q_rev_flat).view(N,H,L,D)
+        V_new = V_new.permute(0, 2, 1, 3).contiguous() # N L H C
+
+        return V_new
 
         
 

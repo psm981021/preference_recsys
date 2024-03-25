@@ -74,8 +74,7 @@ class UPTRec(torch.nn.Module):
                 distance = 'euclidean', 
                 tqdm_flag=False,
                 device = self.dev
-                
-                
+            
             )
             seq_cluster_id = seq_cluster_id.to(self.dev)
 
@@ -100,7 +99,9 @@ class UPTRec(torch.nn.Module):
 
         ### --- timeline masking --- ###
         timeline_mask = torch.BoolTensor(seq == 0).to(self.dev)
-        seq_emb *= ~timeline_mask.unsqueeze(-1) # Brodacast in last dim
+
+        # Brodacast in last dim
+        seq_emb *= ~timeline_mask.unsqueeze(-1) 
 
         ### --- attention masking using cluster ids --- ###
         
