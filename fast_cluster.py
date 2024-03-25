@@ -213,25 +213,49 @@ def clustered_aggregate(X, G, F, lengths, Y=None):
     # F: Factors tensor of shape N H C, factors to multiply each input vector within groups
     # lengths: Tensor of length N, length of each sequence in batch
 
-    N = X.size(0) 
-    H = X.size(1)
-    L = X.size(2)
-    E = X.size(3)
-    C = F.size(2)  if Y is not None else F.size(2) 
+    N, H, L, E = X.size()
+    C = F.size(2)
 
     if Y is None:
         Y = torch.zeros(N, C, E, device=X.device, dtype=X.dtype)
-    else:
-        Y.zero_()
+    # else:
+    #     Y.zero_()
+        
+    # Cast group indices tensor to integer dtype
+    group_indices = G.to(torch.int64).cuda()
 
-    for n in range(N): # batch
-        for h in range(H): # head
-            for l in range(L): # each position
-                k_cur = G[n][h][l] # retrieve current group index
-                f_cur = F[n][h][k_cur] # retrive factor from current group
-                y_cur = Y[n][h][k_cur]
-                for e in range(E):
-                    y_cur += f_cur * X[n][h][l][e].item()  # update aggregated vector
+    # rewriten code
+    # Iterate over batch, head and position dimensions using tensor operations
+    # Sum the contributions of each input vector to its corresponding group in Y
+    for n in range(N):
+        
+        group_indices_n = group_indices[n].unsqueeze(0).squeeze(0)
+        
+        # Gather factors for each group
+        group_factors = F[n].gather(1, group_indices_n)  
+        group_factors_transposed = group_factors.t() 
+
+        # computes the contributions of each input vector to each group based on the factors.
+        aggregated_values = torch.matmul(X[n].permute(0, 2, 1), group_factors_transposed.unsqueeze(0)).squeeze(0)
+        #aggregated_values = torch.matmul(X[n], group_factors_transposed)  
+
+        aggregated_values_transposed = aggregated_values.transpose(0, 1)
+        lengths_expanded = lengths[n].unsqueeze(-1).unsqueeze(-1).expand_as(aggregated_values).to(aggregated_values.device)  
+
+        # Divide by sequence lengths
+        aggregated_values_transposed /= lengths_expanded.float()  
+        # Accumulate values for each group
+        import IPython; IPython.embed(colors='Linux'); exit(1)
+        Y[n] += aggregated_values_transposed  
+
+    # for n in range(N): # batch
+    #     for h in range(H): # head
+    #         for l in range(L): # each position
+    #             k_cur = G[n][h][l] # retrieve current group index
+    #             f_cur = F[n][h][k_cur] # retrive factor from current group
+    #             y_cur = Y[n][h][k_cur]
+    #             for e in range(E):
+    #                 y_cur += f_cur * X[n][h][l][e].item()  # update aggregated vector
 
     return Y
 

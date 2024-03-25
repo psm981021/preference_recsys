@@ -130,7 +130,7 @@ class Clustered_Attention(nn.Module):
 
     """
     #iterations change to 10
-    def __init__(self, args, iterations =2, bits =32):
+    def __init__(self, args, iterations =1, bits =32):
         super(Clustered_Attention, self).__init__()
 
         self.args = args
@@ -156,8 +156,8 @@ class Clustered_Attention(nn.Module):
         return x.permute(0, 2, 1, 3)
     
     def _create_query_groups(self, Q, query_lengths):
-
         N, H, L, E = Q.shape
+
 
         planes = Q.new_empty((self.bits, E+1)) # assign number of hashes for representation 
         torch.nn.init.normal_(planes) #initialize with normal distributuon
@@ -216,7 +216,8 @@ class Clustered_Attention(nn.Module):
         queries = self.transpose_for_scores(mix_query)
         keys = self.transpose_for_scores(mix_key)
         values = self.transpose_for_scores(mix_value)
-    
+
+        
         N, H, L, E = queries.shape
         _, _, S, D = values.shape
 
@@ -254,7 +255,7 @@ class Clustered_Attention(nn.Module):
 
         # Broadcast grouped attention
 
-        
+
         V_broadcast = self._broadcast_values(V, groups, query_lengths)
         
 
