@@ -225,7 +225,7 @@ def kmeans_gpu(hash_codes, lengths, centroids, distances, cluster_bit_counts, la
     K, B = cluster_bit_counts.shape[2:]
 
     for itr in range(iterations):
-        print(f"Iteration: {itr + 1}")
+        #print(f"Iteration: {itr + 1}")
         start_time = time.time()
 
         assign_clusters_kernel(hash_codes, lengths, centroids, labels, distances) #,(L - 1) // 1024 + 1)
@@ -237,7 +237,7 @@ def kmeans_gpu(hash_codes, lengths, centroids, distances, cluster_bit_counts, la
         end_time = time.time()
         elapsed_time = end_time - start_time
 
-        print(f"Elapsed time for iteration {itr + 1}: {elapsed_time} seconds")
+        #print(f"Elapsed time for iteration {itr + 1}: {elapsed_time} seconds")
     
     #return centroids
 
@@ -342,7 +342,7 @@ def clustered_broadcast(Y, groups, counts, factors, X=None):
                 # Iterate over each query in the sequence
                 # Get query index for current sequence and position
                 query_index = group_indices[l]  
-                
+
                 if query_index < group_count[l]:
                     # Get factor for current query
                     factor = group_factors[query_index]  

@@ -138,7 +138,7 @@ class Clustered_Attention(nn.Module):
 
     """
     #iterations change to 10
-    def __init__(self, args, iterations =1, bits =32):
+    def __init__(self, args, iterations =10, bits =32):
         super(Clustered_Attention, self).__init__()
 
         self.args = args
@@ -271,8 +271,9 @@ class Clustered_Attention(nn.Module):
         rev_indx = torch.argsort(sorted_indx, dim=-1)
         q_rev_flat = (rev_indx.view(N*H, -1) + q_offset).reshape(-1)
         V_new = V_broadcast.reshape(-1, D).index_select(0, q_rev_flat).view(N,H,L,D)
-        V_new = V_new.permute(0, 2, 1, 3).contiguous() # N L H C
-
+        V_new = V_new.permute(0, 2, 1, 3).contiguous().view(N,L,-1) # N L H*C
+        
+        # add normalization , dropout residual connection if needed
         return V_new
 
         
@@ -291,8 +292,7 @@ class FeedForward(nn.Module):
         self.dropout = nn.Dropout(args.dropout_rate)
 
     def forward(self,seq):
-        hidden_state = self.layernorm(hidden_state)
-
+        hidden_state = self.layernorm(seq)
         hidden_state = self.inner_layer(seq)
         hidden_state = self.activation(hidden_state)
         hidden_state = self.outer_layer(hidden_state)
