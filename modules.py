@@ -84,6 +84,7 @@ class _GroupQueries(torch.autograd.Function):
     def forward(ctx, Q, clusters, counts, lengths):
         factors = 1./counts.float()
         q_grouped = clustered_aggregate(Q, clusters, factors, lengths)
+        
         ctx.save_for_backward(clusters, counts, factors)
 
         return q_grouped
@@ -242,7 +243,7 @@ class Clustered_Attention(nn.Module):
 
         # Aggregate the re-arranged queries
         
-        Q_grouped_ = self._group_queries(s_queries, groups, query_lengths) #128 10 50
+        Q_grouped_ = self._group_queries(s_queries, groups, query_lengths)
         Q_grouped = Q_grouped_.view(N,H,-1,E)
 
         
