@@ -59,7 +59,7 @@ def hamming_distance(a, b):
     return hamming_dist
 
 # @torch.jit.script
-def assign_clusters_kernel(hash_codes, lengths, centroids, labels, distances):
+def assign_clusters_kernel_temp(hash_codes, lengths, centroids, labels, distances):
     N, H, L = hash_codes.shape
     K = centroids.shape[2]
 
@@ -79,11 +79,12 @@ def assign_clusters_kernel(hash_codes, lengths, centroids, labels, distances):
                     labels[n, h, l] = best_cluster
                     distances[n, h, l] = best_distance
 
-def assign_clusters_kernel_works(hash_codes, lengths, centroids, labels, distances, n_blocks_per_sequence, MAX=65):
+def assign_clusters_kernel(hash_codes, lengths, centroids, labels, distances, n_blocks_per_sequence, MAX=65):
     """
     Assigns each hash code to its closest centroid based on Hamming distance
     It updates labels tensor with the assigned cluster indices and distances tensor
     """
+    start_time = time.time()
     N, H, L = hash_codes.shape
     K = centroids.shape[2]
 
@@ -118,8 +119,10 @@ def assign_clusters_kernel_works(hash_codes, lengths, centroids, labels, distanc
 
                 labels[n, h, l] = best_cluster
                 distances[n, h, l] = best_distance
+    end_time = time.time()
+    print(f"Running assign clusters kernel took {end_time - start_time} seconds")
 
-def bit_count_kernel(labels, hash_codes, counts, cluster_bit_counts):
+def bit_count_kernel_temp(labels, hash_codes, counts, cluster_bit_counts):
     N, H, L = labels.shape
     K, B = cluster_bit_counts.shape[2:]
 
@@ -137,13 +140,14 @@ def bit_count_kernel(labels, hash_codes, counts, cluster_bit_counts):
                         cluster_bit_counts[n, h, labels[n, h, l], i] += val_to_add
                     counts[n, h, labels[n, h, l]] += 1
 
-def bit_count_kernel_works(labels, hash_codes, counts, cluster_bit_counts):
+def bit_count_kernel(labels, hash_codes, counts, cluster_bit_counts):
     """
 
-    Computes bit counts for each cluster based on the assigned labelsand has codes
+    Computes bit counts for each cluster based on the assigned labels and hash codes
     Updates counts and cluster_bit_counts 
 
     """
+    start_time = time.time()
     N, H, L = labels.shape
     K, B = cluster_bit_counts.shape[2:]
 
@@ -171,9 +175,11 @@ def bit_count_kernel_works(labels, hash_codes, counts, cluster_bit_counts):
                 val_to_add = -1
             cluster_bit_counts[n, h, best_cluster, i] += val_to_add
         counts[n, h, best_cluster] += 1
-
+    end_time = time.time()
+    print(f"Running bit count kernel took: {start_time-end_time} seconds")
         
 def compute_means_kernel(counts, cluster_bit_counts, centroids):
+    start_time = time.time()
     N, H, K = counts.shape
     B = cluster_bit_counts.shape[3]
 
@@ -185,6 +191,8 @@ def compute_means_kernel(counts, cluster_bit_counts, centroids):
                     if cluster_bit_counts[n, h, k, i] > 0:
                         mean_k |= (1 << i)
                 centroids[n, h, k] = mean_k
+    end_time = time.time()
+    print(f"Running compute means kernel took: {start_time-end_time} seconds")
 
 
 def compute_means_kernel_works(counts, cluster_bit_counts, centroids):
@@ -225,10 +233,8 @@ def kmeans_gpu(hash_codes, lengths, centroids, distances, cluster_bit_counts, la
     K, B = cluster_bit_counts.shape[2:]
 
     for itr in range(iterations):
-        #print(f"Iteration: {itr + 1}")
         start_time = time.time()
-
-        assign_clusters_kernel(hash_codes, lengths, centroids, labels, distances) #,(L - 1) // 1024 + 1)
+        assign_clusters_kernel(hash_codes, lengths, centroids, labels, distances,(L - 1) // 1024 + 1)
         counts.zero_()
         cluster_bit_counts.zero_()
         bit_count_kernel(labels, hash_codes, counts, cluster_bit_counts)
@@ -236,8 +242,7 @@ def kmeans_gpu(hash_codes, lengths, centroids, distances, cluster_bit_counts, la
 
         end_time = time.time()
         elapsed_time = end_time - start_time
-
-        #print(f"Elapsed time for iteration {itr + 1}: {elapsed_time} seconds")
+        print(f"Running kmeans gpu for iteration: {itr + 1} took: {elapsed_time} seconds")
     
     #return centroids
 

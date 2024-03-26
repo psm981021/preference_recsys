@@ -26,7 +26,7 @@ parser.add_argument('--lr', default=0.001, type=float)
 parser.add_argument('--maxlen', default=50, type=int)
 #parser.add_argument('--hidden_units', default=50, type=int)
 parser.add_argument('--num_blocks', default=2, type=int)
-parser.add_argument('--num_epochs', default=200, type=int)
+parser.add_argument('--num_epochs', default=100, type=int)
 parser.add_argument('--num_heads', default=2, type=int)
 parser.add_argument('--dropout_rate', default=0.5, type=float)
 parser.add_argument('--l2_emb', default=0.0, type=float)
@@ -35,7 +35,7 @@ parser.add_argument('--inference_only', default=False, type=str2bool)
 parser.add_argument('--state_dict_path', default=None, type=str)
 parser.add_argument('--item_hidden_units', default= 64, type=int, help="hidden units for item embedding")
 parser.add_argument('--user_hidden_units', default= 64, help ="hidden units for user embedding")
-parser.add_argument('--cluster_num', default =10, help ="number of clusters")
+parser.add_argument('--cluster_num', default =15, help ="number of clusters")
 parser.add_argument('--threshold_user', default= 1.0, help ="threshold for user embedding")
 parser.add_argument('--threshold_item', default= 1.0, help ="threshold for item embedding")
 parser.add_argument('--attention_mask', default='base',type=str,help="base, cluster")
@@ -102,20 +102,15 @@ if __name__ == '__main__':
     T = 0.0
     t0 = time.time()
 
-    best_valid_ndcg = 0.0
-    best_valid_hit = 0.0
-
     best_test_ndcg = 0.0
     best_test_hit = 0.0
-
-    cur_step = 1
-    update_epoch = 0
-    
-    flag_early_stopping = False
+    best_epoch = 0
 
     for epoch in range(epoch_start_idx, args.num_epochs + 1):
         if args.inference_only: break # just to decrease identition
         for step in range(num_batch): # tqdm(range(num_batch), total=num_batch, ncols=70, leave=False, unit='b'):
+           
+            start_time = time.time()
 
             u, seq, pos, neg = sampler.next_batch() # tuples to ndarray
             u, seq, pos, neg = np.array(u), np.array(seq), np.array(pos), np.array(neg)
@@ -136,7 +131,10 @@ if __name__ == '__main__':
             loss.backward()
             adam_optimizer.step()
 
-            print("loss in epoch {} iteration {}: {}".format(epoch, step, loss.item())) # expected 0.4~0.6 after init few epochs
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+
+            print("loss in epoch {} iteration {}: {} time: {}".format(epoch, step, loss.item(),elapsed_time)) # expected 0.4~0.6 after init few epochs
         #if epoch == 1 :
         if epoch % 10 == 0:
             model.eval()
@@ -151,28 +149,14 @@ if __name__ == '__main__':
             
             current_valid_ndcg, current_valid_hit = t_valid[0], t_valid[1] 
             current_test_ndcg, current_test_hit = t_test[0], t_test[1]
-
-
-            # HIT@K will be the criteria
-            if current_valid_hit > best_valid_hit:
-                cur_step = 1
-                best_valid_hit, best_valid_ndcg = current_valid_hit, current_valid_ndcg
-                best_test_hit, best_test_ndcg = current_test_hit, current_test_ndcg
             
-            
-            # if evaluation not improved
-            elif current_valid_hit < best_valid_hit or current_valid_ndcg < best_valid_ndcg:
-                cur_step+=1
+            if best_test_hit > current_test_hit:
+                best_test_hit = current_test_hit
+                best_test_ndcg = current_test_ndcg
+                best_epoch = epoch
 
-                if args.early_stopping == True and cur_step > args.patience:
-                    flag_early_stopping = True
-                    f.write('(Best Results HIT) Early stopping occurred on epoch: %d, time: %.4f(s), valid (NDCG@%d: %.4f, HR@%d: %.4f), test (NDCG@%d: %.4f, HR@%d: %.4f)\n'
-                    % (epoch, T, args.k, best_valid_ndcg, args.k, best_valid_hit,
-                        args.k, best_test_ndcg, args.k, best_test_hit))
-
-        
-            f.write('cur_step:%d, epoch:%d, time: %f(s), valid (NDCG@%d: %.4f, HR@%d: %.4f), test (NDCG@%d: %.4f, HR@%d: %.4f) \n'
-            % (cur_step, epoch, T, args.k, current_valid_ndcg ,args.k, current_valid_hit
+            f.write('epoch:%d, time: %f(s), valid (NDCG@%d: %.4f, HR@%d: %.4f), test (NDCG@%d: %.4f, HR@%d: %.4f) \n'
+            % (epoch, T, args.k, current_valid_ndcg ,args.k, current_valid_hit
                ,args.k, current_test_ndcg,args.k, current_test_hit))
 
             f.flush()
@@ -180,8 +164,11 @@ if __name__ == '__main__':
             model.train()
     
         
-        if epoch == args.num_epochs and flag_early_stopping == True:
+        if epoch == args.num_epochs:
             f.write('finished\n')
+            f.write('Best test results with HIT occured at epoch:%d, test (NDCG@%d: %.5f, HR@%d: %.5f) \n'
+                    %(epoch, args.k, best_test_ndcg, args.k, best_test_hit))
+            
             folder = args.dataset + '_' + args.train_dir
             fname = 'SASRec.epoch={}.lr={}.layer={}.head={}.hidden={}.maxlen={}.pth'
             fname = fname.format(args.num_epochs, args.lr, args.num_blocks, args.num_heads, args.item_hidden_units,args.user_hidden_units, args.maxlen)
@@ -191,7 +178,6 @@ if __name__ == '__main__':
     sampler.close()
     print("Done")
     
-
 '''
 python main.py --dataset=Beauty --train_dir=test
 '''
