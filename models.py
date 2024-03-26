@@ -110,6 +110,7 @@ class UPTRec(torch.nn.Module):
         
         elif args.attention_mask == 'cluster':
             #attention mask using cluster_ids
+            import IPython; IPython.embed(colors='Linux');exit(1)
             batch_cluster_ids_tensor = torch.stack(batch_cluster_ids) # B x T x 1
             
             # Calculate a mask where each element indicates if it belongs to the same cluster as each other element
