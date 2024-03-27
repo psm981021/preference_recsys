@@ -84,6 +84,7 @@ def assign_clusters_kernel(hash_codes, lengths, centroids, labels, distances, n_
     Assigns each hash code to its closest centroid based on Hamming distance
     It updates labels tensor with the assigned cluster indices and distances tensor
     """
+    #check for validty
     start_time = time.time()
     N, H, L = hash_codes.shape
     K = centroids.shape[2]
@@ -142,10 +143,8 @@ def bit_count_kernel_temp(labels, hash_codes, counts, cluster_bit_counts):
 
 def bit_count_kernel(labels, hash_codes, counts, cluster_bit_counts):
     """
-
     Computes bit counts for each cluster based on the assigned labels and hash codes
     Updates counts and cluster_bit_counts 
-
     """
     start_time = time.time()
     N, H, L = labels.shape
@@ -176,7 +175,7 @@ def bit_count_kernel(labels, hash_codes, counts, cluster_bit_counts):
             cluster_bit_counts[n, h, best_cluster, i] += val_to_add
         counts[n, h, best_cluster] += 1
     end_time = time.time()
-    print(f"Running bit count kernel took: {start_time-end_time} seconds")
+    print(f"Running bit count kernel took: {end_time-start_time} seconds")
         
 def compute_means_kernel(counts, cluster_bit_counts, centroids):
     start_time = time.time()
@@ -192,7 +191,7 @@ def compute_means_kernel(counts, cluster_bit_counts, centroids):
                         mean_k |= (1 << i)
                 centroids[n, h, k] = mean_k
     end_time = time.time()
-    print(f"Running compute means kernel took: {start_time-end_time} seconds")
+    print(f"Running compute means kernel took: {end_time-start_time} seconds")
 
 
 def compute_means_kernel_works(counts, cluster_bit_counts, centroids):
@@ -274,7 +273,7 @@ def clustered_aggregate(X, G, F, lengths, Y=None):
     N, H, L, E = X.size()
     C = F.size(2)
     Y = torch.zeros(N, H, C, E, device=X.device, dtype=X.dtype)
-
+    start_time = time.time()
     # Better computation !!
     for n in range(N): # batch
         for h in range(H): # head
@@ -283,6 +282,7 @@ def clustered_aggregate(X, G, F, lengths, Y=None):
                 f_cur = F[n][h][k_cur] # retrieve factor from current group
                 for e in range(E):
                     Y[n][h][k_cur][e] += f_cur * X[n][h][l][e]
+    end_time = time.time()
 
     # This code works!! returns shape of N x H x C x E
     # for n in range(N): # batch
@@ -293,7 +293,7 @@ def clustered_aggregate(X, G, F, lengths, Y=None):
     #             y_cur = Y[n][h][k_cur]
     #             for e in range(E):
     #                 y_cur += f_cur * X[n][h][l][e].item()  # update aggregated vector
-
+    print(f"Running clustered_aggregate took: {end_time-start_time} seconds")
     return Y
 
 def set_group(C, E):
@@ -330,7 +330,7 @@ def clustered_broadcast(Y, groups, counts, factors, X=None):
     #     device=X.device,
     #     dtype=torch.int32
     # )
-
+    start_time = time.time()
     # Iterate over each group and perform broadcast operation
     for n in range(N):
         for h in range(H):
@@ -343,7 +343,7 @@ def clustered_broadcast(Y, groups, counts, factors, X=None):
             # Get count of clusters in the group
             group_count = counts[n, h]  
 
-            for l in range(C):
+            for l in range(C): #check
                 # Iterate over each query in the sequence
                 # Get query index for current sequence and position
                 query_index = group_indices[l]  
@@ -356,7 +356,9 @@ def clustered_broadcast(Y, groups, counts, factors, X=None):
                         for e in range(E):
                             # Iterate over each element in the vector
                             X[n, h, l, e] = Y[n, h, c, e] * factor
+    end_time = time.time()
 
+    print(f"Running clustered_broadcast took: {end_time-start_time} seconds")
     return X
 
     indx_maps = create_maps(group_counts, block_counts) #provides indices to iterate over each group in the batch

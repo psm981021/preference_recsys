@@ -104,7 +104,6 @@ class _BroadcastValues(torch.autograd.Function):
         v_grouped N H C E
         counts N H C
         """
-
         # N x H x C
         factors = torch.ones_like(counts, dtype=v_grouped.dtype)
 
@@ -113,7 +112,6 @@ class _BroadcastValues(torch.autograd.Function):
         ctx.save_for_backward(clusters, counts, factors, lengths)
 
         return V
-
     @staticmethod
     def backward(ctx, grad_v):
         clusters, counts, factors, lengths = ctx.saved_tensors
@@ -138,7 +136,7 @@ class Clustered_Attention(nn.Module):
 
     """
     #iterations change to 10
-    def __init__(self, args, iterations =10, bits =32):
+    def __init__(self, args, iterations =5, bits =32):
         super(Clustered_Attention, self).__init__()
 
         self.args = args
@@ -222,7 +220,6 @@ class Clustered_Attention(nn.Module):
         mix_key= self.key(seq)
         mix_value = self.value(seq)
 
-        
         queries = self.transpose_for_scores(mix_query)
         keys = self.transpose_for_scores(mix_key)
         values = self.transpose_for_scores(mix_value)
@@ -271,7 +268,7 @@ class Clustered_Attention(nn.Module):
         rev_indx = torch.argsort(sorted_indx, dim=-1)
         q_rev_flat = (rev_indx.view(N*H, -1) + q_offset).reshape(-1)
         V_new = V_broadcast.reshape(-1, D).index_select(0, q_rev_flat).view(N,H,L,D)
-        V_new = V_new.permute(0, 2, 1, 3).contiguous().view(N,L,-1) # N L H*C
+        V_new = V_new.permute(0, 2, 1, 3).contiguous().view(N,L,-1) # N L H C
         
         # add normalization , dropout residual connection if needed
         return V_new

@@ -25,21 +25,21 @@ parser.add_argument('--batch_size', default=128, type=int)
 parser.add_argument('--lr', default=0.001, type=float)
 parser.add_argument('--maxlen', default=50, type=int)
 #parser.add_argument('--hidden_units', default=50, type=int)
-parser.add_argument('--num_blocks', default=2, type=int)
+parser.add_argument('--num_blocks', default=1, type=int)
 parser.add_argument('--num_epochs', default=100, type=int)
 parser.add_argument('--num_heads', default=2, type=int)
 parser.add_argument('--dropout_rate', default=0.5, type=float)
 parser.add_argument('--l2_emb', default=0.0, type=float)
-parser.add_argument('--device', default='cuda:1', type=str)
+parser.add_argument('--device', default='cuda:0', type=str)
 parser.add_argument('--inference_only', default=False, type=str2bool)
 parser.add_argument('--state_dict_path', default=None, type=str)
 parser.add_argument('--item_hidden_units', default= 64, type=int, help="hidden units for item embedding")
 parser.add_argument('--user_hidden_units', default= 64, help ="hidden units for user embedding")
-parser.add_argument('--cluster_num', default =15, help ="number of clusters")
+parser.add_argument('--cluster_num', default =10, help ="number of clusters")
 parser.add_argument('--threshold_user', default= 1.0, help ="threshold for user embedding")
 parser.add_argument('--threshold_item', default= 1.0, help ="threshold for item embedding")
-parser.add_argument('--attention_mask', default='cluster',type=str,help="base, cluster")
-parser.add_argument('--attention', default='base',type =str, help="base: use self-attention cluster: use clustered-attention ")
+parser.add_argument('--attention_mask', default='base',type=str,help="base, cluster")
+parser.add_argument('--attention', default='cluster',type =str, help="base: use self-attention cluster: use clustered-attention ")
 parser.add_argument('--SSE', default = False, type= str2bool, help="Stochastic Shared Embedding")
 parser.add_argument('--k', default = 10, type=ndcg_k_type , help ="Metrics@K")
 parser.add_argument('--early_stopping', default = True, type = bool, help ="enable early stopping")
@@ -114,7 +114,6 @@ if __name__ == '__main__':
 
             u, seq, pos, neg = sampler.next_batch() # tuples to ndarray
             u, seq, pos, neg = np.array(u), np.array(seq), np.array(pos), np.array(neg)
-
             pos_logits, neg_logits = model(u, seq, pos, neg, args)
             pos_labels, neg_labels = torch.ones(pos_logits.shape, device=args.device), torch.zeros(neg_logits.shape, device=args.device)
             
@@ -135,8 +134,8 @@ if __name__ == '__main__':
             elapsed_time = end_time - start_time
 
             print("loss in epoch {} iteration {}: {} time: {}".format(epoch, step, loss.item(),elapsed_time)) # expected 0.4~0.6 after init few epochs
-        #if epoch == 1 :
-        if epoch % 10 == 0:
+        if epoch % 2 == 0 :# == 2 :
+        #if epoch % 10 == 0:
             model.eval()
             t1 = time.time() - t0
             T += t1
