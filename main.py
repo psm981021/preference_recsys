@@ -21,7 +21,7 @@ def ndcg_k_type(value):
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', required=True, help ="name of the dataset name")
 parser.add_argument('--train_dir', required=True, help = "dir where log will be stored")
-parser.add_argument('--batch_size', default=128, type=int)
+parser.add_argument('--batch_size', default=16, type=int)
 parser.add_argument('--lr', default=0.001, type=float)
 parser.add_argument('--maxlen', default=50, type=int)
 #parser.add_argument('--hidden_units', default=50, type=int)
@@ -30,7 +30,7 @@ parser.add_argument('--num_epochs', default=100, type=int)
 parser.add_argument('--num_heads', default=2, type=int)
 parser.add_argument('--dropout_rate', default=0.5, type=float)
 parser.add_argument('--l2_emb', default=0.0, type=float)
-parser.add_argument('--device', default='cuda:0', type=str)
+parser.add_argument('--device', default='cuda:1', type=str)
 parser.add_argument('--inference_only', default=False, type=str2bool)
 parser.add_argument('--state_dict_path', default=None, type=str)
 parser.add_argument('--item_hidden_units', default= 64, type=int, help="hidden units for item embedding")
@@ -134,7 +134,7 @@ if __name__ == '__main__':
             elapsed_time = end_time - start_time
 
             print("loss in epoch {} iteration {}: {} time: {}".format(epoch, step, loss.item(),elapsed_time)) # expected 0.4~0.6 after init few epochs
-        if epoch % 2 == 0 :# == 2 :
+        if epoch == 1 or epoch == 2 or epoch % 10 == 0:# == 2 :
         #if epoch % 10 == 0:
             model.eval()
             t1 = time.time() - t0

@@ -120,6 +120,7 @@ def assign_clusters_kernel(hash_codes, lengths, centroids, labels, distances, n_
 
                 labels[n, h, l] = best_cluster
                 distances[n, h, l] = best_distance
+    
     end_time = time.time()
     print(f"Running assign clusters kernel took {end_time - start_time} seconds")
 
@@ -307,6 +308,13 @@ def set_group(C, E):
             return G
 
 def clustered_broadcast(Y, groups, counts, factors, X=None):
+    """
+    Y: B H C E
+    groups: B H L
+    counts: B H C
+    factors: B H C
+    
+    """
     # Y: Aggregated tensor N C E
     device = Y.device
 
@@ -318,18 +326,10 @@ def clustered_broadcast(Y, groups, counts, factors, X=None):
         )
     N, H, C, E = Y.shape
     _, _, L, _ = X.shape
-
-    # threads = 256
-    # G = set_group(C, E)
-    # group_counts = counts.view(N, H, G, -1).sum(-1)
-    # block_counts = (group_counts + threads - 1) // threads
-    # total_blocks = block_counts.sum().item()
-
-    # indx_maps = torch.ones(
-    #     (total_blocks, 5),
-    #     device=X.device,
-    #     dtype=torch.int32
-    # )
+    """
+    
+    
+    """
     start_time = time.time()
     # Iterate over each group and perform broadcast operation
     for n in range(N):
@@ -342,8 +342,7 @@ def clustered_broadcast(Y, groups, counts, factors, X=None):
 
             # Get count of clusters in the group
             group_count = counts[n, h]  
-
-            for l in range(C): #check
+            for l in range(L): 
                 # Iterate over each query in the sequence
                 # Get query index for current sequence and position
                 query_index = group_indices[l]  
