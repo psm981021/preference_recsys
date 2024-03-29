@@ -313,7 +313,7 @@ class EncoderLayer(nn.Module):
     def forward(self, hidden_state, attention_mask, args):
         if args.attention == 'base':
             attention_output = self.base_attention(hidden_state, attention_mask)
-        elif args.attention == 'cluster':
+        elif args.attention == 'fast_cluster':
             attention_output = self.cluster_attention(hidden_state, attention_mask)
 
             

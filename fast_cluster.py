@@ -342,19 +342,21 @@ def clustered_broadcast(Y, groups, counts, factors, X=None):
 
             # Get count of clusters in the group
             group_count = counts[n, h]  
-            for l in range(L): 
+            for l in range(C): 
                 # Iterate over each query in the sequence
                 # Get query index for current sequence and position
                 query_index = group_indices[l]  
-
-                if query_index < group_count[l]:
-                    # Get factor for current query
-                    factor = group_factors[query_index]  
-                    for c in range(C):
-                        # Iterate over each cluster in the group
-                        for e in range(E):
-                            # Iterate over each element in the vector
-                            X[n, h, l, e] = Y[n, h, c, e] * factor
+                try:
+                    if query_index < group_count[l]:
+                        # Get factor for current query
+                        factor = group_factors[query_index]  
+                        for c in range(C):
+                            # Iterate over each cluster in the group
+                            for e in range(E):
+                                # Iterate over each element in the vector
+                                X[n, h, l, e] = Y[n, h, c, e] * factor
+                except:
+                    import IPython; IPython.embed(colors='Linux'); exit(1)
     end_time = time.time()
 
     print(f"Running clustered_broadcast took: {end_time-start_time} seconds")

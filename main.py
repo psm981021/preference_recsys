@@ -21,7 +21,7 @@ def ndcg_k_type(value):
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', required=True, help ="name of the dataset name")
 parser.add_argument('--train_dir', required=True, help = "dir where log will be stored")
-parser.add_argument('--batch_size', default=16, type=int)
+parser.add_argument('--batch_size', default=32, type=int)
 parser.add_argument('--lr', default=0.001, type=float)
 parser.add_argument('--maxlen', default=50, type=int)
 #parser.add_argument('--hidden_units', default=50, type=int)
@@ -39,7 +39,7 @@ parser.add_argument('--cluster_num', default =10, help ="number of clusters")
 parser.add_argument('--threshold_user', default= 1.0, help ="threshold for user embedding")
 parser.add_argument('--threshold_item', default= 1.0, help ="threshold for item embedding")
 parser.add_argument('--attention_mask', default='base',type=str,help="base, cluster")
-parser.add_argument('--attention', default='cluster',type =str, help="base: use self-attention cluster: use clustered-attention ")
+parser.add_argument('--attention', default='base',type =str, help="base: use self-attention fast_cluster: fast clustered attention ")
 parser.add_argument('--SSE', default = False, type= str2bool, help="Stochastic Shared Embedding")
 parser.add_argument('--k', default = 10, type=ndcg_k_type , help ="Metrics@K")
 parser.add_argument('--early_stopping', default = True, type = bool, help ="enable early stopping")
@@ -134,7 +134,7 @@ if __name__ == '__main__':
             elapsed_time = end_time - start_time
 
             print("loss in epoch {} iteration {}: {} time: {}".format(epoch, step, loss.item(),elapsed_time)) # expected 0.4~0.6 after init few epochs
-        if epoch == 1 or epoch == 2 or epoch % 10 == 0:# == 2 :
+        if epoch == 1 or epoch == 2 or epoch % 5 == 0:# == 2 :
         #if epoch % 10 == 0:
             model.eval()
             t1 = time.time() - t0
