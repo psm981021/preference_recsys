@@ -98,13 +98,13 @@ class Trainer:
         HIT_10, NDCG_10, MRR = get_metric(pred_list, 10)
         post_fix = {
             "Epoch": epoch,
-            "HIT@1": "{:.4f}".format(HIT_1),
-            "NDCG@1": "{:.4f}".format(NDCG_1),
-            "HIT@5": "{:.4f}".format(HIT_5),
-            "NDCG@5": "{:.4f}".format(NDCG_5),
-            "HIT@10": "{:.4f}".format(HIT_10),
-            "NDCG@10": "{:.4f}".format(NDCG_10),
-            "MRR": "{:.4f}".format(MRR),
+            "HIT@1": "{:.6f}".format(HIT_1),
+            "NDCG@1": "{:.6f}".format(NDCG_1),
+            "HIT@5": "{:.6f}".format(HIT_5),
+            "NDCG@5": "{:.6f}".format(NDCG_5),
+            "HIT@10": "{:.6f}".format(HIT_10),
+            "NDCG@10": "{:.6f}".format(NDCG_10),
+            "MRR": "{:.6f}".format(MRR),
         }
         print(post_fix)
         with open(self.args.log_file, "a") as f:
@@ -118,12 +118,12 @@ class Trainer:
             ndcg.append(ndcg_k(answers, pred_list, k))
         post_fix = {
             "Epoch": epoch,
-            "HIT@5": "{:.4f}".format(recall[0]),
-            "NDCG@5": "{:.4f}".format(ndcg[0]),
-            "HIT@10": "{:.4f}".format(recall[1]),
-            "NDCG@10": "{:.4f}".format(ndcg[1]),
-            "HIT@20": "{:.4f}".format(recall[3]),
-            "NDCG@20": "{:.4f}".format(ndcg[3]),
+            "HIT@5": "{:.6f}".format(recall[0]),
+            "NDCG@5": "{:.6f}".format(ndcg[0]),
+            "HIT@10": "{:.6f}".format(recall[1]),
+            "NDCG@10": "{:.6f}".format(ndcg[1]),
+            "HIT@20": "{:.6f}".format(recall[3]),
+            "NDCG@20": "{:.6f}".format(ndcg[3]),
         }
         print(post_fix)
         with open(self.args.log_file, "a") as f:
@@ -240,6 +240,7 @@ class UPTRecTrainer(Trainer):
                     sequence_output = sequence_output.view(sequence_output.shape[0], -1)
                     sequence_output = sequence_output.detach().cpu().numpy()
                     kmeans_training_data.append(sequence_output)
+                    import IPython; IPython.embed(colors='Linux')
                 kmeans_training_data = np.concatenate(kmeans_training_data, axis=0)
                 # train multiple clusters
                 print("Training Clusters:")
@@ -349,8 +350,8 @@ class UPTRecTrainer(Trainer):
 
             post_fix = {
                 "epoch": epoch,
-                "rec_avg_loss": "{:.4f}".format(rec_avg_loss / len(rec_cf_data_iter)),
-                "joint_avg_loss": "{:.4f}".format(joint_avg_loss / len(rec_cf_data_iter)),
+                "rec_avg_loss": "{:.6}".format(rec_avg_loss / len(rec_cf_data_iter)),
+                "joint_avg_loss": "{:.6f}".format(joint_avg_loss / len(rec_cf_data_iter)),
             }
             if (epoch + 1) % self.args.log_freq == 0:
                 print(str(post_fix))

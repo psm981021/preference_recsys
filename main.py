@@ -34,7 +34,7 @@ def main():
     parser.add_argument("--output_dir", default="output_custom/", type=str)
     parser.add_argument("--data_name", default="Beauty", type=str)
     parser.add_argument("--do_eval", action="store_true")
-    parser.add_argument("--model_idx", default=0, type=int, help="model idenfier 10, 20, 30...")
+    parser.add_argument("--model_idx", default="test", type=str, help="model idenfier")
     parser.add_argument("--gpu_id", type=str, default="0", help="gpu_id")
 
     # data augmentation args
@@ -115,7 +115,7 @@ def main():
     # train args
     parser.add_argument("--lr", type=float, default=0.001, help="learning rate of adam")
     parser.add_argument("--batch_size", type=int, default=256, help="number of batch_size")
-    parser.add_argument("--epochs", type=int, default=300, help="number of epochs")
+    parser.add_argument("--epochs", type=int, default=500, help="number of epochs")
     parser.add_argument("--no_cuda", action="store_true")
     parser.add_argument("--log_freq", type=int, default=1, help="per epoch print res")
     parser.add_argument("--seed", default=1, type=int)
@@ -144,7 +144,7 @@ def main():
     args.mask_id = max_item + 1
 
     # save model args
-    args_str = f"{args.model_name}-{args.data_name}-{args.model_idx}"
+    args_str = f"{args.model_name}-{args.data_name}-{args.num_intent_clusters}-{args.batch_size}"
     args.log_file = os.path.join(args.output_dir, args_str + ".txt")
 
     show_args_info(args)
