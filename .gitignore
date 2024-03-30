@@ -31,6 +31,6 @@ scripts/
 
 #-----server------
 config/ablation_wo.sh
-
+output_custom/
 # fast-transformers
 fast_transformers/
