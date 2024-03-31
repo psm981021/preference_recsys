@@ -54,6 +54,7 @@ class Trainer:
                 self.clusters.append(cluster)
 
         self.total_augmentaion_pairs = nCr(self.args.n_views, 2)
+
         # projection head for contrastive learn task
         self.projection = nn.Sequential(
             nn.Linear(self.args.max_seq_length * self.args.hidden_size, 512, bias=False),
@@ -61,9 +62,11 @@ class Trainer:
             nn.ReLU(inplace=True),
             nn.Linear(512, self.args.hidden_size, bias=True),
         )
+
         if self.cuda_condition:
             self.model.cuda()
             self.projection.cuda()
+
         # Setting the train and test data loader
         self.train_dataloader = train_dataloader
         self.cluster_dataloader = cluster_dataloader
@@ -231,17 +234,22 @@ class UPTRecTrainer(Trainer):
                 kmeans_training_data = []
                 rec_cf_data_iter = tqdm(enumerate(cluster_dataloader), total=len(cluster_dataloader))
                 for i, (rec_batch, _, _) in rec_cf_data_iter:
+                    
                     rec_batch = tuple(t.to(self.device) for t in rec_batch)
                     _, input_ids, target_pos, target_neg, _ = rec_batch
-                    sequence_output = self.model(input_ids,self.args)
+                    sequence_output = self.model(input_ids,self.args) #[Batch max_length hidden]
+
+                    
                     # average sum
                     if self.args.seq_representation_type == "mean":
-                        sequence_output = torch.mean(sequence_output, dim=1, keepdim=False)
-                    sequence_output = sequence_output.view(sequence_output.shape[0], -1)
+                        # takes means over all item embedding in-batch
+                        sequence_output = torch.mean(sequence_output, dim=1, keepdim=False) # [Batch hidden]
+                    sequence_output = sequence_output.view(sequence_output.shape[0], -1) # [Batch max_length x hidden ]
                     sequence_output = sequence_output.detach().cpu().numpy()
-                    kmeans_training_data.append(sequence_output)
-                    import IPython; IPython.embed(colors='Linux')
-                kmeans_training_data = np.concatenate(kmeans_training_data, axis=0)
+                    
+                    kmeans_training_data.append(sequence_output) #[len(cluster_dataloader) Batch hidden]
+                
+                kmeans_training_data = np.concatenate(kmeans_training_data, axis=0) #[* hidden]
                 # train multiple clusters
                 print("Training Clusters:")
                 for i, cluster in tqdm(enumerate(self.clusters), total=len(self.clusters)):
@@ -252,9 +260,48 @@ class UPTRecTrainer(Trainer):
                 import gc
 
                 gc.collect()
+            
+            elif self.args.contrast_type in ["None"] and epoch >= self.args.warm_up_epoches:
+                print("Preparing Clustering for UPTRec: ")
+                self.model.eval()
+                kmeans_training_data = []
 
+                rec_cf_data_iter = tqdm(enumerate(cluster_dataloader), total=len(cluster_dataloader))
+                for i, rec_batch in rec_cf_data_iter:
+                    
+                    rec_batch = tuple(t.to(self.device) for t in rec_batch)
+                    _, input_ids, target_pos, target_neg, _ = rec_batch
+                    sequence_output = self.model(input_ids,self.args) #[Batch max_length hidden]
+                    
+                    if self.args.seq_representation_type =="mean":
+                        # takes means over all item embedding in-batch
+                        sequence_output = torch.mean(sequence_output, dim=1, keepdim=False) # [Batch hidden]
+                    sequence_output_ = sequence_output
+                    sequence_output = sequence_output.view(sequence_output.shape[0], -1) # [Batch max_length x hidden ]
+                    sequence_output = sequence_output.detach().cpu().numpy()
+
+                    # for clustering in-batch
+
+                for i, cluster in tqdm(enumerate(self.clusters), total=len(self.clusters)):
+                    # cluster centroid has the shape [num_cluster max_length hidden]
+                    # cluster centroid has the shape [num_cluster *] for self.args.seq_representation_type =="mean"
+
+                    cluster.train(sequence_output) # cluster using each sample 
+                    self.clusters[i] = cluster
+
+                for cluster in self.clusters:
+                    intent_id, seq2intent = cluster.query(sequence_output)
+
+                    intent_id_ = intent_id.view(-1,1)
+                    seq2intent_ = seq2intent.view(-1,sequence_output_.size(1),sequence_output_.size(-1))
+
+                    
+            
+                        
+                    
+        #train
             # ------ model training -----#
-            print("Performing Rec model Training:")
+            
             self.model.train()
             rec_avg_loss = 0.0
             cl_individual_avg_losses = [0.0 for i in range(self.total_augmentaion_pairs)]
@@ -264,89 +311,109 @@ class UPTRecTrainer(Trainer):
             print(f"rec dataset length: {len(dataloader)}")
             rec_cf_data_iter = tqdm(enumerate(dataloader), total=len(dataloader))
 
-            for i, (rec_batch, cl_batches, seq_class_label_batches) in rec_cf_data_iter:
-                """
-                rec_batch shape: key_name x batch_size x feature_dim
-                cl_batches shape: 
-                    list of n_views x batch_size x feature_dim tensors
-                """
-                # 0. batch_data will be sent into the device(GPU or CPU)
-                rec_batch = tuple(t.to(self.device) for t in rec_batch)
-                _, input_ids, target_pos, target_neg, _ = rec_batch
+            if self.args.contrast_type in ["None"]:
+                print("Performing Rec model Training with Clustered Attention")
 
-                # ---------- recommendation task ---------------#
-                sequence_output = self.model(input_ids,self.args)
-                rec_loss = self.cross_entropy(sequence_output, target_pos, target_neg)
-                
-                # ---------- contrastive learning task -------------#
-                cl_losses = []
-                for cl_batch in cl_batches:
-                    if self.args.contrast_type == "InstanceCL":
-                        cl_loss = self._instance_cl_one_pair_contrastive_learning(
-                            cl_batch, intent_ids=seq_class_label_batches
-                        )
-                        cl_losses.append(self.args.cf_weight * cl_loss)
-                    elif self.args.contrast_type == "IntentCL":
-                        # ------ performing clustering for getting users' intentions ----#
-                        # average sum
-                        if epoch >= self.args.warm_up_epoches:
-                            if self.args.seq_representation_type == "mean":
-                                sequence_output = torch.mean(sequence_output, dim=1, keepdim=False)
-                            sequence_output = sequence_output.view(sequence_output.shape[0], -1)
-                            sequence_output = sequence_output.detach().cpu().numpy()
 
-                            # query on multiple clusters
-                            for cluster in self.clusters:
-                                seq2intents = []
-                                intent_ids = []
-                                intent_id, seq2intent = cluster.query(sequence_output)
-                                seq2intents.append(seq2intent)
-                                intent_ids.append(intent_id)
-                            cl_loss = self._pcl_one_pair_contrastive_learning(
-                                cl_batch, intents=seq2intents, intent_ids=intent_ids
-                            )
-                            cl_losses.append(self.args.intent_cf_weight * cl_loss)
-                        else:
-                            continue
-                    elif self.args.contrast_type == "Hybrid":
-                        if epoch < self.args.warm_up_epoches:
-                            cl_loss1 = self._instance_cl_one_pair_contrastive_learning(
+                for i, rec_batch in rec_cf_data_iter:
+                    rec_batch = tuple(t.to(self.device) for t in rec_batch)
+                    _, input_ids, target_pos, target_neg, _ = rec_batch
+
+                    # -------- recommendation task ---------
+
+                print("UPTRec debugging");import IPython; IPython.embed(colors='Linux');exit(1)
+
+                    # -------- contrastive learning will be performed ---------- 
+            else:
+
+                print("Performing Rec model Training (ICLRec):")
+
+
+                for i, (rec_batch, cl_batches, seq_class_label_batches) in rec_cf_data_iter:
+                    """
+                    rec_batch shape: key_name x batch_size x feature_dim
+                    cl_batches shape: 
+                        list of n_views x batch_size x feature_dim tensors
+                    """
+                    # 0. batch_data will be sent into the device(GPU or CPU)
+                    rec_batch = tuple(t.to(self.device) for t in rec_batch)
+                    _, input_ids, target_pos, target_neg, _ = rec_batch
+
+                    # ---------- recommendation task ---------------#
+                    sequence_output = self.model(input_ids,self.args)
+                    rec_loss = self.cross_entropy(sequence_output, target_pos, target_neg)
+                    
+                    # ---------- contrastive learning task -------------#
+                    cl_losses = []
+                    for cl_batch in cl_batches:
+                        if self.args.contrast_type == "InstanceCL":
+                            cl_loss = self._instance_cl_one_pair_contrastive_learning(
                                 cl_batch, intent_ids=seq_class_label_batches
                             )
-                            cl_losses.append(self.args.cf_weight * cl_loss1)
-                        else:
-                            cl_loss1 = self._instance_cl_one_pair_contrastive_learning(
-                                cl_batch, intent_ids=seq_class_label_batches
-                            )
-                            cl_losses.append(self.args.cf_weight * cl_loss1)
-                            if self.args.seq_representation_type == "mean":
-                                sequence_output = torch.mean(sequence_output, dim=1, keepdim=False)
-                            sequence_output = sequence_output.view(sequence_output.shape[0], -1)
-                            sequence_output = sequence_output.detach().cpu().numpy()
-                            # query on multiple clusters
-                            for cluster in self.clusters:
-                                seq2intents = []
-                                intent_ids = []
-                                intent_id, seq2intent = cluster.query(sequence_output)
-                                seq2intents.append(seq2intent)
-                                intent_ids.append(intent_id)
-                            cl_loss3 = self._pcl_one_pair_contrastive_learning(
-                                cl_batch, intents=seq2intents, intent_ids=intent_ids
-                            )
-                            cl_losses.append(self.args.intent_cf_weight * cl_loss3)
-                
-                joint_loss = self.args.rec_weight * rec_loss
-                for cl_loss in cl_losses:
-                    joint_loss += cl_loss
-                self.optim.zero_grad()
-                joint_loss.backward()
-                self.optim.step()
+                            cl_losses.append(self.args.cf_weight * cl_loss)
+                        elif self.args.contrast_type == "IntentCL":
+                            # ------ performing clustering for getting users' intentions ----#
+                            # average sum
+                            if epoch >= self.args.warm_up_epoches:
+                                if self.args.seq_representation_type == "mean":
+                                    sequence_output = torch.mean(sequence_output, dim=1, keepdim=False)
+                                sequence_output = sequence_output.view(sequence_output.shape[0], -1)
+                                sequence_output = sequence_output.detach().cpu().numpy()
 
-                rec_avg_loss += rec_loss.item()
+                                # query on multiple clusters
+                                for cluster in self.clusters:
+                                    seq2intents = []
+                                    intent_ids = []
+                                    intent_id, seq2intent = cluster.query(sequence_output)
+                                    seq2intents.append(seq2intent)
+                                    intent_ids.append(intent_id)
+                                cl_loss = self._pcl_one_pair_contrastive_learning(
+                                    cl_batch, intents=seq2intents, intent_ids=intent_ids
+                                )
+                                cl_losses.append(self.args.intent_cf_weight * cl_loss)
+                            else:
+                                continue
+                        elif self.args.contrast_type == "Hybrid":
+                            if epoch < self.args.warm_up_epoches:
+                                cl_loss1 = self._instance_cl_one_pair_contrastive_learning(
+                                    cl_batch, intent_ids=seq_class_label_batches
+                                )
+                                cl_losses.append(self.args.cf_weight * cl_loss1)
+                            else:
+                                cl_loss1 = self._instance_cl_one_pair_contrastive_learning(
+                                    cl_batch, intent_ids=seq_class_label_batches
+                                )
+                                cl_losses.append(self.args.cf_weight * cl_loss1)
+                                if self.args.seq_representation_type == "mean":
+                                    sequence_output = torch.mean(sequence_output, dim=1, keepdim=False)
+                                sequence_output = sequence_output.view(sequence_output.shape[0], -1)
+                                sequence_output = sequence_output.detach().cpu().numpy()
+                                # query on multiple clusters
+                                for cluster in self.clusters:
+                                    seq2intents = []
+                                    intent_ids = []
+                                    intent_id, seq2intent = cluster.query(sequence_output)
+                                    seq2intents.append(seq2intent)
+                                    intent_ids.append(intent_id)
+                                cl_loss3 = self._pcl_one_pair_contrastive_learning(
+                                    cl_batch, intents=seq2intents, intent_ids=intent_ids
+                                )
+                                cl_losses.append(self.args.intent_cf_weight * cl_loss3)
+                    
+                    joint_loss = self.args.rec_weight * rec_loss
+                    for cl_loss in cl_losses:
+                        joint_loss += cl_loss
+                    self.optim.zero_grad()
+                    joint_loss.backward()
+                    self.optim.step()
 
-                for i, cl_loss in enumerate(cl_losses):
-                    cl_sum_avg_loss += cl_loss.item()
-                joint_avg_loss += joint_loss.item()
+                    rec_avg_loss += rec_loss.item()
+
+                    for i, cl_loss in enumerate(cl_losses):
+                        cl_sum_avg_loss += cl_loss.item()
+                    joint_avg_loss += joint_loss.item()
+
+            # end of for statements in model training
 
             post_fix = {
                 "epoch": epoch,
@@ -359,7 +426,7 @@ class UPTRecTrainer(Trainer):
             with open(self.args.log_file, "a") as f:
                 f.write(str(post_fix) + "\n")
 
-        else:
+        else: # for valid and test
             rec_data_iter = tqdm(enumerate(dataloader), total=len(dataloader))
             self.model.eval()
 

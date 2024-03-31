@@ -14,7 +14,7 @@ import argparse
 
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 
-from datasets import RecWithContrastiveLearningDataset, SequentialDataset
+from datasets import RecWithContrastiveLearningDataset, SASRecDataset
 
 from trainers import UPTRecTrainer
 from models import UPTRec, OfflineItemSimilarity, OnlineItemSimilarity
@@ -75,7 +75,7 @@ def main():
         #default="Hybrid",
         type=str,
         help="Ways to contrastive of. \
-                        Support InstanceCL and ShortInterestCL, IntentCL, and Hybrid types.",
+                        Support InstanceCL and ShortInterestCL, IntentCL, and Hybrid types, None",
     )
     parser.add_argument(
         "--num_intent_clusters",
@@ -127,7 +127,7 @@ def main():
     parser.add_argument("--weight_decay", type=float, default=0.0, help="weight_decay of adam")
     parser.add_argument("--adam_beta1", type=float, default=0.9, help="adam first beta value")
     parser.add_argument("--adam_beta2", type=float, default=0.999, help="adam second beta value")
-    parser.add_argument("--device",type=str, default="cuda:0")
+    parser.add_argument("--device",type=str, default="cuda:1")
     args = parser.parse_args()
 
     set_seed(args.seed)
@@ -160,25 +160,39 @@ def main():
     args.checkpoint_path = os.path.join(args.output_dir, checkpoint)
 
     # training data for node classification
-    cluster_dataset = RecWithContrastiveLearningDataset(
-        args, user_seq[: int(len(user_seq) * args.training_data_ratio)], data_type="train"
-    )
-    cluster_sampler = SequentialSampler(cluster_dataset)
-    cluster_dataloader = DataLoader(cluster_dataset, sampler=cluster_sampler, batch_size=args.batch_size)
+    if args.contrast_type == "None":
+        cluster_dataset = SASRecDataset(args, user_seq[: int(len(user_seq) * args.training_data_ratio)], data_type="train")
+        cluster_sampler = SequentialSampler(cluster_dataset)
+        cluster_dataloader = DataLoader(cluster_dataset, sampler=cluster_sampler, batch_size=args.batch_size)
 
-    train_dataset = RecWithContrastiveLearningDataset(
-        args, user_seq[: int(len(user_seq) * args.training_data_ratio)], data_type="train"
-    )
-    train_sampler = RandomSampler(train_dataset)
-    train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.batch_size)
+        train_dataset = SASRecDataset(args, user_seq[: int(len(user_seq) * args.training_data_ratio)], data_type="train")
+        train_sampler = RandomSampler(train_dataset)
+        train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.batch_size)
 
-    eval_dataset = RecWithContrastiveLearningDataset(args, user_seq, data_type="valid")
-    eval_sampler = SequentialSampler(eval_dataset)
-    eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.batch_size)
+        eval_dataset = SASRecDataset(args, user_seq, data_type="valid")
+        eval_sampler = SequentialSampler(eval_dataset)
+        eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.batch_size)
 
-    test_dataset = RecWithContrastiveLearningDataset(args, user_seq, data_type="test")
-    test_sampler = SequentialSampler(test_dataset)
-    test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.batch_size)
+        test_dataset = SASRecDataset(args, user_seq, data_type="test")
+        test_sampler = SequentialSampler(test_dataset)
+        test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.batch_size)
+
+    else:
+        cluster_dataset = RecWithContrastiveLearningDataset(args, user_seq[: int(len(user_seq) * args.training_data_ratio)], data_type="train")
+        cluster_sampler = SequentialSampler(cluster_dataset)
+        cluster_dataloader = DataLoader(cluster_dataset, sampler=cluster_sampler, batch_size=args.batch_size)
+
+        train_dataset = RecWithContrastiveLearningDataset(args, user_seq[: int(len(user_seq) * args.training_data_ratio)], data_type="train")
+        train_sampler = RandomSampler(train_dataset)
+        train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.batch_size)
+
+        eval_dataset = RecWithContrastiveLearningDataset(args, user_seq, data_type="valid")
+        eval_sampler = SequentialSampler(eval_dataset)
+        eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.batch_size)
+
+        test_dataset = RecWithContrastiveLearningDataset(args, user_seq, data_type="test")
+        test_sampler = SequentialSampler(test_dataset)
+        test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.batch_size)
 
     model = UPTRec(args=args)
     
@@ -215,3 +229,5 @@ def main():
 
 
 main()
+# python main.py --model_idx="test" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=15 --gpu_id=1
+# python main.py --model_idx="test" --seq_representation_type="concatenate"

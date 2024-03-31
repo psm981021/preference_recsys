@@ -142,12 +142,23 @@ class RecWithContrastiveLearningDataset(Dataset):
 
             # add supervision of sequences
             seq_class_label = self._process_sequence_label_signal(seq_label_signal)
+
+            # cur_rec_tensors returns user_id, input_id, target_pos, target_neg, answer
+            # cf_ternsors_list returns augmented_seq
+            # seq_clas_label returns supervised answer for augmented_seq
+
             return (cur_rec_tensors, cf_tensors_list, seq_class_label)
+
         elif self.data_type == "valid":
             cur_rec_tensors = self._data_sample_rec_task(user_id, items, input_ids, target_pos, answer)
+
+            # cur_rec_tensors returns user_id, input_id, target_pos, target_neg, answer
+
             return cur_rec_tensors
         else:
             cur_rec_tensors = self._data_sample_rec_task(user_id, items_with_noise, input_ids, target_pos, answer)
+
+            # cur_rec_tensors returns user_id, input_id, target_pos, target_neg, answer
             return cur_rec_tensors
 
     def __len__(self):
@@ -158,13 +169,13 @@ class RecWithContrastiveLearningDataset(Dataset):
     
 
 
-class SequentialDataset(Dataset):
+class SASRecDataset(Dataset):
     def __init__(self, args, user_seq, test_neg_items=None, data_type="train"):
         self.args = args
         self.user_seq = user_seq
         self.test_neg_items = test_neg_items
         self.data_type = data_type
-        self.max_len = args.maxlen
+        self.max_len = args.max_seq_length
 
     def _data_sample_rec_task(self, user_id, items, input_ids, target_pos, answer):
         # make a deep copy to avoid original sequence be modified
@@ -239,7 +250,7 @@ class SequentialDataset(Dataset):
             input_ids = items[:-1]
             target_pos = items[1:]
             answer = [items[-1]]
-
+        #  returns user_id, input_id, target_pos, target_neg, answer
         return self._data_sample_rec_task(user_id, items, input_ids, target_pos, answer)
 
     def __len__(self):

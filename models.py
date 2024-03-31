@@ -241,7 +241,7 @@ class KMeans(object):
         self.first_batch = True
         self.hidden_size = hidden_size
         self.clus, self.index = self.__init_cluster(self.hidden_size)
-        self.centroids = []
+        self.centroids = [] 
 
     def __init_cluster(
         self, hidden_size, verbose=False, niter=20, nredo=5, max_points_per_centroid=4096, min_points_per_centroid=0
@@ -265,12 +265,12 @@ class KMeans(object):
 
     def train(self, x):
         # train to get centroids
-        
         if x.shape[0] > self.num_cluster:
             self.clus.train(x, self.index)
 
-        # get cluster centroids
+        # get cluster centroids [num_cluster, *]
         centroids = faiss.vector_to_array(self.clus.centroids).reshape(self.num_cluster, self.hidden_size)
+
         # convert to cuda Tensors for broadcast
         centroids = torch.Tensor(centroids).to(self.device)
         self.centroids = nn.functional.normalize(centroids, p=2, dim=1)
@@ -340,7 +340,7 @@ class UPTRec(torch.nn.Module):
         sequence_embedding = self.UPTembedding(input_ids)
         encoder_layer = self.encoder(sequence_embedding, extended_attention_mask,args)
         sequence_output = encoder_layer[-1]
-
+        
         return sequence_output 
 
 
