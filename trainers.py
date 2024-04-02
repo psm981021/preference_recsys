@@ -18,8 +18,7 @@ from torch.utils.data import DataLoader, RandomSampler
 from models import KMeans
 from datasets import RecWithContrastiveLearningDataset
 from modules import NCELoss, NTXent, SupConLoss, PCLoss
-from utils import recall_at_k, ndcg_k, get_metric, get_user_seqs, nCr
-
+from utils import *
 
 class Trainer:
     def __init__(self, model, train_dataloader, cluster_dataloader, eval_dataloader, test_dataloader, args):
@@ -271,34 +270,30 @@ class UPTRecTrainer(Trainer):
                     
                     rec_batch = tuple(t.to(self.device) for t in rec_batch)
                     _, input_ids, target_pos, target_neg, _ = rec_batch
-                    sequence_output = self.model(input_ids,self.args) #[Batch max_length hidden]
+
+                    sequence_output = self.model.item_embedding(input_ids) #[Batch max_length hidden]
                     
-                    if self.args.seq_representation_type =="mean":
-                        # takes means over all item embedding in-batch
-                        sequence_output = torch.mean(sequence_output, dim=1, keepdim=False) # [Batch hidden]
-                    sequence_output_ = sequence_output
                     sequence_output = sequence_output.view(sequence_output.shape[0], -1) # [Batch max_length x hidden ]
                     sequence_output = sequence_output.detach().cpu().numpy()
 
-                    # for clustering in-batch
+                    kmeans_training_data.append(sequence_output) #[len(cluster_dataloader) Batch hidden]
 
+                kmeans_training_data = np.concatenate(kmeans_training_data, axis=0) #[* hidden]
+
+                print("Training Clusters:")
                 for i, cluster in tqdm(enumerate(self.clusters), total=len(self.clusters)):
                     # cluster centroid has the shape [num_cluster max_length hidden]
                     # cluster centroid has the shape [num_cluster *] for self.args.seq_representation_type =="mean"
 
-                    cluster.train(sequence_output) # cluster using each sample 
+                    cluster.train(kmeans_training_data) # cluster using each sample 
                     self.clusters[i] = cluster
 
-                for cluster in self.clusters:
-                    intent_id, seq2intent = cluster.query(sequence_output)
+                    # clean memory
+                    del kmeans_training_data
+                    import gc
 
-                    intent_id_ = intent_id.view(-1,1)
-                    seq2intent_ = seq2intent.view(-1,sequence_output_.size(1),sequence_output_.size(-1))
-
-                    
-            
-                        
-                    
+                    gc.collect()
+                             
         #train
             # ------ model training -----#
             
@@ -314,14 +309,29 @@ class UPTRecTrainer(Trainer):
             if self.args.contrast_type in ["None"]:
                 print("Performing Rec model Training with Clustered Attention")
 
-
                 for i, rec_batch in rec_cf_data_iter:
                     rec_batch = tuple(t.to(self.device) for t in rec_batch)
                     _, input_ids, target_pos, target_neg, _ = rec_batch
+                    sequence_output = self.model.item_embedding(input_ids)
+                    sequence_output = sequence_output.view(sequence_output.shape[0], -1) # [Batch max_length x hidden ]
+                    sequence_output = sequence_output.detach().cpu().numpy()
 
                     # -------- recommendation task ---------
+                    # Clustered Attention will be put in place
+                    
+                    # first use trained cluster to get the cluster id for each user representation
+                    # here user representation means item embedding viewed with (*, -1) shape 
 
-                print("UPTRec debugging");import IPython; IPython.embed(colors='Linux');exit(1)
+                    for cluster in self.clusters:
+                        intent_id, seq2intent = cluster.query(sequence_output)
+                        # seq2intent represents centroids
+                        # intent_id rerpesents Cluster ID
+                    
+                    self.args.cluster_id = intent_id
+                    sequence_output = self.model(input_ids,self.args)
+
+                    print("UPTRec debugging");import IPython; IPython.embed(colors='Linux');exit(1)
+                
 
                     # -------- contrastive learning will be performed ---------- 
             else:

@@ -322,6 +322,7 @@ class UPTRec(torch.nn.Module):
 
 
     def forward(self,input_ids,args):
+    
         attention_mask = (input_ids > 0)
         extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)  # torch.int64
         max_len = attention_mask.size(-1)

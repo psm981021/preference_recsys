@@ -411,6 +411,27 @@ class NTXent(nn.Module):
         loss = -logprob[np.repeat(np.arange(n), m - 1), labels].sum() / n / (m - 1) / self.norm
         return loss
 
+class Clustered_Attention_Chunking(nn.Module):
+    def __init__(self, args):
+        super(Clustered_Attention_Chunking, self).__init__()
+
+        pass
+
+    def forward(self, seq, cluster_id):
+        #chunking
+        N,C,E = seq.shape
+
+        seq_sort = seq.view(N, -1)
+        sorted_indices = torch.argsort(cluster_id)
+        seq_sorted = seq_sort[sorted_indices].view(N,C,E)
+        
+        reverse_indices = torch.argsort(sorted_indices)
+        seq_sort = seq_sorted.view(N,-1)
+        original_seq = seq_sorted[reverse_indices].view(N,C,E)
+
+
+        print("UPTRec attention debugging ");import IPython; IPython.embed(colors='Linux');exit(1)
+
 class SelfAttention(nn.Module):
     def __init__(self, args):
         super(SelfAttention,self).__init__()
@@ -511,10 +532,19 @@ class EncoderLayer(nn.Module):
 
         self.base_attention = SelfAttention(args)
         self.cluster_attention = Clustered_Attention(args)
+        self.cluster_attention_chunking = Clustered_Attention_Chunking(args)
         self.feedforward = FeedForward(args)
 
     def forward(self, hidden_state, attention_mask,args):
-        attention_output = self.base_attention(hidden_state, attention_mask) 
+        
+        if args.cluster_id.size(0) == hidden_state.size(0):
+            # perform Clustered Attention
+            attention_output = self.cluster_attention_chunking(hidden_state, args.cluster_id)
+
+        else:
+            # perform Self-Attention
+            attention_output = self.base_attention(hidden_state, attention_mask) 
+
         feedforward_output = self.feedforward(attention_output)
 
         return feedforward_output
