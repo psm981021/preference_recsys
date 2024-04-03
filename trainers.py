@@ -260,17 +260,19 @@ class UPTRecTrainer(Trainer):
 
                 gc.collect()
             
-            elif self.args.contrast_type in ["None"] and epoch >= self.args.warm_up_epoches:
+            elif self.args.contrast_type in ["None"] and self.args.attention_type =="Cluseter" and epoch >= self.args.warm_up_epoches:
                 print("Preparing Clustering for UPTRec: ")
                 self.model.eval()
                 kmeans_training_data = []
 
                 rec_cf_data_iter = tqdm(enumerate(cluster_dataloader), total=len(cluster_dataloader))
+                # check for validity, In-batch computation Vs Clustering outside the Batch
                 for i, rec_batch in rec_cf_data_iter:
                     
                     rec_batch = tuple(t.to(self.device) for t in rec_batch)
                     _, input_ids, target_pos, target_neg, _ = rec_batch
 
+                    # check for validity, item_embedding vs model
                     sequence_output = self.model.item_embedding(input_ids) #[Batch max_length hidden]
                     
                     sequence_output = sequence_output.view(sequence_output.shape[0], -1) # [Batch max_length x hidden ]
@@ -288,11 +290,11 @@ class UPTRecTrainer(Trainer):
                     cluster.train(kmeans_training_data) # cluster using each sample 
                     self.clusters[i] = cluster
 
-                    # clean memory
-                    del kmeans_training_data
-                    import gc
+                # clean memory
+                del kmeans_training_data
+                import gc
 
-                    gc.collect()
+                gc.collect()
                              
         #train
             # ------ model training -----#
@@ -312,7 +314,7 @@ class UPTRecTrainer(Trainer):
                 for i, rec_batch in rec_cf_data_iter:
                     rec_batch = tuple(t.to(self.device) for t in rec_batch)
                     _, input_ids, target_pos, target_neg, _ = rec_batch
-                    sequence_output = self.model.item_embedding(input_ids)
+                    sequence_output = self.model(input_ids,self.args)
                     sequence_output = sequence_output.view(sequence_output.shape[0], -1) # [Batch max_length x hidden ]
                     sequence_output = sequence_output.detach().cpu().numpy()
 
@@ -321,17 +323,31 @@ class UPTRecTrainer(Trainer):
                     
                     # first use trained cluster to get the cluster id for each user representation
                     # here user representation means item embedding viewed with (*, -1) shape 
-
-                    for cluster in self.clusters:
-                        intent_id, seq2intent = cluster.query(sequence_output)
-                        # seq2intent represents centroids
-                        # intent_id rerpesents Cluster ID
-                    
-                    self.args.cluster_id = intent_id
+                    if self.args.attention_type == "Cluster":
+                        for cluster in self.clusters:
+                            intent_id, seq2intent = cluster.query(sequence_output)
+                            # seq2intent represents centroids
+                            # intent_id rerpesents Cluster ID
+                        
+                        self.args.cluster_id = intent_id
                     sequence_output = self.model(input_ids,self.args)
 
-                    print("UPTRec debugging");import IPython; IPython.embed(colors='Linux');exit(1)
-                
+                    # ---------- recommendation task ---------------#
+
+                    rec_loss = self.cross_entropy(sequence_output, target_pos, target_neg)
+
+
+                    joint_loss = self.args.rec_weight * rec_loss
+                    self.optim.zero_grad()
+                    joint_loss.backward()
+                    self.optim.step()
+
+                    rec_avg_loss += rec_loss.item()
+                    joint_avg_loss += joint_loss.item()
+
+                # end of for statements in model training
+
+                    #print("UPTRec debugging");import IPython; IPython.embed(colors='Linux');exit(1)
 
                     # -------- contrastive learning will be performed ---------- 
             else:

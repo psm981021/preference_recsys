@@ -78,6 +78,13 @@ def main():
                         Support InstanceCL and ShortInterestCL, IntentCL, and Hybrid types, None",
     )
     parser.add_argument(
+        "--attention_type",
+        default ="Base",
+        type=str,
+        help="Ways of performing Attention Mechanism\
+            Supports 'Base' for Self-Attention and 'Cluster' for Clustered Atteniton"
+    )
+    parser.add_argument(
         "--num_intent_clusters",
         default="256",
         type=str,
@@ -144,12 +151,12 @@ def main():
     args.mask_id = max_item + 1
 
     # save model args
-    args_str = f"{args.model_name}-{args.data_name}-{args.num_intent_clusters}-{args.batch_size}"
+    args_str = f"{args.model_name}-{args.data_name}-{args.model_idx} -{args.num_intent_clusters}-{args.batch_size}"
     args.log_file = os.path.join(args.output_dir, args_str + ".txt")
 
     show_args_info(args)
 
-    with open(args.log_file, "a") as f:
+    with open(args.log_file, "w") as f:
         f.write(str(args) + "\n")
 
     # set item score in train set to `0` in validation
@@ -206,7 +213,7 @@ def main():
 
     else:
         print(f"Train ICLRec")
-        early_stopping = EarlyStopping(args.checkpoint_path, patience=40, verbose=True)
+        early_stopping = EarlyStopping(args.checkpoint_path, patience=200, verbose=True)
         for epoch in range(args.epochs):
             trainer.train(epoch)
             # evaluate on NDCG@20
@@ -230,4 +237,11 @@ def main():
 
 main()
 # python main.py --model_idx="test" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=15 --gpu_id=1
+# python main.py --model_idx="baseline" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=15 --gpu_id=1
 # python main.py --model_idx="test" --seq_representation_type="concatenate"
+
+
+
+
+# baseline model can be used as SASRec
+# python main.py --model_idx="SASRec" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=15 --gpu_id=1

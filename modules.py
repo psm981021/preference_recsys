@@ -536,8 +536,7 @@ class EncoderLayer(nn.Module):
         self.feedforward = FeedForward(args)
 
     def forward(self, hidden_state, attention_mask,args):
-        
-        if args.cluster_id.size(0) == hidden_state.size(0):
+        if args.attention_type == "Cluster":
             # perform Clustered Attention
             attention_output = self.cluster_attention_chunking(hidden_state, args.cluster_id)
 
@@ -554,6 +553,7 @@ class EncoderLayer(nn.Module):
 class Encoder(nn.Module):
     def __init__(self,args):
         super(Encoder, self).__init__()
+        self.args =args
         layer = EncoderLayer(args)
         self.layer = nn.ModuleList([copy.deepcopy(layer) for _ in range(args.num_hidden_layers)])
     

@@ -303,7 +303,7 @@ class UPTRec(torch.nn.Module):
         self.criterion = nn.BCELoss(reduction="none")
         self.loss_ce = nn.CrossEntropyLoss()
 
-    def UPTembedding(self,input_ids, flag=str):
+    def UPTembedding(self,input_ids):
 
             
         sequence_length = input_ids.size(1)
