@@ -296,7 +296,7 @@ class UPTRec(torch.nn.Module):
         self.position_embedding = nn.Embedding(args.max_seq_length, args.hidden_size)
 
         self.emb_dropout = nn.Dropout(p=args.hidden_dropout_prob)
-        self.layernorm = nn.LayerNorm(args.hidden_size, eps=1e-8)
+        self.layernorm = nn.LayerNorm(args.hidden_size, eps=1e-12)
 
         self.encoder = Encoder(args)
 
@@ -334,6 +334,7 @@ class UPTRec(torch.nn.Module):
 
         subsequent_mask = subsequent_mask.to(input_ids.device)
 
+        # [Batch 1 max_len max_len]
         extended_attention_mask = extended_attention_mask * subsequent_mask
         extended_attention_mask = extended_attention_mask.to(dtype=next(self.parameters()).dtype)  # fp16 compatibility
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0

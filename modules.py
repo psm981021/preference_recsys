@@ -414,23 +414,57 @@ class NTXent(nn.Module):
 class Clustered_Attention_Chunking(nn.Module):
     def __init__(self, args):
         super(Clustered_Attention_Chunking, self).__init__()
-
+        self.args =args
+        self.attention = SelfAttention(args)
         pass
 
-    def forward(self, seq, cluster_id):
+    def forward(self, seq, attention_mask, cluster_id):
         #chunking
         N,C,E = seq.shape
+        chunk_size = N // int(self.args.num_intent_clusters)
+        N = chunk_size * int(self.args.num_intent_clusters)
 
         seq_sort = seq.view(N, -1)
         sorted_indices = torch.argsort(cluster_id)
+        
         seq_sorted = seq_sort[sorted_indices].view(N,C,E)
         
+        attention_outputs = []
+        for i in range(int(self.args.num_intent_clusters)):
+            #use chunking
+            start_idx = i * chunk_size
+            end_idx = min((i + 1) * chunk_size, N)
+
+            chunk_seq = seq_sorted[start_idx:end_idx,:, :]
+            
+            chunk_attention_mask_ = attention_mask[start_idx:end_idx,: , :, :]
+
+            #check validity, if score does not improve change query R wxd Key,Value to R wx2d
+            attention_output = self.attention(chunk_seq,chunk_attention_mask_)
+            attention_outputs.append(attention_output)
+        
+        outputs = torch.cat(attention_outputs, dim=0)
+        
+        # #postpone
+        # for chunk_seq in seq_sorted_chunk.unbind(1):
+            
+        #     attention_output = self.attention(chunk_seq)
+        #     attention_outputs.append(attention_output)
+
+            
+
+        # concat after attention
         reverse_indices = torch.argsort(sorted_indices)
-        seq_sort = seq_sorted.view(N,-1)
-        original_seq = seq_sorted[reverse_indices].view(N,C,E)
+        try: 
+            seq_sort = outputs.view(N,-1)
+        except:
+            print("Clustered Attention Debugging");import IPython;IPython.embed(colors='Linux');exit(1)
+        output = seq_sort[reverse_indices].view(N,C,E)
 
+        return output
+        
 
-        print("UPTRec attention debugging ");import IPython; IPython.embed(colors='Linux');exit(1)
+        
 
 class SelfAttention(nn.Module):
     def __init__(self, args):
@@ -456,7 +490,7 @@ class SelfAttention(nn.Module):
         self.output_dropout = nn.Dropout(args.hidden_dropout_prob)
 
         self.dense = nn.Linear(self.hidden_units, self.hidden_units)
-        self.layernorm = nn.LayerNorm(self.hidden_units, eps=1e-8)
+        self.layernorm = nn.LayerNorm(self.hidden_units, eps=1e-12)
         
     def transpose_for_scores(self,x): #not currently used due to concat of user, item embedding
         new_x_shape = x.size()[:-1] + (self.num_heads, self.attention_head_size)
@@ -478,14 +512,7 @@ class SelfAttention(nn.Module):
         attention_score = torch.matmul(query,key.transpose(-1,-2)) / self.sqrt_scale
         attention_score = attention_score + attention_mask
 
-        # if attention_mask.dim() == 2:
-        #     attention_mask = attention_mask.unsqueeze(0).expand(attention_score.size(0), -1, -1)
-        #     attention_score = attention_score + (attention_mask.unsqueeze(1).to(torch.float32) - 1) * 100000000
-        # else:
-        #     attention_mask = attention_mask.unsqueeze(1).expand(-1, attention_score.size(1), -1, -1)
-        #     attention_score = attention_score + (attention_mask.to(torch.float32) - 1) * 100000000
-
-        attention_prob = F.softmax(attention_score, dim=-1)
+        attention_prob = nn.Softmax( dim=-1)(attention_score)
         attention_prob = self.attn_dropout(attention_prob)
 
         context = torch.matmul(attention_prob, value)
@@ -510,7 +537,7 @@ class FeedForward(nn.Module):
         self.inner_layer = nn.Linear(self.hidden_units,self.hidden_units*4)
         self.activation = nn.GELU()
         self.outer_layer = nn.Linear(self.hidden_units*4,self.hidden_units)
-        self.layernorm = nn.LayerNorm(self.hidden_units, eps=1e-8)
+        self.layernorm = nn.LayerNorm(self.hidden_units, eps=1e-12)
         self.dropout = nn.Dropout(args.hidden_dropout_prob)
 
     def forward(self,seq):
@@ -519,7 +546,7 @@ class FeedForward(nn.Module):
         hidden_state = self.activation(hidden_state)
         hidden_state = self.outer_layer(hidden_state)
         hidden_state = self.dropout(hidden_state)
-        hidden_state = self.layernorm(hidden_state)
+        hidden_state = self.layernorm(hidden_state+seq)
 
         return hidden_state
 
@@ -531,14 +558,14 @@ class EncoderLayer(nn.Module):
         super(EncoderLayer, self).__init__()
 
         self.base_attention = SelfAttention(args)
-        self.cluster_attention = Clustered_Attention(args)
+        #self.cluster_attention = Clustered_Attention(args)
         self.cluster_attention_chunking = Clustered_Attention_Chunking(args)
         self.feedforward = FeedForward(args)
 
     def forward(self, hidden_state, attention_mask,args):
         if args.attention_type == "Cluster":
             # perform Clustered Attention
-            attention_output = self.cluster_attention_chunking(hidden_state, args.cluster_id)
+            attention_output = self.cluster_attention_chunking(hidden_state, attention_mask, args.cluster_id)
 
         else:
             # perform Self-Attention

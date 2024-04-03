@@ -260,7 +260,7 @@ class UPTRecTrainer(Trainer):
 
                 gc.collect()
             
-            elif self.args.contrast_type in ["None"] and self.args.attention_type =="Cluseter" and epoch >= self.args.warm_up_epoches:
+            elif self.args.contrast_type in ["None"] and self.args.attention_type =="Cluster" and epoch >= self.args.warm_up_epoches:
                 print("Preparing Clustering for UPTRec: ")
                 self.model.eval()
                 kmeans_training_data = []
@@ -314,7 +314,7 @@ class UPTRecTrainer(Trainer):
                 for i, rec_batch in rec_cf_data_iter:
                     rec_batch = tuple(t.to(self.device) for t in rec_batch)
                     _, input_ids, target_pos, target_neg, _ = rec_batch
-                    sequence_output = self.model(input_ids,self.args)
+                    sequence_output = self.model.item_embedding(input_ids)
                     sequence_output = sequence_output.view(sequence_output.shape[0], -1) # [Batch max_length x hidden ]
                     sequence_output = sequence_output.detach().cpu().numpy()
 
@@ -328,7 +328,8 @@ class UPTRecTrainer(Trainer):
                             intent_id, seq2intent = cluster.query(sequence_output)
                             # seq2intent represents centroids
                             # intent_id rerpesents Cluster ID
-                        
+                    
+                    
                         self.args.cluster_id = intent_id
                     sequence_output = self.model(input_ids,self.args)
 

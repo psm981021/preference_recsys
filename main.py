@@ -11,6 +11,7 @@ import numpy as np
 import random
 import torch
 import argparse
+import time
 
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 
@@ -120,9 +121,10 @@ def main():
     parser.add_argument("--max_seq_length", default=50, type=int)
 
     # train args
+    parser.add_argument("--save_pt",type=str, default="False")
     parser.add_argument("--lr", type=float, default=0.001, help="learning rate of adam")
     parser.add_argument("--batch_size", type=int, default=256, help="number of batch_size")
-    parser.add_argument("--epochs", type=int, default=500, help="number of epochs")
+    parser.add_argument("--epochs", type=int, default=3000, help="number of epochs")
     parser.add_argument("--no_cuda", action="store_true")
     parser.add_argument("--log_freq", type=int, default=1, help="per epoch print res")
     parser.add_argument("--seed", default=1, type=int)
@@ -170,19 +172,19 @@ def main():
     if args.contrast_type == "None":
         cluster_dataset = SASRecDataset(args, user_seq[: int(len(user_seq) * args.training_data_ratio)], data_type="train")
         cluster_sampler = SequentialSampler(cluster_dataset)
-        cluster_dataloader = DataLoader(cluster_dataset, sampler=cluster_sampler, batch_size=args.batch_size)
+        cluster_dataloader = DataLoader(cluster_dataset, sampler=cluster_sampler, batch_size=args.batch_size, drop_last=True)
 
         train_dataset = SASRecDataset(args, user_seq[: int(len(user_seq) * args.training_data_ratio)], data_type="train")
         train_sampler = RandomSampler(train_dataset)
-        train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.batch_size)
+        train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.batch_size, drop_last=True)
 
         eval_dataset = SASRecDataset(args, user_seq, data_type="valid")
         eval_sampler = SequentialSampler(eval_dataset)
-        eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.batch_size)
+        eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.batch_size, drop_last=True)
 
         test_dataset = SASRecDataset(args, user_seq, data_type="test")
         test_sampler = SequentialSampler(test_dataset)
-        test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.batch_size)
+        test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.batch_size, drop_last=True)
 
     else:
         cluster_dataset = RecWithContrastiveLearningDataset(args, user_seq[: int(len(user_seq) * args.training_data_ratio)], data_type="train")
@@ -212,8 +214,12 @@ def main():
         scores, result_info = trainer.test(0, full_sort=True)
 
     else:
+        start_time = time.time()
+
         print(f"Train ICLRec")
-        early_stopping = EarlyStopping(args.checkpoint_path, patience=200, verbose=True)
+        early_stopping = EarlyStopping(args.checkpoint_path, patience=2000, verbose=True)
+        if args.save_pt == "True":
+            trainer.load(args.checkpoint_path)
         for epoch in range(args.epochs):
             trainer.train(epoch)
             # evaluate on NDCG@20
@@ -228,11 +234,19 @@ def main():
         trainer.model.load_state_dict(torch.load(args.checkpoint_path))
         scores, result_info = trainer.test(0, full_sort=True)
 
+        end_time = time.time()
+        execution_time = end_time - start_time
+
+        hours = int(execution_time // 3600)
+        minutes = int((execution_time % 3600) // 60)
+        seconds = int(execution_time % 60)
+
     print(args_str)
     print(result_info)
     with open(args.log_file, "a") as f:
         f.write(args_str + "\n")
         f.write(result_info + "\n")
+        f.write(f"To run Epoch:{args.epochs} , It took {hours} hours, {minutes} minutes, {seconds} seconds\n")
 
 
 main()
@@ -243,5 +257,15 @@ main()
 
 
 
-# baseline model can be used as SASRec
-# python main.py --model_idx="SASRec" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=15 --gpu_id=1
+# ------- baseline model can be used as SASRec ----------
+# python main.py --model_idx="SASRec" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=1 --gpu_id=1
+    #continue training 
+# python main.py --model_idx="SASRec" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=1 --gpu_id=1 --save_pt="True"
+
+
+# ------- Cluster Attention for UPTRec ---------
+# test version
+# python main.py --model_idx="test" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=16 --gpu_id=0 --attention_type="Cluster"
+
+# run version
+# python main.py --model_idx="UPTRec_Clustered_Attention" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=16 --gpu_id=0 --attention_type="Cluster"x
