@@ -423,7 +423,7 @@ def ndcg_k(actual, predicted, topk):
 class EarlyStopping:
     """Early stops the training if validation loss doesn't improve after a given patience."""
 
-    def __init__(self, checkpoint_path, patience=7, verbose=False, delta=0):
+    def __init__(self,checkpoint_path, patience=7, verbose=False, delta=0):
         """
         Args:
             patience (int): How long to wait after last time validation loss improved.
@@ -469,13 +469,13 @@ class EarlyStopping:
         if self.verbose:
             # ({self.score_min:.6f} --> {score:.6f}) 
             print(f"Validation score increased.  Saving model ...")
-        #torch.save(model.state_dict(), self.checkpoint_path)
-        torch.save({
-            'epochs': self.args.epochs,
-            'model_state_dict': self.model.cpu().state_dict(),
+        torch.save(model.state_dict(), self.checkpoint_path)
+        # torch.save({
+        #     'epochs':self.args.epochs,
+        #     'model_state_dict':model.cpu().state_dict(),
             
-            # Save other necessary components...
-        }, self.checkpoint_path)
+        #     # Save other necessary components...
+        # }, self.checkpoint_path)
         self.score_min = score
 
 
