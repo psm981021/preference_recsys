@@ -124,20 +124,33 @@ class Trainer:
             "NDCG@5": "{:.6f}".format(ndcg[0]),
             "HIT@10": "{:.6f}".format(recall[1]),
             "NDCG@10": "{:.6f}".format(ndcg[1]),
+            "HIT@15": "{:.6f}".format(recall[2]),
+            "NDCG@15": "{:.6f}".format(ndcg[2]),
             "HIT@20": "{:.6f}".format(recall[3]),
             "NDCG@20": "{:.6f}".format(ndcg[3]),
         }
         print(post_fix)
         with open(self.args.log_file, "a") as f:
             f.write(str(post_fix) + "\n")
-        return [recall[0], ndcg[0], recall[1], ndcg[1], recall[3], ndcg[3]], str(post_fix)
+        return [recall[0], ndcg[0], recall[1], ndcg[1], recall[2], ndcg[2], recall[3], ndcg[3]], str(post_fix)
 
     def save(self, file_name):
-        torch.save(self.model.cpu().state_dict(), file_name)
+        torch.save({
+            'epochs': self.args.epochs,
+            'model_state_dict': self.model.cpu().state_dict(),
+            
+            # Save other necessary components...
+        }, file_name)
+
+        #torch.save(self.model.cpu().state_dict(), file_name)
+
         self.model.to(self.device)
 
     def load(self, file_name):
-        self.model.load_state_dict(torch.load(file_name))
+        #self.model.load_state_dict(torch.load(file_name))
+        checkpoint = torch.load(file_name)
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.args.start_epochs = checkpoint['epochs']
 
     def cross_entropy(self, seq_out, pos_ids, neg_ids):
         # [batch seq_len hidden_size]
@@ -273,8 +286,9 @@ class UPTRecTrainer(Trainer):
                     _, input_ids, target_pos, target_neg, _ = rec_batch
 
                     # check for validity, item_embedding vs model
-                    sequence_output = self.model.item_embedding(input_ids) #[Batch max_length hidden]
-                    
+                    #sequence_output = self.model.item_embedding(input_ids) #[Batch max_length hidden]
+                    sequence_output = self.model(input_ids,self.args) #[Batch max_length hidden]
+
                     sequence_output = sequence_output.view(sequence_output.shape[0], -1) # [Batch max_length x hidden ]
                     sequence_output = sequence_output.detach().cpu().numpy()
 
@@ -314,7 +328,10 @@ class UPTRecTrainer(Trainer):
                 for i, rec_batch in rec_cf_data_iter:
                     rec_batch = tuple(t.to(self.device) for t in rec_batch)
                     _, input_ids, target_pos, target_neg, _ = rec_batch
-                    sequence_output = self.model.item_embedding(input_ids)
+
+                    #sequence_output = self.model.item_embedding(input_ids)
+                    sequence_output = self.model(input_ids,self.args)
+                    
                     sequence_output = sequence_output.view(sequence_output.shape[0], -1) # [Batch max_length x hidden ]
                     sequence_output = sequence_output.detach().cpu().numpy()
 

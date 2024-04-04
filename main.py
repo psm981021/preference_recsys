@@ -124,7 +124,7 @@ def main():
     parser.add_argument("--save_pt",type=str, default="False")
     parser.add_argument("--lr", type=float, default=0.001, help="learning rate of adam")
     parser.add_argument("--batch_size", type=int, default=256, help="number of batch_size")
-    parser.add_argument("--epochs", type=int, default=3000, help="number of epochs")
+    parser.add_argument("--epochs", type=int, default=3500, help="number of epochs")
     parser.add_argument("--no_cuda", action="store_true")
     parser.add_argument("--log_freq", type=int, default=1, help="per epoch print res")
     parser.add_argument("--seed", default=1, type=int)
@@ -153,12 +153,12 @@ def main():
     args.mask_id = max_item + 1
 
     # save model args
-    args_str = f"{args.model_name}-{args.data_name}-{args.model_idx} -{args.num_intent_clusters}-{args.batch_size}"
+    args_str = f"{args.model_name}-{args.data_name}-{args.model_idx}-{args.num_intent_clusters}-{args.batch_size}"
     args.log_file = os.path.join(args.output_dir, args_str + ".txt")
 
     show_args_info(args)
 
-    with open(args.log_file, "w") as f:
+    with open(args.log_file, "a") as f:
         f.write(str(args) + "\n")
 
     # set item score in train set to `0` in validation
@@ -217,8 +217,10 @@ def main():
         start_time = time.time()
 
         print(f"Train ICLRec")
-        early_stopping = EarlyStopping(args.checkpoint_path, patience=2000, verbose=True)
-        if args.save_pt == "True":
+        early_stopping = EarlyStopping(args.checkpoint_path, patience=500, verbose=True)
+        args.start_epochs = 0
+        if os.path.exists(args.checkpoint_path):
+            print("continue learning");import IPython; IPython.embed(colors='Linux');exit(1)
             trainer.load(args.checkpoint_path)
         for epoch in range(args.epochs):
             trainer.train(epoch)
@@ -250,16 +252,16 @@ def main():
 
 
 main()
-# python main.py --model_idx="test" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=15 --gpu_id=1
-# python main.py --model_idx="baseline" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=15 --gpu_id=1
-# python main.py --model_idx="test" --seq_representation_type="concatenate"
 
 
+# test
+#python main.py --model_idx="test_" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=16 --gpu_id=0 --attention_type="Cluster" --epochs=10 --save_pt="True"
 
 
 # ------- baseline model can be used as SASRec ----------
 # python main.py --model_idx="SASRec" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=1 --gpu_id=1
-    #continue training 
+
+#continue training 
 # python main.py --model_idx="SASRec" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=1 --gpu_id=1 --save_pt="True"
 
 
@@ -267,5 +269,8 @@ main()
 # test version
 # python main.py --model_idx="test" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=16 --gpu_id=0 --attention_type="Cluster"
 
-# run version
-# python main.py --model_idx="UPTRec_Clustered_Attention" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=16 --gpu_id=0 --attention_type="Cluster"x
+# run version - clustering using item embedding
+# python main.py --model_idx="UPTRec_Clustered_Attention" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=16 --gpu_id=0 --attention_type="Cluster"
+
+# 
+#python main.py --model_idx="UPTRec_Clustered_Attention_encoder" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=16 --gpu_id=0 --attention_type="Cluster"

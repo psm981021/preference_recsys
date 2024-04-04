@@ -469,7 +469,13 @@ class EarlyStopping:
         if self.verbose:
             # ({self.score_min:.6f} --> {score:.6f}) 
             print(f"Validation score increased.  Saving model ...")
-        torch.save(model.state_dict(), self.checkpoint_path)
+        #torch.save(model.state_dict(), self.checkpoint_path)
+        torch.save({
+            'epochs': self.args.epochs,
+            'model_state_dict': self.model.cpu().state_dict(),
+            
+            # Save other necessary components...
+        }, self.checkpoint_path)
         self.score_min = score
 
 
