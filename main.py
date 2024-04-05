@@ -206,10 +206,11 @@ def main():
     model = UPTRec(args=args)
     
     trainer = UPTRecTrainer(model, train_dataloader, cluster_dataloader, eval_dataloader, test_dataloader, args)
-
+    
     if args.do_eval:
         trainer.args.train_matrix = test_rating_matrix
         trainer.load(args.checkpoint_path)
+        args.pca = "True"
         print(f"Load model from {args.checkpoint_path} for test!")
         scores, result_info = trainer.test(0, full_sort=True)
 
@@ -261,16 +262,19 @@ main()
 # ------- baseline model can be used as SASRec ----------
 # python main.py --model_idx="SASRec" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=1 --gpu_id=1
 
+# eval 
+# python main.py --model_name="ICLRec" --model_idx="Baseline" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=1 --gpu_id=1 --do_eval
+
 #continue training 
 # python main.py --model_idx="SASRec" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=1 --gpu_id=1 --save_pt="True"
 
 
 # ------- Cluster Attention for UPTRec ---------
-# test version
-# python main.py --model_idx="test" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=16 --gpu_id=0 --attention_type="Cluster"
-
 # run version - clustering using item embedding
 # python main.py --model_idx="UPTRec_Clustered_Attention" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=16 --gpu_id=0 --attention_type="Cluster"
 
-# 
+# run version - Clustering using encoder
 #python main.py --model_idx="UPTRec_Clustered_Attention_encoder" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=16 --gpu_id=0 --attention_type="Cluster"
+
+# eval
+# python main.py --model_idx="UPTRec_Clustered_Attention_item_embedding" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=16 --gpu_id=0 --attention_type="Cluster" --do_eval

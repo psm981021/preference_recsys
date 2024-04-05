@@ -20,6 +20,11 @@ from datasets import RecWithContrastiveLearningDataset
 from modules import NCELoss, NTXent, SupConLoss, PCLoss
 from utils import *
 
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
+from sklearn.decomposition import TruncatedSVD
+
 class Trainer:
     def __init__(self, model, train_dataloader, cluster_dataloader, eval_dataloader, test_dataloader, args):
 
@@ -147,10 +152,10 @@ class Trainer:
         self.model.to(self.device)
 
     def load(self, file_name):
-        #self.model.load_state_dict(torch.load(file_name))
-        checkpoint = torch.load(file_name)
-        self.model.load_state_dict(checkpoint['model_state_dict'])
-        self.args.start_epochs = checkpoint['epochs']
+        self.model.load_state_dict(torch.load(file_name))
+        # checkpoint = torch.load(file_name)
+        # self.model.load_state_dict(checkpoint['model_state_dict'])
+        # self.args.start_epochs = checkpoint['epochs']
 
     def cross_entropy(self, seq_out, pos_ids, neg_ids):
         # [batch seq_len hidden_size]
@@ -323,7 +328,6 @@ class UPTRecTrainer(Trainer):
             rec_cf_data_iter = tqdm(enumerate(dataloader), total=len(dataloader))
 
             if self.args.contrast_type in ["None"]:
-                print("Performing Rec model Training with Clustered Attention")
 
                 for i, rec_batch in rec_cf_data_iter:
                     rec_batch = tuple(t.to(self.device) for t in rec_batch)
@@ -472,6 +476,7 @@ class UPTRecTrainer(Trainer):
 
         else: # for valid and test
             rec_data_iter = tqdm(enumerate(dataloader), total=len(dataloader))
+            
             self.model.eval()
 
             pred_list = None
@@ -482,6 +487,26 @@ class UPTRecTrainer(Trainer):
                     # 0. batch_data will be sent into the device(GPU or cpu)
                     batch = tuple(t.to(self.device) for t in batch)
                     user_ids, input_ids, target_pos, target_neg, answers = batch
+                    if hasattr(self.args, 'pca') and i in [0,1,2,3,4,6,7,8,10,11,12,14,15,18,20,22,28,30,32,45,56,78,80]:
+                        embedding_transform = self.model.item_embedding(input_ids).view(256,-1).cpu().detach().numpy()
+
+                        pca = PCA(n_components=2)
+                        tsne = TSNE(n_components=2, perplexity=30.0)
+                        svd = TruncatedSVD(n_components=2)
+
+                        embedding_tsne = tsne.fit_transform(embedding_transform)
+                        embedding_svd = svd.fit_transform(embedding_transform)
+
+                        plt.figure(figsize=(10, 6))
+                        plt.scatter(embedding_svd[:, 0], embedding_svd[:, 1], label='t-sne', s=10)
+
+                        plt.title('t-SNE projection')
+                        plt.xlabel('Component 1')
+                        plt.ylabel('Component 2')
+                        plt.legend()
+
+                        plt.savefig('plot_tsne_Baseline_{}.png'.format(i))
+                        
                     recommend_output = self.model(input_ids,self.args)
 
                     recommend_output = recommend_output[:, -1, :]
@@ -505,6 +530,7 @@ class UPTRecTrainer(Trainer):
                     else:
                         pred_list = np.append(pred_list, batch_pred_list, axis=0)
                         answer_list = np.append(answer_list, answers.cpu().data.numpy(), axis=0)
+                import IPython; IPython.embed(colors='Linux');exit(1)
                 return self.get_full_sort_score(epoch, answer_list, pred_list)
 
             else:
