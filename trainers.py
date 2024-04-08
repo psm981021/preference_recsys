@@ -291,9 +291,7 @@ class UPTRecTrainer(Trainer):
                     _, input_ids, target_pos, target_neg, _ = rec_batch
 
                     # check for validity, item_embedding vs model
-                    #sequence_output = self.model.item_embedding(input_ids) #[Batch max_length hidden]
-                    sequence_output = self.model(input_ids,self.args) #[Batch max_length hidden]
-
+                    sequence_output = self.model.item_embedding(input_ids) #[Batch max_length hidden]
                     sequence_output = sequence_output.view(sequence_output.shape[0], -1) # [Batch max_length x hidden ]
                     sequence_output = sequence_output.detach().cpu().numpy()
 
@@ -329,13 +327,12 @@ class UPTRecTrainer(Trainer):
 
             if self.args.contrast_type in ["None"]:
 
+                print("Performing Rec model Training with UPTRec")
                 for i, rec_batch in rec_cf_data_iter:
                     rec_batch = tuple(t.to(self.device) for t in rec_batch)
                     _, input_ids, target_pos, target_neg, _ = rec_batch
 
-                    #sequence_output = self.model.item_embedding(input_ids)
-                    sequence_output = self.model(input_ids,self.args)
-                    
+                    sequence_output = self.model.item_embedding(input_ids)
                     sequence_output = sequence_output.view(sequence_output.shape[0], -1) # [Batch max_length x hidden ]
                     sequence_output = sequence_output.detach().cpu().numpy()
 
@@ -352,6 +349,7 @@ class UPTRecTrainer(Trainer):
                     
                     
                         self.args.cluster_id = intent_id
+                    
                     sequence_output = self.model(input_ids,self.args)
 
                     # ---------- recommendation task ---------------#
@@ -530,7 +528,7 @@ class UPTRecTrainer(Trainer):
                     else:
                         pred_list = np.append(pred_list, batch_pred_list, axis=0)
                         answer_list = np.append(answer_list, answers.cpu().data.numpy(), axis=0)
-                import IPython; IPython.embed(colors='Linux');exit(1)
+                
                 return self.get_full_sort_score(epoch, answer_list, pred_list)
 
             else:

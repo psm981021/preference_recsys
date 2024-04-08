@@ -563,8 +563,7 @@ class EncoderLayer(nn.Module):
         self.feedforward = FeedForward(args)
 
     def forward(self, hidden_state, attention_mask,args):
-        if args.attention_type == "Cluster" and hasattr(args, 'clsuter_id'):
-            print("Performing Rec model Training with Clustered Attention")
+        if args.attention_type == "Cluster" and hasattr(args, 'cluster_id'):
             # perform Clustered Attention
             attention_output = self.cluster_attention_chunking(hidden_state, attention_mask, args.cluster_id)
 

@@ -125,6 +125,7 @@ def main():
     parser.add_argument("--lr", type=float, default=0.001, help="learning rate of adam")
     parser.add_argument("--batch_size", type=int, default=256, help="number of batch_size")
     parser.add_argument("--epochs", type=int, default=3500, help="number of epochs")
+    parser.add_argument("--patience", type=int, default=100, help="early stopping patience")
     parser.add_argument("--no_cuda", action="store_true")
     parser.add_argument("--log_freq", type=int, default=1, help="per epoch print res")
     parser.add_argument("--seed", default=1, type=int)
@@ -158,7 +159,7 @@ def main():
 
     show_args_info(args)
 
-    with open(args.log_file, "a") as f:
+    with open(args.log_file, "w") as f:
         f.write(str(args) + "\n")
 
     # set item score in train set to `0` in validation
@@ -218,10 +219,10 @@ def main():
         start_time = time.time()
 
         print(f"Train ICLRec")
-        early_stopping = EarlyStopping(args.checkpoint_path, patience=500, verbose=True)
+        early_stopping = EarlyStopping(args.checkpoint_path, args.patience, verbose=True)
         args.start_epochs = 0
         if os.path.exists(args.checkpoint_path):
-            print("continue learning");import IPython; IPython.embed(colors='Linux');exit(1)
+            #print("continue learning");import IPython; IPython.embed(colors='Linux');exit(1)
             trainer.load(args.checkpoint_path)
         for epoch in range(args.epochs):
             trainer.train(epoch)
@@ -256,7 +257,7 @@ main()
 
 
 # test
-#python main.py --model_idx="test_" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=16 --gpu_id=0 --attention_type="Cluster" --epochs=10 --save_pt="True"
+#python main.py --model_idx="test_1" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=16 --gpu_id=0 --attention_type="Cluster" --epochs=10
 
 
 # ------- baseline model can be used as SASRec ----------
@@ -271,10 +272,29 @@ main()
 
 # ------- Cluster Attention for UPTRec ---------
 # run version - clustering using item embedding
-# python main.py --model_idx="UPTRec_Clustered_Attention" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=16 --gpu_id=0 --attention_type="Cluster"
+# python main.py --model_name="UPTRec" --model_idx="UPTRec_Clustered_Attention" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=16 --gpu_id=0 --attention_type="Cluster"
 
 # run version - Clustering using encoder
 #python main.py --model_idx="UPTRec_Clustered_Attention_encoder" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=16 --gpu_id=0 --attention_type="Cluster"
 
 # eval
 # python main.py --model_idx="UPTRec_Clustered_Attention_item_embedding" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=16 --gpu_id=0 --attention_type="Cluster" --do_eval
+# ---------- Amazon Beauty --------------
+
+# Basline 
+# scripts/Beauty/Baseline.sh
+
+# Clustered Attention Version - epoch 3500
+# scripts/Beauty/Cluster_Attention.sh    
+
+# ---------- Amazon Toys_and_Games -------------------
+
+# Clustered Attention Version - epoch 3500
+# scripts/Toys_and_Games/Cluster_Attention.sh    
+
+
+
+# ----------- Amazon Sports_and_Outdoors ---------------
+
+# Clustered Attention Version - epoch 3500
+# scripts/Sports_and_Outdoors/Cluster_Attention.sh  
