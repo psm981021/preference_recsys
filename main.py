@@ -230,6 +230,7 @@ def main():
             scores, _ = trainer.valid(epoch, full_sort=True)
             early_stopping(np.array(scores[-1:]), trainer.model)
             if early_stopping.early_stop:
+                save_epoch = epoch
                 print("Early stopping")
                 break
         trainer.args.train_matrix = test_rating_matrix
@@ -250,7 +251,7 @@ def main():
     with open(args.log_file, "a") as f:
         f.write(args_str + "\n")
         f.write(result_info + "\n")
-        f.write(f"To run Epoch:{args.epochs} , It took {hours} hours, {minutes} minutes, {seconds} seconds\n")
+        f.write(f"To run Epoch:{save_epoch} , It took {hours} hours, {minutes} minutes, {seconds} seconds\n")
 
 
 main()
