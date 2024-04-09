@@ -219,7 +219,7 @@ def main():
         start_time = time.time()
 
         print(f"Train ICLRec")
-        early_stopping = EarlyStopping(args.checkpoint_path, args.patience, verbose=True)
+        early_stopping = EarlyStopping(args.log_file,args.checkpoint_path, args.patience, verbose=True)
         args.start_epochs = 0
         if os.path.exists(args.checkpoint_path):
             #print("continue learning");import IPython; IPython.embed(colors='Linux');exit(1)
