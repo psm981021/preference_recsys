@@ -159,8 +159,6 @@ def main():
 
     show_args_info(args)
 
-    with open(args.log_file, "w") as f:
-        f.write(str(args) + "\n")
 
     # set item score in train set to `0` in validation
     args.train_matrix = valid_rating_matrix
@@ -168,6 +166,13 @@ def main():
     # save model
     checkpoint = args_str + ".pt"
     args.checkpoint_path = os.path.join(args.output_dir, checkpoint)
+    if os.path.exists(args.checkpoint_path):
+        with open(args.log_file, "a") as f:
+            f.write("------------------------------ Continue Training ------------------------------ \n")
+        
+    else:
+        with open(args.log_file, "a") as f:
+            f.write(str(args) + "\n")
 
     # training data for node classification
     if args.contrast_type == "None":
