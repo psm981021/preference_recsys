@@ -132,6 +132,7 @@ class RecWithContrastiveLearningDataset(Dataset):
             input_ids = items_with_noise[:-1]
             target_pos = items_with_noise[1:]
             answer = [items_with_noise[-1]]
+        
         if self.data_type == "train":
             cur_rec_tensors = self._data_sample_rec_task(user_id, items, input_ids, target_pos, answer)
             cf_tensors_list = []

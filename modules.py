@@ -229,6 +229,7 @@ class PCLoss(nn.Module):
         # don't do de-noise
         else:
             for intent in intents:
+                print("IntentCL debugging");import IPython; IPython.embed(colors='Linux');exit(1);
                 pos_one_compare_loss = self.criterion(batch_sample_one, intent, intent_ids=None)
                 pos_two_compare_loss = self.criterion(batch_sample_two, intent, intent_ids=None)
                 mean_pcl_loss += pos_one_compare_loss
