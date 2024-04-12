@@ -175,39 +175,22 @@ def main():
             f.write(str(args) + "\n")
 
     # training data for node classification
-    if args.contrast_type == "None":
-        cluster_dataset = SASRecDataset(args, user_seq[: int(len(user_seq) * args.training_data_ratio)], data_type="train")
-        cluster_sampler = SequentialSampler(cluster_dataset)
-        cluster_dataloader = DataLoader(cluster_dataset, sampler=cluster_sampler, batch_size=args.batch_size, drop_last=True)
 
-        train_dataset = SASRecDataset(args, user_seq[: int(len(user_seq) * args.training_data_ratio)], data_type="train")
-        train_sampler = RandomSampler(train_dataset)
-        train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.batch_size, drop_last=True)
+    cluster_dataset = RecWithContrastiveLearningDataset(args, user_seq[: int(len(user_seq) * args.training_data_ratio)], data_type="train")
+    cluster_sampler = SequentialSampler(cluster_dataset)
+    cluster_dataloader = DataLoader(cluster_dataset, sampler=cluster_sampler, batch_size=args.batch_size, drop_last=True)
 
-        eval_dataset = SASRecDataset(args, user_seq, data_type="valid")
-        eval_sampler = SequentialSampler(eval_dataset)
-        eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.batch_size, drop_last=True)
+    train_dataset = RecWithContrastiveLearningDataset(args, user_seq[: int(len(user_seq) * args.training_data_ratio)], data_type="train")
+    train_sampler = RandomSampler(train_dataset)
+    train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.batch_size, drop_last=True)
 
-        test_dataset = SASRecDataset(args, user_seq, data_type="test")
-        test_sampler = SequentialSampler(test_dataset)
-        test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.batch_size, drop_last=True)
+    eval_dataset = RecWithContrastiveLearningDataset(args, user_seq, data_type="valid")
+    eval_sampler = SequentialSampler(eval_dataset)
+    eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.batch_size, drop_last=True)
 
-    else:
-        cluster_dataset = RecWithContrastiveLearningDataset(args, user_seq[: int(len(user_seq) * args.training_data_ratio)], data_type="train")
-        cluster_sampler = SequentialSampler(cluster_dataset)
-        cluster_dataloader = DataLoader(cluster_dataset, sampler=cluster_sampler, batch_size=args.batch_size, drop_last=True)
-
-        train_dataset = RecWithContrastiveLearningDataset(args, user_seq[: int(len(user_seq) * args.training_data_ratio)], data_type="train")
-        train_sampler = RandomSampler(train_dataset)
-        train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.batch_size, drop_last=True)
-
-        eval_dataset = RecWithContrastiveLearningDataset(args, user_seq, data_type="valid")
-        eval_sampler = SequentialSampler(eval_dataset)
-        eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.batch_size, drop_last=True)
-
-        test_dataset = RecWithContrastiveLearningDataset(args, user_seq, data_type="test")
-        test_sampler = SequentialSampler(test_dataset)
-        test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.batch_size, drop_last=True)
+    test_dataset = RecWithContrastiveLearningDataset(args, user_seq, data_type="test")
+    test_sampler = SequentialSampler(test_dataset)
+    test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.batch_size, drop_last=True)
 
     model = UPTRec(args=args)
     
@@ -230,7 +213,6 @@ def main():
             #print("continue learning");import IPython; IPython.embed(colors='Linux');exit(1)
             trainer.load(args.checkpoint_path)
         for epoch in range(args.epochs):
-            
             trainer.train(epoch)
             # evaluate on NDCG@20
             scores, _ = trainer.valid(epoch, full_sort=True)
@@ -288,12 +270,14 @@ main()
 
 # eval
 # python main.py --model_idx="UPTRec_Clustered_Attention_item_embedding" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=16 --gpu_id=0 --attention_type="Cluster" --do_eval
+
+
 # ---------- Amazon Beauty --------------
 
 # Basline 
 # scripts/Beauty/Baseline.sh
 
-# Clustered Attention Version - epoch 3500
+# Clustered Attention Version
 # scripts/Beauty/Cluster_Attention.sh    
 
 # Clustered Attnetion + IntentCL
