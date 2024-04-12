@@ -222,6 +222,7 @@ class PCLoss(nn.Module):
         if intent_ids is not None:
             for intent, intent_id in zip(intents, intent_ids):
                 pos_one_compare_loss = self.criterion(batch_sample_one, intent, intent_id)
+                
                 pos_two_compare_loss = self.criterion(batch_sample_two, intent, intent_id)
                 mean_pcl_loss += pos_one_compare_loss
                 mean_pcl_loss += pos_two_compare_loss
@@ -229,7 +230,7 @@ class PCLoss(nn.Module):
         # don't do de-noise
         else:
             for intent in intents:
-            
+                
                 pos_one_compare_loss = self.criterion(batch_sample_one, intent, intent_ids=None)
                 pos_two_compare_loss = self.criterion(batch_sample_two, intent, intent_ids=None)
                 mean_pcl_loss += pos_one_compare_loss
@@ -353,6 +354,7 @@ class NCELoss(nn.Module):
         d = sim12.shape[-1]
         # avoid contrast against positive intents
         if intent_ids is not None:
+            
             intent_ids = intent_ids.contiguous().view(-1, 1)
             mask_11_22 = torch.eq(intent_ids, intent_ids.T).long().to(self.device)
             sim11[mask_11_22 == 1] = float("-inf")
@@ -361,7 +363,7 @@ class NCELoss(nn.Module):
             mask_11_22[eye_metrix == 1] = 0
             sim12[mask_11_22 == 1] = float("-inf")
         else:
-            print("IntentCL debugging");import IPython; IPython.embed(colors='Linux');exit(1);
+            
             mask = torch.eye(d, dtype=torch.long).to(self.device)
             sim11[mask == 1] = float("-inf")
             if sim22.shape != torch.Size([1]):
@@ -370,13 +372,12 @@ class NCELoss(nn.Module):
             # sim11[..., range(d), range(d)] = float('-inf')
             # sim22[..., range(d), range(d)] = float('-inf')
 
-        raw_scores1 = torch.cat([sim12, sim11], dim=-1)
-        raw_scores2 = torch.cat([sim22, sim12.transpose(-1, -2)], dim=-1)
+        raw_scores1 = torch.cat([sim12, sim11], dim=-1) #positive
+        raw_scores2 = torch.cat([sim22, sim12.transpose(-1, -2)], dim=-1) #negative
         logits = torch.cat([raw_scores1, raw_scores2], dim=-2)
         labels = torch.arange(2 * d, dtype=torch.long, device=logits.device)
         nce_loss = self.criterion(logits, labels)
         return nce_loss
-
 
 class NTXent(nn.Module):
     """
@@ -429,8 +430,10 @@ class Clustered_Attention_Chunking(nn.Module):
 
         seq_sort = seq.view(N, -1)
         sorted_indices = torch.argsort(cluster_id)
-        
-        seq_sorted = seq_sort[sorted_indices].view(N,C,E)
+        try:
+            seq_sorted = seq_sort[sorted_indices].view(N,C,E)
+        except:
+            import IPython; IPython.embed(colors='Linux'); exit(1);
         
         attention_outputs = []
         for i in range(int(self.args.num_intent_clusters)):

@@ -195,19 +195,19 @@ def main():
     else:
         cluster_dataset = RecWithContrastiveLearningDataset(args, user_seq[: int(len(user_seq) * args.training_data_ratio)], data_type="train")
         cluster_sampler = SequentialSampler(cluster_dataset)
-        cluster_dataloader = DataLoader(cluster_dataset, sampler=cluster_sampler, batch_size=args.batch_size)
+        cluster_dataloader = DataLoader(cluster_dataset, sampler=cluster_sampler, batch_size=args.batch_size, drop_last=True)
 
         train_dataset = RecWithContrastiveLearningDataset(args, user_seq[: int(len(user_seq) * args.training_data_ratio)], data_type="train")
         train_sampler = RandomSampler(train_dataset)
-        train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.batch_size)
+        train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.batch_size, drop_last=True)
 
         eval_dataset = RecWithContrastiveLearningDataset(args, user_seq, data_type="valid")
         eval_sampler = SequentialSampler(eval_dataset)
-        eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.batch_size)
+        eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.batch_size, drop_last=True)
 
         test_dataset = RecWithContrastiveLearningDataset(args, user_seq, data_type="test")
         test_sampler = SequentialSampler(test_dataset)
-        test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.batch_size)
+        test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.batch_size, drop_last=True)
 
     model = UPTRec(args=args)
     
@@ -223,13 +223,14 @@ def main():
     else:
         start_time = time.time()
 
-        print(f"Train ICLRec")
+        print(f"Train UPTRec")
         early_stopping = EarlyStopping(args.log_file,args.checkpoint_path, args.patience, verbose=True)
         args.start_epochs = 0
         if os.path.exists(args.checkpoint_path):
             #print("continue learning");import IPython; IPython.embed(colors='Linux');exit(1)
             trainer.load(args.checkpoint_path)
         for epoch in range(args.epochs):
+            
             trainer.train(epoch)
             # evaluate on NDCG@20
             scores, _ = trainer.valid(epoch, full_sort=True)
@@ -260,6 +261,8 @@ def main():
 
 
 main()
+
+# import IPython; IPython.embed(colors='Linux'); exit(1);
 
 
 # test
@@ -295,6 +298,7 @@ main()
 
 # Clustered Attnetion + IntentCL
 # scripts/Beauty/Cluster_Attention_IntentCL.sh    
+
 # ---------- Amazon Toys_and_Games -------------------
 
 # Clustered Attention Version - epoch 3500
