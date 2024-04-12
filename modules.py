@@ -229,7 +229,7 @@ class PCLoss(nn.Module):
         # don't do de-noise
         else:
             for intent in intents:
-                print("IntentCL debugging");import IPython; IPython.embed(colors='Linux');exit(1);
+            
                 pos_one_compare_loss = self.criterion(batch_sample_one, intent, intent_ids=None)
                 pos_two_compare_loss = self.criterion(batch_sample_two, intent, intent_ids=None)
                 mean_pcl_loss += pos_one_compare_loss
@@ -361,9 +361,11 @@ class NCELoss(nn.Module):
             mask_11_22[eye_metrix == 1] = 0
             sim12[mask_11_22 == 1] = float("-inf")
         else:
+            print("IntentCL debugging");import IPython; IPython.embed(colors='Linux');exit(1);
             mask = torch.eye(d, dtype=torch.long).to(self.device)
             sim11[mask == 1] = float("-inf")
-            sim22[mask == 1] = float("-inf")
+            if sim22.shape != torch.Size([1]):
+                sim22[mask == 1] = float("-inf")
             # sim22 = sim22.masked_fill_(mask, -np.inf)
             # sim11[..., range(d), range(d)] = float('-inf')
             # sim22[..., range(d), range(d)] = float('-inf')

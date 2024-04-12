@@ -293,6 +293,8 @@ main()
 # Clustered Attention Version - epoch 3500
 # scripts/Beauty/Cluster_Attention.sh    
 
+# Clustered Attnetion + IntentCL
+# scripts/Beauty/Cluster_Attention_IntentCL.sh    
 # ---------- Amazon Toys_and_Games -------------------
 
 # Clustered Attention Version - epoch 3500
