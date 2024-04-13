@@ -5468,3 +5468,53 @@ EarlyStopping counter: 67 out of 500
 {'Epoch': 1880, 'HIT@5': '0.042879', 'NDCG@5': '0.027790', 'HIT@10': '0.067574', 'NDCG@10': '0.035767', 'HIT@15': '0.087913', 'NDCG@15': '0.041152', 'HIT@20': '0.106591', 'NDCG@20': '0.045557'}
 EarlyStopping counter: 68 out of 500
 {'epoch': 1881, 'rec_avg_loss': '0.268433', 'joint_avg_loss': '0.000000'}
+{'Epoch': 1881, 'HIT@5': '0.042430', 'NDCG@5': '0.027505', 'HIT@10': '0.068741', 'NDCG@10': '0.035976', 'HIT@15': '0.088901', 'NDCG@15': '0.041304', 'HIT@20': '0.107175', 'NDCG@20': '0.045614'}
+EarlyStopping counter: 69 out of 500
+{'epoch': 1882, 'rec_avg_loss': '0.268677', 'joint_avg_loss': '0.000000'}
+{'Epoch': 1882, 'HIT@5': '0.043193', 'NDCG@5': '0.027967', 'HIT@10': '0.068696', 'NDCG@10': '0.036160', 'HIT@15': '0.089260', 'NDCG@15': '0.041588', 'HIT@20': '0.108342', 'NDCG@20': '0.046101'}
+EarlyStopping counter: 70 out of 500
+{'epoch': 1883, 'rec_avg_loss': '0.271354', 'joint_avg_loss': '0.000000'}
+{'Epoch': 1883, 'HIT@5': '0.043418', 'NDCG@5': '0.028074', 'HIT@10': '0.067753', 'NDCG@10': '0.035910', 'HIT@15': '0.088811', 'NDCG@15': '0.041453', 'HIT@20': '0.106142', 'NDCG@20': '0.045547'}
+EarlyStopping counter: 71 out of 500
+{'epoch': 1884, 'rec_avg_loss': '0.271192', 'joint_avg_loss': '0.000000'}
+{'Epoch': 1884, 'HIT@5': '0.042834', 'NDCG@5': '0.027277', 'HIT@10': '0.067933', 'NDCG@10': '0.035307', 'HIT@15': '0.088946', 'NDCG@15': '0.040845', 'HIT@20': '0.107175', 'NDCG@20': '0.045144'}
+EarlyStopping counter: 72 out of 500
+{'epoch': 1885, 'rec_avg_loss': '0.270381', 'joint_avg_loss': '0.000000'}
+{'Epoch': 1885, 'HIT@5': '0.040454', 'NDCG@5': '0.025924', 'HIT@10': '0.066137', 'NDCG@10': '0.034217', 'HIT@15': '0.086162', 'NDCG@15': '0.039499', 'HIT@20': '0.104301', 'NDCG@20': '0.043783'}
+EarlyStopping counter: 73 out of 500
+{'epoch': 1886, 'rec_avg_loss': '0.269087', 'joint_avg_loss': '0.000000'}
+{'Epoch': 1886, 'HIT@5': '0.041577', 'NDCG@5': '0.027011', 'HIT@10': '0.067663', 'NDCG@10': '0.035342', 'HIT@15': '0.088991', 'NDCG@15': '0.040973', 'HIT@20': '0.105963', 'NDCG@20': '0.044982'}
+EarlyStopping counter: 74 out of 500
+{'epoch': 1887, 'rec_avg_loss': '0.270385', 'joint_avg_loss': '0.000000'}
+{'Epoch': 1887, 'HIT@5': '0.043059', 'NDCG@5': '0.027572', 'HIT@10': '0.069325', 'NDCG@10': '0.035986', 'HIT@15': '0.090652', 'NDCG@15': '0.041609', 'HIT@20': '0.107669', 'NDCG@20': '0.045631'}
+EarlyStopping counter: 75 out of 500
+{'epoch': 1888, 'rec_avg_loss': '0.271501', 'joint_avg_loss': '0.000000'}
+{'Epoch': 1888, 'HIT@5': '0.043508', 'NDCG@5': '0.027870', 'HIT@10': '0.071345', 'NDCG@10': '0.036830', 'HIT@15': '0.090876', 'NDCG@15': '0.041987', 'HIT@20': '0.109151', 'NDCG@20': '0.046291'}
+EarlyStopping counter: 76 out of 500
+{'epoch': 1889, 'rec_avg_loss': '0.272228', 'joint_avg_loss': '0.000000'}
+{'Epoch': 1889, 'HIT@5': '0.042654', 'NDCG@5': '0.026914', 'HIT@10': '0.068382', 'NDCG@10': '0.035175', 'HIT@15': '0.088497', 'NDCG@15': '0.040485', 'HIT@20': '0.107040', 'NDCG@20': '0.044856'}
+EarlyStopping counter: 77 out of 500
+{'epoch': 1890, 'rec_avg_loss': '0.269062', 'joint_avg_loss': '0.000000'}
+{'Epoch': 1890, 'HIT@5': '0.042879', 'NDCG@5': '0.027327', 'HIT@10': '0.070133', 'NDCG@10': '0.036061', 'HIT@15': '0.090113', 'NDCG@15': '0.041331', 'HIT@20': '0.108342', 'NDCG@20': '0.045633'}
+EarlyStopping counter: 78 out of 500
+{'epoch': 1891, 'rec_avg_loss': '0.27083', 'joint_avg_loss': '0.000000'}
+{'Epoch': 1891, 'HIT@5': '0.041981', 'NDCG@5': '0.026901', 'HIT@10': '0.068427', 'NDCG@10': '0.035421', 'HIT@15': '0.089754', 'NDCG@15': '0.041056', 'HIT@20': '0.107489', 'NDCG@20': '0.045236'}
+EarlyStopping counter: 79 out of 500
+{'epoch': 1892, 'rec_avg_loss': '0.269844', 'joint_avg_loss': '0.000000'}
+{'Epoch': 1892, 'HIT@5': '0.042340', 'NDCG@5': '0.026758', 'HIT@10': '0.068472', 'NDCG@10': '0.035140', 'HIT@15': '0.091101', 'NDCG@15': '0.041117', 'HIT@20': '0.107534', 'NDCG@20': '0.044992'}
+EarlyStopping counter: 80 out of 500
+{'epoch': 1893, 'rec_avg_loss': '0.270051', 'joint_avg_loss': '0.000000'}
+{'Epoch': 1893, 'HIT@5': '0.042250', 'NDCG@5': '0.026624', 'HIT@10': '0.069010', 'NDCG@10': '0.035198', 'HIT@15': '0.089170', 'NDCG@15': '0.040529', 'HIT@20': '0.105244', 'NDCG@20': '0.044322'}
+EarlyStopping counter: 81 out of 500
+{'epoch': 1894, 'rec_avg_loss': '0.271001', 'joint_avg_loss': '0.000000'}
+{'Epoch': 1894, 'HIT@5': '0.041532', 'NDCG@5': '0.026798', 'HIT@10': '0.068517', 'NDCG@10': '0.035452', 'HIT@15': '0.090023', 'NDCG@15': '0.041144', 'HIT@20': '0.107444', 'NDCG@20': '0.045261'}
+EarlyStopping counter: 82 out of 500
+{'epoch': 1895, 'rec_avg_loss': '0.272914', 'joint_avg_loss': '0.000000'}
+{'Epoch': 1895, 'HIT@5': '0.041487', 'NDCG@5': '0.026293', 'HIT@10': '0.069055', 'NDCG@10': '0.035120', 'HIT@15': '0.088901', 'NDCG@15': '0.040350', 'HIT@20': '0.106906', 'NDCG@20': '0.044602'}
+EarlyStopping counter: 83 out of 500
+{'epoch': 1896, 'rec_avg_loss': '0.267349', 'joint_avg_loss': '0.000000'}
+{'Epoch': 1896, 'HIT@5': '0.043014', 'NDCG@5': '0.027210', 'HIT@10': '0.069459', 'NDCG@10': '0.035685', 'HIT@15': '0.090248', 'NDCG@15': '0.041177', 'HIT@20': '0.108118', 'NDCG@20': '0.045394'}
+EarlyStopping counter: 84 out of 500
+{'epoch': 1897, 'rec_avg_loss': '0.269741', 'joint_avg_loss': '0.000000'}
+{'Epoch': 1897, 'HIT@5': '0.040320', 'NDCG@5': '0.026024', 'HIT@10': '0.068112', 'NDCG@10': '0.034973', 'HIT@15': '0.089485', 'NDCG@15': '0.040626', 'HIT@20': '0.107310', 'NDCG@20': '0.044833'}
+EarlyStopping counter: 85 out of 500
