@@ -7,4 +7,5 @@ python main.py \
     --attention_type="Cluster" \
     --augment_type="mask" \
     --model_idx="UPTRec_Clustered_Attention_IntentCL" \
-    --num_intent_clusters=16 --gpu_id=1 --epochs=4000 --patience=500 --de_noise\ 
+    --num_intent_clusters=32
+    --gpu_id=1\ --epochs=2000\ --patience=500\ --batch_size=512\ --de_noise\ 
