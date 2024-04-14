@@ -8420,3 +8420,4 @@ EarlyStopping counter: 500 out of 500
 UPTRec-Beauty-UPTRec_Clustered_Attention_valid_test_adjusted-16-256
 {'Epoch': 0, 'HIT@5': '0.039107', 'NDCG@5': '0.025689', 'HIT@10': '0.060614', 'NDCG@10': '0.032611', 'HIT@15': '0.076015', 'NDCG@15': '0.036680', 'HIT@20': '0.090338', 'NDCG@20': '0.040063'}
 To run Epoch:829 , It took 10 hours, 40 minutes, 4 seconds
+

@@ -281,7 +281,10 @@ main()
 # scripts/Beauty/Cluster_Attention.sh    
 
 # Clustered Attnetion + IntentCL
-# scripts/Beauty/Cluster_Attention_IntentCL.sh    
+# scripts/Beauty/Cluster_Attention_IntentCL.sh   
+
+# Hyper parameter
+# scripts/Beauty/Cluster_Attention_IntentCL_hyper.sh 
 
 # ---------- Amazon Toys_and_Games -------------------
 
@@ -294,3 +297,6 @@ main()
 
 # Clustered Attention Version - epoch 3500
 # scripts/Sports_and_Outdoors/Cluster_Attention.sh  
+
+# Hyper parameter
+# scripts/Beauty/Cluster_Attention_IntentCL_hyper.sh 

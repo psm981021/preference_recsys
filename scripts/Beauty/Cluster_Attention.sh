@@ -7,4 +7,4 @@ python main.py \
     --seq_representation_type="concatenate" \
     --attention_type="Cluster" \
     --model_idx="UPTRec_Clustered_Attention_valid_test_adjusted" \
-    --num_intent_clusters=16 --gpu_id=1 --epochs=1000 --patience=500\ 
+    --num_intent_clusters=32 --gpu_id=0 --epochs=2000 --patience=500\ 
