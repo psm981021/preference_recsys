@@ -239,7 +239,10 @@ def main():
     with open(args.log_file, "a") as f:
         f.write(args_str + "\n")
         f.write(result_info + "\n")
-        f.write(f"To run Epoch:{save_epoch} , It took {hours} hours, {minutes} minutes, {seconds} seconds\n")
+        try:
+            f.write(f"To run Epoch:{save_epoch} , It took {hours} hours, {minutes} minutes, {seconds} seconds\n")
+        except:
+            f.write(f"To run Epoch:{args.epochs} , It took {hours} hours, {minutes} minutes, {seconds} seconds\n")
 
 
 main()
