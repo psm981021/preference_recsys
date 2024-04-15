@@ -222,7 +222,6 @@ class PCLoss(nn.Module):
         if intent_ids is not None:
             for intent, intent_id in zip(intents, intent_ids):
                 pos_one_compare_loss = self.criterion(batch_sample_one, intent, intent_id)
-                
                 pos_two_compare_loss = self.criterion(batch_sample_two, intent, intent_id)
                 mean_pcl_loss += pos_one_compare_loss
                 mean_pcl_loss += pos_two_compare_loss

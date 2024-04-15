@@ -210,7 +210,7 @@ def main():
         early_stopping = EarlyStopping(args.log_file,args.checkpoint_path, args.patience, verbose=True)
         args.start_epochs = 0
         if os.path.exists(args.checkpoint_path):
-            #print("continue learning");import IPython; IPython.embed(colors='Linux');exit(1)
+            
             trainer.load(args.checkpoint_path)
         for epoch in range(args.epochs):
             trainer.train(epoch)
@@ -285,6 +285,10 @@ main()
 
 # Clustered Attnetion + IntentCL
 # scripts/Beauty/Cluster_Attention_IntentCL.sh   
+
+# Clustered Attention + Hybrid
+# scripts/Beauty/Cluster_Attention_Hybrid.sh   
+
 
 # Hyper parameter
 # scripts/Beauty/Cluster_Attention_IntentCL_hyper.sh 
