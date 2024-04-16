@@ -346,9 +346,10 @@ class UPTRecTrainer(Trainer):
                         for cl_batch in cl_batches:
                             
                             if self.args.contrast_type == "InstanceCL":
+                                
                                 cl_loss = self._instance_cl_one_pair_contrastive_learning(
                                     cl_batch, intent_ids=seq_class_label_batches
-                                )
+                                    )
                                 cl_losses.append(self.args.cf_weight * cl_loss)
                             elif self.args.contrast_type == "IntentCL":
                                 # ------ performing clustering for getting users' intentions ----#
