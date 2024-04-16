@@ -203,7 +203,7 @@ class UPTRecTrainer(Trainer):
         """
         cl_batch = torch.cat(inputs, dim=0)
         
-        self.args.cluster_id = torch.cat((intent_ids, intent_ids), dim=0)
+        # self.args.cluster_id = torch.cat((intent_ids, intent_ids), dim=0)
         intent_ids = torch.cat((intent_ids[0], intent_ids[0]), dim=0)
 
         cl_batch = cl_batch.to(self.device)
@@ -233,7 +233,7 @@ class UPTRecTrainer(Trainer):
         n_views, (bsz, seq_len) = len(inputs), inputs[0].shape
         cl_batch = torch.cat(inputs, dim=0)
         
-        self.args.cluster_id = torch.cat((intent_ids[0], intent_ids[0]), dim=0)
+        # self.args.cluster_id = torch.cat((intent_ids[0], intent_ids[0]), dim=0)
         #intent_ids = torch.cat((intent_ids[0], intent_ids[0]), dim=0)
 
         cl_batch = cl_batch.to(self.device)
@@ -316,15 +316,18 @@ class UPTRecTrainer(Trainer):
                     item_embedding = item_embedding.view(item_embedding.shape[0], -1)
                     item_embedding = item_embedding.detach().cpu().numpy()
 
-                    if self.args.attention_type == "Cluster":
-                        for cluster in self.clusters:
-                            intent_id, seq2intent = cluster.query(item_embedding)
-
-                        self.args.cluster_id = intent_id
+                    # query on multiple clusters
+                    for cluster in self.clusters:
+                        seq2intents = []
+                        intent_ids = []
+                        intent_id, seq2intent = cluster.query(item_embedding)
+                        seq2intents.append(seq2intent)
+                        intent_ids.append(intent_id)
+                    #self.args.cluster_id = intent_id
 
                     # ---------- recommendation task ---------------#
                     
-                    sequence_output = self.model(input_ids,self.args)
+                    sequence_output = self.model(input_ids,self.args,intent_ids)
                     
                     rec_loss = self.cross_entropy(sequence_output, target_pos, target_neg)
 
@@ -365,9 +368,6 @@ class UPTRecTrainer(Trainer):
                                         seq2intents.append(seq2intent)
                                         intent_ids.append(intent_id)
                                     
-                                
-                                    self.args.cluster_id = intent_id
-                                    
                                     cl_loss = self._pcl_one_pair_contrastive_learning(cl_batch, intents=seq2intents, intent_ids=intent_ids)
                                     
                                     cl_losses.append(self.args.intent_cf_weight * cl_loss)
@@ -397,8 +397,6 @@ class UPTRecTrainer(Trainer):
                                         seq2intents.append(seq2intent)
                                         intent_ids.append(intent_id)
                                     
-                                
-                                    self.args.cluster_id = intent_id
                                     cl_loss3 = self._pcl_one_pair_contrastive_learning(
                                         cl_batch, intents=seq2intents, intent_ids=intent_ids
                                     )
@@ -463,19 +461,19 @@ class UPTRecTrainer(Trainer):
 
                         plt.savefig('plot_tsne_Baseline_{}.png'.format(i))
 
-                    # item_embedding = self.model.item_embedding(input_ids)
-                    # item_embedding = item_embedding.view(item_embedding.shape[0], -1)
-                    # item_embedding = item_embedding.detach().cpu().numpy()
+                    item_embedding = self.model.item_embedding(input_ids)
+                    item_embedding = item_embedding.view(item_embedding.shape[0], -1)
+                    item_embedding = item_embedding.detach().cpu().numpy()
 
-                    # for cluster in self.clusters:
-                    #     seq2intents = []
-                    #     intent_ids = []
-                    #     intent_id, seq2intent = cluster.query(item_embedding)
-                    #     seq2intents.append(seq2intent)
-                    #     intent_ids.append(intent_id)
+                    for cluster in self.clusters:
+                        seq2intents = []
+                        intent_ids = []
+                        intent_id, seq2intent = cluster.query(item_embedding)
+                        seq2intents.append(seq2intent)
+                        intent_ids.append(intent_id)
                     # self.args.cluster_id = intent_id
-
-                    recommend_output = self.model(input_ids,self.args)
+                    
+                    recommend_output = self.model(input_ids,self.args,intent_ids)
 
                     recommend_output = recommend_output[:, -1, :]
                     # recommendation results
@@ -511,8 +509,10 @@ class UPTRecTrainer(Trainer):
                         intent_id, seq2intent = cluster.query(item_embedding)
                         seq2intents.append(seq2intent)
                         intent_ids.append(intent_id)
-                    self.args.cluster_id = intent_id
-                    recommend_output = self.model.finetune(input_ids,self.args)
+
+
+                    # self.args.cluster_id = intent_id
+                    recommend_output = self.model.finetune(input_ids,self.args,intent_ids)
                     test_neg_items = torch.cat((answers, sample_negs), -1)
                     recommend_output = recommend_output[:, -1, :]
 

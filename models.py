@@ -321,7 +321,7 @@ class UPTRec(torch.nn.Module):
 
 
 
-    def forward(self,input_ids,args):
+    def forward(self,input_ids,args,cluster_id =None):
     
         attention_mask = (input_ids > 0)
         extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)  # torch.int64
@@ -340,7 +340,7 @@ class UPTRec(torch.nn.Module):
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
 
         sequence_embedding = self.UPTembedding(input_ids)
-        encoder_layer = self.encoder(sequence_embedding, extended_attention_mask,args)
+        encoder_layer = self.encoder(sequence_embedding, extended_attention_mask,args,cluster_id)
         sequence_output = encoder_layer[-1]
         
         return sequence_output 

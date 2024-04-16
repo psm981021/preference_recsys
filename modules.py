@@ -314,8 +314,6 @@ class PCLoss(nn.Module):
         # do de-noise
         if intent_ids is not None:
             for intent, intent_id in zip(intents, intent_ids):
-                print("NCELoss"); import IPython; IPython.embed(colors='Linux');exit(1);
-                # intent_ids가 잘 못 들어가고 있다.
                 pos_one_compare_loss = self.criterion(batch_sample_one, intent, intent_id)
                 pos_two_compare_loss = self.criterion(batch_sample_two, intent, intent_id)
                 mean_pcl_loss += pos_one_compare_loss
@@ -423,7 +421,7 @@ class Clustered_Attention_Chunking(nn.Module):
         self.attention = SelfAttention(args)
         pass
 
-    def forward(self, seq, attention_mask, cluster_id):
+    def forward(self, seq, attention_mask, cluster_id = None):
         #chunking
         N,C,E = seq.shape
         chunk_size = N // int(self.args.num_intent_clusters)
@@ -569,10 +567,11 @@ class EncoderLayer(nn.Module):
         self.cluster_attention_chunking = Clustered_Attention_Chunking(args)
         self.feedforward = FeedForward(args)
 
-    def forward(self, hidden_state, attention_mask,args):
-        if args.attention_type == "Cluster" and hasattr(args, 'cluster_id'):
+    def forward(self, hidden_state, attention_mask,args,cluster_id):
+        if cluster_id is not None:
+        # if args.attention_type == "Cluster" and hasattr(args, 'cluster_id'):
             # perform Clustered Attention
-            attention_output = self.cluster_attention_chunking(hidden_state, attention_mask, args.cluster_id)
+            attention_output = self.cluster_attention_chunking(hidden_state, attention_mask,cluster_id)
 
         else:
             # perform Self-Attention
@@ -591,11 +590,11 @@ class Encoder(nn.Module):
         layer = EncoderLayer(args)
         self.layer = nn.ModuleList([copy.deepcopy(layer) for _ in range(args.num_hidden_layers)])
     
-    def forward(self, hidden_state, attention_mask,args):
+    def forward(self, hidden_state, attention_mask,args,cluster_id):
         all_encoder_layer = []
 
         for layer_module in self.layer:
-            hidden_state = layer_module(hidden_state, attention_mask,args)
+            hidden_state = layer_module(hidden_state, attention_mask,args,cluster_id)
             all_encoder_layer.append(hidden_state)
 
         return all_encoder_layer
