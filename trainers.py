@@ -204,7 +204,7 @@ class UPTRecTrainer(Trainer):
         cl_batch = torch.cat(inputs, dim=0)
         
         # self.args.cluster_id = torch.cat((intent_ids, intent_ids), dim=0)
-        intent_ids = torch.cat((intent_ids[0], intent_ids[0]), dim=0)
+        #intent_ids = torch.cat((intent_ids[0], intent_ids[0]), dim=0)
 
         cl_batch = cl_batch.to(self.device)
         cl_sequence_output = self.model(cl_batch,self.args)

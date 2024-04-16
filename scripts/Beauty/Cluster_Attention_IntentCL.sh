@@ -1,6 +1,6 @@
-for augment_type in reorder
+for augment_type in mask
 do
-    for beta in 0.2 
+    for gamma in 0.7 
     do
         python main.py \
             --model_name="UPTRec" \
@@ -9,10 +9,10 @@ do
             --contrast_type="IntentCL" \
             --seq_representation_type="concatenate" \
             --attention_type="Cluster" \
-            --model_idx="UPTRec_Clustered_Attention_IntentCL_${augment_type}_${beta}_test" \
+            --model_idx="UPTRec_Clustered_Attention_IntentCL_${augment_type}_${gamma}" \
             --augment_type=$augment_type \
-            --beta=$beta \
-            --num_intent_clusters=16 --gpu_id=1 --epochs=3000 --patience=500 --de_noise
+            --gamma=$gamma \
+            --num_intent_clusters=32 --gpu_id=0 --epochs=2000 --patience=500 --de_noise
 
     done
 done
