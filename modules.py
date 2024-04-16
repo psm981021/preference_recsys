@@ -428,11 +428,14 @@ class Clustered_Attention_Chunking(nn.Module):
         N = chunk_size * int(self.args.num_intent_clusters)
 
         seq_sort = seq.view(N, -1)
-        sorted_indices = torch.argsort(cluster_id)
+        try:
+            sorted_indices = torch.argsort(cluster_id[0])
+        except:
+            print("error with cluster_id in modules"); import IPython; IPython.embed(colors='Linux');exit(1);
         try:
             seq_sorted = seq_sort[sorted_indices].view(N,C,E)
         except:
-            import IPython; IPython.embed(colors='Linux'); exit(1);
+            print("Error with sorting in Cluster Attention");import IPython; IPython.embed(colors='Linux'); exit(1);
         
         attention_outputs = []
         for i in range(int(self.args.num_intent_clusters)):
