@@ -463,17 +463,17 @@ class UPTRecTrainer(Trainer):
 
                         plt.savefig('plot_tsne_Baseline_{}.png'.format(i))
 
-                    item_embedding = self.model.item_embedding(input_ids)
-                    item_embedding = item_embedding.view(item_embedding.shape[0], -1)
-                    item_embedding = item_embedding.detach().cpu().numpy()
+                    # item_embedding = self.model.item_embedding(input_ids)
+                    # item_embedding = item_embedding.view(item_embedding.shape[0], -1)
+                    # item_embedding = item_embedding.detach().cpu().numpy()
 
-                    for cluster in self.clusters:
-                        seq2intents = []
-                        intent_ids = []
-                        intent_id, seq2intent = cluster.query(item_embedding)
-                        seq2intents.append(seq2intent)
-                        intent_ids.append(intent_id)
-                    self.args.cluster_id = intent_id
+                    # for cluster in self.clusters:
+                    #     seq2intents = []
+                    #     intent_ids = []
+                    #     intent_id, seq2intent = cluster.query(item_embedding)
+                    #     seq2intents.append(seq2intent)
+                    #     intent_ids.append(intent_id)
+                    # self.args.cluster_id = intent_id
 
                     recommend_output = self.model(input_ids,self.args)
 
