@@ -176,7 +176,7 @@ class Trainer:
         return loss
 
     def predict_sample(self, seq_out, test_neg_sample):
-        # [batch 100 hidden_size]
+        # [batch seq_length hidden_size]
         test_item_emb = self.model.item_embedding(test_neg_sample)
         # [batch hidden_size]
         test_logits = torch.bmm(test_item_emb, seq_out.unsqueeze(-1)).squeeze(-1)  # [B 100]
@@ -204,6 +204,7 @@ class UPTRecTrainer(Trainer):
         cl_batch = torch.cat(inputs, dim=0)
         
         self.args.cluster_id = torch.cat((intent_ids, intent_ids), dim=0)
+        intent_ids = torch.cat((intent_ids[0], intent_ids[0]), dim=0)
 
         cl_batch = cl_batch.to(self.device)
         cl_sequence_output = self.model(cl_batch,self.args)
@@ -233,6 +234,7 @@ class UPTRecTrainer(Trainer):
         cl_batch = torch.cat(inputs, dim=0)
         
         self.args.cluster_id = torch.cat((intent_ids[0], intent_ids[0]), dim=0)
+        #intent_ids = torch.cat((intent_ids[0], intent_ids[0]), dim=0)
 
         cl_batch = cl_batch.to(self.device)
         cl_sequence_output = self.model(cl_batch,self.args)
@@ -242,7 +244,8 @@ class UPTRecTrainer(Trainer):
         cl_sequence_flatten = cl_sequence_output.view(cl_batch.shape[0], -1)
         
         cl_output_slice = torch.split(cl_sequence_flatten, bsz)
-        if self.args.de_noise:
+        #PCLoss
+        if self.args.de_noise: 
             cl_loss = self.pcl_criterion(cl_output_slice[0], cl_output_slice[1], intents=intents, intent_ids=intent_ids)
         else:
             cl_loss = self.pcl_criterion(cl_output_slice[0], cl_output_slice[1], intents=intents, intent_ids=None)

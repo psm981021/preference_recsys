@@ -9,10 +9,10 @@ do
             --contrast_type="IntentCL" \
             --seq_representation_type="concatenate" \
             --attention_type="Cluster" \
-            --model_idx="UPTRec_Clustered_Attention_IntentCL_${augment_type}_${beta}" \
+            --model_idx="UPTRec_Clustered_Attention_IntentCL_${augment_type}_${beta}_test" \
             --augment_type=$augment_type \
             --beta=$beta \
-            --num_intent_clusters=16 --gpu_id=1 --epochs=3000 --patience=500\ 
+            --num_intent_clusters=16 --gpu_id=1 --epochs=3000 --patience=500 --de_noise
 
     done
 done

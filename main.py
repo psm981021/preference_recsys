@@ -214,6 +214,7 @@ def main():
             trainer.load(args.checkpoint_path)
         for epoch in range(args.epochs):
             trainer.train(epoch)
+            
             # evaluate on NDCG@20
             scores, _ = trainer.valid(epoch, full_sort=True)
             early_stopping(np.array(scores[-1:]), trainer.model)

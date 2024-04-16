@@ -202,41 +202,6 @@ class Clustered_Attention(nn.Module):
         return V_new
     
 
-class PCLoss(nn.Module):
-    """ Reference: https://github.com/salesforce/PCL/blob/018a929c53fcb93fd07041b1725185e1237d2c0e/pcl/builder.py#L168
-    """
-
-    def __init__(self, temperature, device, contrast_mode="all"):
-        super(PCLoss, self).__init__()
-        self.contrast_mode = contrast_mode
-        self.criterion = NCELoss(temperature, device)
-
-    def forward(self, batch_sample_one, batch_sample_two, intents, intent_ids):
-        """
-        features: 
-        intents: num_clusters x batch_size x hidden_dims
-        """
-        # instance contrast with prototypes
-        mean_pcl_loss = 0
-        # do de-noise
-        if intent_ids is not None:
-            for intent, intent_id in zip(intents, intent_ids):
-                pos_one_compare_loss = self.criterion(batch_sample_one, intent, intent_id)
-                pos_two_compare_loss = self.criterion(batch_sample_two, intent, intent_id)
-                mean_pcl_loss += pos_one_compare_loss
-                mean_pcl_loss += pos_two_compare_loss
-            mean_pcl_loss /= 2 * len(intents)
-        # don't do de-noise
-        else:
-            for intent in intents:
-                
-                pos_one_compare_loss = self.criterion(batch_sample_one, intent, intent_ids=None)
-                pos_two_compare_loss = self.criterion(batch_sample_two, intent, intent_ids=None)
-                mean_pcl_loss += pos_one_compare_loss
-                mean_pcl_loss += pos_two_compare_loss
-            mean_pcl_loss /= 2 * len(intents)
-        return mean_pcl_loss
-
 
 class SupConLoss(nn.Module):
     """Supervised Contrastive Learning: https://arxiv.org/pdf/2004.11362.pdf.
@@ -328,7 +293,44 @@ class SupConLoss(nn.Module):
         loss = loss.view(anchor_count, batch_size).mean()
 
         return loss
+    
+    
+class PCLoss(nn.Module):
+    """ Reference: https://github.com/salesforce/PCL/blob/018a929c53fcb93fd07041b1725185e1237d2c0e/pcl/builder.py#L168
+    """
 
+    def __init__(self, temperature, device, contrast_mode="all"):
+        super(PCLoss, self).__init__()
+        self.contrast_mode = contrast_mode
+        self.criterion = NCELoss(temperature, device)
+
+    def forward(self, batch_sample_one, batch_sample_two, intents, intent_ids):
+        """
+        features: 
+        intents: num_clusters x batch_size x hidden_dims
+        """
+        # instance contrast with prototypes
+        mean_pcl_loss = 0
+        # do de-noise
+        if intent_ids is not None:
+            for intent, intent_id in zip(intents, intent_ids):
+                print("NCELoss"); import IPython; IPython.embed(colors='Linux');exit(1);
+                # intent_ids가 잘 못 들어가고 있다.
+                pos_one_compare_loss = self.criterion(batch_sample_one, intent, intent_id)
+                pos_two_compare_loss = self.criterion(batch_sample_two, intent, intent_id)
+                mean_pcl_loss += pos_one_compare_loss
+                mean_pcl_loss += pos_two_compare_loss
+            mean_pcl_loss /= 2 * len(intents)
+        # don't do de-noise
+        else:
+            for intent in intents:
+                
+                pos_one_compare_loss = self.criterion(batch_sample_one, intent, intent_ids=None)
+                pos_two_compare_loss = self.criterion(batch_sample_two, intent, intent_ids=None)
+                mean_pcl_loss += pos_one_compare_loss
+                mean_pcl_loss += pos_two_compare_loss
+            mean_pcl_loss /= 2 * len(intents)
+        return mean_pcl_loss
 
 class NCELoss(nn.Module):
     """
@@ -353,7 +355,7 @@ class NCELoss(nn.Module):
         d = sim12.shape[-1]
         # avoid contrast against positive intents
         if intent_ids is not None:
-            
+            #intent_ids should be list
             intent_ids = intent_ids.contiguous().view(-1, 1)
             mask_11_22 = torch.eq(intent_ids, intent_ids.T).long().to(self.device)
             sim11[mask_11_22 == 1] = float("-inf")
