@@ -8,6 +8,9 @@ data/embedding/
 data/ml-1m/
 data/*.txt
 
+data/preprocess.py
+data/preprocess.ipynb
+
 #result log
 result_log/
 

@@ -428,14 +428,9 @@ class Clustered_Attention_Chunking(nn.Module):
         N = chunk_size * int(self.args.num_intent_clusters)
 
         seq_sort = seq.view(N, -1)
-        try:
-            sorted_indices = torch.argsort(cluster_id[0])
-        except:
-            print("error with cluster_id in modules"); import IPython; IPython.embed(colors='Linux');exit(1);
-        try:
-            seq_sorted = seq_sort[sorted_indices].view(N,C,E)
-        except:
-            print("Error with sorting in Cluster Attention");import IPython; IPython.embed(colors='Linux'); exit(1);
+        sorted_indices = torch.argsort(cluster_id[0])
+        seq_sorted = seq_sort[sorted_indices].view(N,C,E)
+            
         
         attention_outputs = []
         for i in range(int(self.args.num_intent_clusters)):
@@ -450,24 +445,27 @@ class Clustered_Attention_Chunking(nn.Module):
             #check validity, if score does not improve change query R wxd Key,Value to R wx2d
             attention_output = self.attention(chunk_seq,chunk_attention_mask_)
             attention_outputs.append(attention_output)
-        
+            
         outputs = torch.cat(attention_outputs, dim=0)
-        
-        # #postpone
-        # for chunk_seq in seq_sorted_chunk.unbind(1):
             
-        #     attention_output = self.attention(chunk_seq)
-        #     attention_outputs.append(attention_output)
-
-            
-
         # concat after attention
         reverse_indices = torch.argsort(sorted_indices)
-        try: 
-            seq_sort = outputs.view(N,-1)
-        except:
-            print("Clustered Attention Debugging");import IPython;IPython.embed(colors='Linux');exit(1)
+        seq_sort = outputs.view(N,-1)
         output = seq_sort[reverse_indices].view(N,C,E)
+        # start_idx = torch.arange(0, N, chunk_size)
+        # end_idx = start_idx + chunk_size
+        # chunk_seq = seq_sorted[start_idx[:, None], end_idx[:, None], :].reshape(-1, C, E)
+
+        # chunk_attention_mask_ = attention_mask[start_idx[:, None], :, :, :]
+        # chunk_attention_mask_ = chunk_attention_mask_.reshape(-1, chunk_attention_mask_.shape[2], chunk_attention_mask_.shape[3])
+
+        # attention_output = self.attention(chunk_seq, chunk_attention_mask_)
+        # outputs = attention_output.reshape(self.args.num_intent_clusters, chunk_size, C, E)
+
+        # reverse_indices = torch.argsort(sorted_indices)
+        # seq_sort = outputs.view(N, -1)
+        # output = seq_sort[reverse_indices].view(N, C, E)
+    
 
         return output
         

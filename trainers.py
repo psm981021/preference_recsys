@@ -207,7 +207,7 @@ class UPTRecTrainer(Trainer):
         #intent_ids = torch.cat((intent_ids[0], intent_ids[0]), dim=0)
 
         cl_batch = cl_batch.to(self.device)
-        cl_sequence_output = self.model(cl_batch,self.args)
+        cl_sequence_output = self.model(cl_batch,self.args,intent_ids)
         # cf_sequence_output = cf_sequence_output[:, -1, :]
 
         if self.args.seq_representation_instancecl_type == "mean":
@@ -237,7 +237,7 @@ class UPTRecTrainer(Trainer):
         #intent_ids = torch.cat((intent_ids[0], intent_ids[0]), dim=0)
 
         cl_batch = cl_batch.to(self.device)
-        cl_sequence_output = self.model(cl_batch,self.args)
+        cl_sequence_output = self.model(cl_batch,self.args,intent_ids)
 
         if self.args.seq_representation_type == "mean":
             cl_sequence_output = torch.mean(cl_sequence_output, dim=1, keepdim=False)
