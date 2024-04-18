@@ -12,6 +12,7 @@ do
             --model_idx="UPTRec_Clustered_Attention_Hybrid_${augment_type}_${gamma}" \
             --augment_type=$augment_type \
             --gamma=$gamma \
+            --n_views=$n_views \
             --num_intent_clusters=32 --gpu_id=1 --epochs=2000 --patience=500 --warm_up_epochs=40 --de_noise
 
     done

@@ -347,9 +347,9 @@ class NCELoss(nn.Module):
         # sim11 = self.cossim(batch_sample_one.unsqueeze(-2), batch_sample_one.unsqueeze(-3)) / self.temperature
         # sim22 = self.cossim(batch_sample_two.unsqueeze(-2), batch_sample_two.unsqueeze(-3)) / self.temperature
         # sim12 = self.cossim(batch_sample_one.unsqueeze(-2), batch_sample_two.unsqueeze(-3)) / self.temperature
-        sim11 = torch.matmul(batch_sample_one, batch_sample_one.T) / self.temperature
-        sim22 = torch.matmul(batch_sample_two, batch_sample_two.T) / self.temperature
-        sim12 = torch.matmul(batch_sample_one, batch_sample_two.T) / self.temperature
+        sim11 = torch.matmul(batch_sample_one, batch_sample_one.T) #/ self.temperature
+        sim22 = torch.matmul(batch_sample_two, batch_sample_two.T) #/ self.temperature
+        sim12 = torch.matmul(batch_sample_one, batch_sample_two.T) #/ self.temperature
         d = sim12.shape[-1]
         # avoid contrast against positive intents
         if intent_ids is not None:
@@ -372,7 +372,7 @@ class NCELoss(nn.Module):
             # sim22[..., range(d), range(d)] = float('-inf')
 
         raw_scores1 = torch.cat([sim12, sim11], dim=-1) #positive
-        raw_scores2 = torch.cat([sim22, sim12.transpose(-1, -2)], dim=-1) #negative
+        raw_scores2 = torch.cat([sim22, sim12.transpose(-1, -2)], dim=-1)/self.temperature #negative
         logits = torch.cat([raw_scores1, raw_scores2], dim=-2)
         labels = torch.arange(2 * d, dtype=torch.long, device=logits.device)
         nce_loss = self.criterion(logits, labels)
@@ -445,13 +445,14 @@ class Clustered_Attention_Chunking(nn.Module):
             #check validity, if score does not improve change query R wxd Key,Value to R wx2d
             attention_output = self.attention(chunk_seq,chunk_attention_mask_)
             attention_outputs.append(attention_output)
-            
+
         outputs = torch.cat(attention_outputs, dim=0)
             
         # concat after attention
         reverse_indices = torch.argsort(sorted_indices)
         seq_sort = outputs.view(N,-1)
         output = seq_sort[reverse_indices].view(N,C,E)
+
         # start_idx = torch.arange(0, N, chunk_size)
         # end_idx = start_idx + chunk_size
         # chunk_seq = seq_sorted[start_idx[:, None], end_idx[:, None], :].reshape(-1, C, E)
