@@ -16,7 +16,7 @@ do
                 --augment_type=$augment_type \
                 --n_views=$n_views \
                 --gamma=$gamma \
-                --num_intent_clusters=16 --gpu_id=0 --epochs=100 --patience=500 --warm_up_epochs=10 --de_noise
+                --num_intent_clusters=16 --gpu_id=0 --epochs=100 --patience=500 --warm_up_epoches=10 --de_noise
         done
     done
 done
@@ -38,7 +38,7 @@ do
                 --augment_type=$augment_type \
                 --temperature=$temperature \
                 --gamma=$gamma \
-                --num_intent_clusters=16 --gpu_id=0 --epochs=100 --patience=500 --warm_up_epochs=10 --de_noise
+                --num_intent_clusters=16 --gpu_id=0 --epochs=100 --patience=500 --warm_up_epoches=10 --de_noise
         done
     done
 done
@@ -63,7 +63,7 @@ do
                     --model_idx="UPTRec_Clustered_Attention_IntentCL_hyper_weight_${augment_type}_${gamma}_${cf_weight}_${rec_weight}_${intent_cf_weight}" \
                     --augment_type=$augment_type \
                     --gamma=$gamma \
-                    --num_intent_clusters=16 --gpu_id=0 --epochs=100 --patience=500 --warm_up_epochs=10 --de_noise 
+                    --num_intent_clusters=16 --gpu_id=0 --epochs=100 --patience=500 --warm_up_epoches=10 --de_noise 
         done
     done
 done

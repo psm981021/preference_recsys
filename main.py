@@ -293,6 +293,8 @@ main()
 
 # Hyper parameter
 # scripts/Beauty/Cluster_Attention_IntentCL_hyper.sh 
+# scripts/Beauty/Cluster_Attention_Hybrid_hyper.sh
+# scripts/Beauty/Cluster_Attention_IntentCL_hyper.sh
 
 # ---------- Amazon Toys_and_Games -------------------
 

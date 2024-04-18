@@ -207,7 +207,7 @@ class UPTRecTrainer(Trainer):
         #intent_ids = torch.cat((intent_ids[0], intent_ids[0]), dim=0)
 
         cl_batch = cl_batch.to(self.device)
-        cl_sequence_output = self.model(cl_batch,self.args,intent_ids)
+        cl_sequence_output = self.model(cl_batch,self.args)
         # cf_sequence_output = cf_sequence_output[:, -1, :]
 
         if self.args.seq_representation_instancecl_type == "mean":
@@ -234,7 +234,7 @@ class UPTRecTrainer(Trainer):
         cl_batch = torch.cat(inputs, dim=0)
         
         # self.args.cluster_id = torch.cat((intent_ids[0], intent_ids[0]), dim=0)
-        #intent_ids = torch.cat((intent_ids[0], intent_ids[0]), dim=0)
+        intent_ids = torch.cat((intent_ids[0], intent_ids[0]), dim=0)
 
         cl_batch = cl_batch.to(self.device)
         cl_sequence_output = self.model(cl_batch,self.args,intent_ids)
@@ -328,7 +328,7 @@ class UPTRecTrainer(Trainer):
                     # ---------- recommendation task ---------------#
                     
                     sequence_output = self.model(input_ids,self.args,intent_ids)
-                    
+                
                     rec_loss = self.cross_entropy(sequence_output, target_pos, target_neg)
 
                     if self.args.contrast_type in ["None"]:

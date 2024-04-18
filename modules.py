@@ -430,7 +430,6 @@ class Clustered_Attention_Chunking(nn.Module):
         seq_sort = seq.view(N, -1)
         sorted_indices = torch.argsort(cluster_id[0])
         seq_sorted = seq_sort[sorted_indices].view(N,C,E)
-            
         
         attention_outputs = []
         for i in range(int(self.args.num_intent_clusters)):
