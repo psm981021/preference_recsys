@@ -25,6 +25,11 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from sklearn.decomposition import TruncatedSVD
 
+import plotly.express as px
+import plotly.offline as pyo
+import pandas as pd
+
+
 class Trainer:
     def __init__(self, model, train_dataloader, cluster_dataloader, eval_dataloader, test_dataloader, args):
 
@@ -93,7 +98,7 @@ class Trainer:
         return self.iteration(epoch, self.eval_dataloader, full_sort=full_sort, train=False)
 
     def test(self, epoch, full_sort=False):
-        return self.iteration(epoch, self.test_dataloader, full_sort=full_sort, train=False)
+        return self.iteration(epoch, self.test_dataloader,self.cluster_dataloader, full_sort=full_sort, train=False)
 
     def iteration(self, epoch, dataloader, full_sort=False, train=True):
         raise NotImplementedError
@@ -232,13 +237,10 @@ class UPTRecTrainer(Trainer):
         """
         n_views, (bsz, seq_len) = len(inputs), inputs[0].shape
         cl_batch = torch.cat(inputs, dim=0)
-        
-        # self.args.cluster_id = torch.cat((intent_ids[0], intent_ids[0]), dim=0)
-        intent_ids = torch.cat((intent_ids[0], intent_ids[0]), dim=0)
 
         cl_batch = cl_batch.to(self.device)
         cl_sequence_output = self.model(cl_batch,self.args,intent_ids)
-
+        
         if self.args.seq_representation_type == "mean":
             cl_sequence_output = torch.mean(cl_sequence_output, dim=1, keepdim=False)
         cl_sequence_flatten = cl_sequence_output.view(cl_batch.shape[0], -1)
@@ -270,7 +272,6 @@ class UPTRecTrainer(Trainer):
                     _, input_ids, target_pos, target_neg, _ = rec_batch
                     #sequence_output = self.model(input_ids,self.args) #[Batch max_length hidden]
                     item_embedding = self.model.item_embedding(input_ids)
-
                     item_embedding = item_embedding.view(item_embedding.shape[0], -1).detach().cpu().numpy() # [Batch max_length x hidden ]
                     
                     kmeans_training_data.append(item_embedding) #[len(cluster_dataloader) Batch hidden]
@@ -431,37 +432,92 @@ class UPTRecTrainer(Trainer):
 
         else: # for valid and test
             rec_data_iter = tqdm(enumerate(dataloader), total=len(dataloader))
-            
             self.model.eval()
-
             pred_list = None
-
             if full_sort:
+                #### --------- embedding ------------ ###
+
+                if self.args.embedding :
+                    kmeans_training_data = []
+                    rec_cf_data_iter = tqdm(enumerate(cluster_dataloader), total=len(cluster_dataloader))
+                    for i, (rec_batch, _, _) in rec_cf_data_iter:
+                        
+                        rec_batch = tuple(t.to(self.device) for t in rec_batch)
+                        _, input_ids, target_pos, target_neg, _ = rec_batch
+                        #sequence_output = self.model(input_ids,self.args) #[Batch max_length hidden]
+                        item_embedding = self.model.item_embedding(input_ids)
+
+                        item_embedding = item_embedding.view(item_embedding.shape[0], -1).detach().cpu().numpy() 
+                        kmeans_training_data.append(item_embedding)
+
+                    kmeans_training_data = np.concatenate(kmeans_training_data, axis=0)
+
+                    tsne = TSNE(n_components=2, perplexity=30.0)
+                    embedding_2d = tsne.fit_transform(kmeans_training_data)
+                    
+                    
+                    plt.figure(figsize=(20, 20))
+                    plt.scatter(embedding_2d[:, 0], embedding_2d[:, 1], alpha=0.5)
+                    plt.tight_layout() 
+                    plt.savefig(f'{self.args.model_idx}_item_embedding_Baseline.png')
+                    plt.show()
+
+                #### --------- embedding ------------ ###
+
+                #### ---------- attention map --------- ####
+
+                if self.args.attention_map:
+
+                    kmeans_training_data = []
+                    rec_cf_data_iter = tqdm(enumerate(cluster_dataloader), total=len(cluster_dataloader))
+                    for i, (rec_batch, _, _) in rec_cf_data_iter:
+                        
+                        rec_batch = tuple(t.to(self.device) for t in rec_batch)
+                        _, input_ids, target_pos, target_neg, _ = rec_batch
+                        #sequence_output = self.model(input_ids,self.args) #[Batch max_length hidden]
+                        item_embedding = self.model.item_embedding(input_ids)
+                        item_embedding = item_embedding.view(item_embedding.shape[0], -1).detach().cpu().numpy() # [Batch max_length x hidden ]
+                        
+                        kmeans_training_data.append(item_embedding) #[len(cluster_dataloader) Batch hidden]
+                    
+                    kmeans_training_data = np.concatenate(kmeans_training_data, axis=0) #[* hidden]
+                    # train multiple clusters
+                    print("Training Clusters:")
+                    for i, cluster in tqdm(enumerate(self.clusters), total=len(self.clusters)):
+                        cluster.train(kmeans_training_data)
+                        self.clusters[i] = cluster
+                    # clean memory
+                    del kmeans_training_data
+
+
+                    rec_cf_data_iter = tqdm(enumerate(cluster_dataloader), total=len(cluster_dataloader))
+                    for i, (rec_batch, _, _) in rec_cf_data_iter:
+                        
+                        rec_batch = tuple(t.to(self.device) for t in rec_batch)
+                        _, input_ids, target_pos, target_neg, _ = rec_batch
+                        #sequence_output = self.model(input_ids,self.args) #[Batch max_length hidden]
+                        item_embedding = self.model.item_embedding(input_ids)
+                        item_embedding = item_embedding.view(item_embedding.shape[0], -1).detach().cpu().numpy() 
+
+                        
+                        for cluster in self.clusters:
+                            seq2intents = []
+                            intent_ids = []
+                            intent_id, seq2intent = cluster.query(item_embedding)
+                            seq2intents.append(seq2intent)
+                            intent_ids.append(intent_id)
+
+                    recommend_output = self.model(input_ids,self.args,intent_ids)
+
+
+
                 answer_list = None
+
+
                 for i, batch in rec_data_iter:
                     # 0. batch_data will be sent into the device(GPU or cpu)
                     batch = tuple(t.to(self.device) for t in batch)
                     user_ids, input_ids, target_pos, target_neg, answers = batch
-                    if hasattr(self.args, 'pca') and i in [0,1,2,3,4,6,7,8,10,11,12,14,15,18,20,22,28,30,32,45,56,78,80]:
-                        embedding_transform = self.model.item_embedding(input_ids).view(256,-1).cpu().detach().numpy()
-
-                        pca = PCA(n_components=2)
-                        tsne = TSNE(n_components=2, perplexity=30.0)
-                        svd = TruncatedSVD(n_components=2)
-
-                        embedding_tsne = tsne.fit_transform(embedding_transform)
-                        embedding_svd = svd.fit_transform(embedding_transform)
-
-                        plt.figure(figsize=(10, 6))
-                        plt.scatter(embedding_svd[:, 0], embedding_svd[:, 1], label='t-sne', s=10)
-
-                        plt.title('t-SNE projection')
-                        plt.xlabel('Component 1')
-                        plt.ylabel('Component 2')
-                        plt.legend()
-
-                        plt.savefig('plot_tsne_Baseline_{}.png'.format(i))
-
                     item_embedding = self.model.item_embedding(input_ids)
                     item_embedding = item_embedding.view(item_embedding.shape[0], -1)
                     item_embedding = item_embedding.detach().cpu().numpy()

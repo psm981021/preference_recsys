@@ -6,6 +6,9 @@ import copy
 import torch.nn.functional as F
 import numpy as np
 from fast_cluster import compute_hashes, clustered_aggregate, clustered_broadcast
+import matplotlib.pyplot as plt
+import seaborn as sns
+import random
 
 class _GroupQueries(torch.autograd.Function):
     @staticmethod
@@ -355,6 +358,7 @@ class NCELoss(nn.Module):
         if intent_ids is not None:
             #intent_ids should be list
             intent_ids = intent_ids.contiguous().view(-1, 1)
+
             mask_11_22 = torch.eq(intent_ids, intent_ids.T).long().to(self.device)
             sim11[mask_11_22 == 1] = float("-inf")
             sim22[mask_11_22 == 1] = float("-inf")
@@ -413,6 +417,20 @@ class NTXent(nn.Module):
         # TODO: maybe different terms for each process should only be computed here...
         loss = -logprob[np.repeat(np.arange(n), m - 1), labels].sum() / n / (m - 1) / self.norm
         return loss
+    
+def plot_attention_map(attention_map,args):
+    x_labels = [f'{index}' if index % 5 == 0 else '' for index in range(attention_map.shape[1])]
+    y_labels = [f'{index}' if index % 5 == 0 else '' for index in range(attention_map.shape[1])]
+
+    plt.figure(figsize=(15, 15))
+    sns.heatmap(attention_map, cmap='viridis', annot=False, xticklabels=x_labels, yticklabels=y_labels)
+    plt.xlabel('Item Index')
+    plt.ylabel('Item Index')
+    plt.title('Attention Map')
+    
+    # Save the figure with a random index, model_idx seems to be missing, using a placeholder
+    plt.savefig(f'attention_map_{random.randint(0, 100)}.png')
+    plt.show()
 
 class Clustered_Attention_Chunking(nn.Module):
     def __init__(self, args):
@@ -428,10 +446,22 @@ class Clustered_Attention_Chunking(nn.Module):
         N = chunk_size * int(self.args.num_intent_clusters)
 
         seq_sort = seq.view(N, -1)
-        sorted_indices = torch.argsort(cluster_id[0])
-        seq_sorted = seq_sort[sorted_indices].view(N,C,E)
+        if isinstance(cluster_id, list):
+            if N == len(cluster_id[0]):
+                sorted_indices = torch.argsort(cluster_id[0]) #cluster_id input as list
+            else:
+                cluster_id = torch.cat((cluster_id[0], cluster_id[0]), dim=0)
+                sorted_indices = torch.argsort(cluster_id)
+        else:
+            sorted_indices = torch.argsort(cluster_id)
+
+        try:    
+            seq_sorted = seq_sort[sorted_indices].view(N,C,E)
+        except:
+            print("\nClustered Attention Debugging");import IPython; IPython.embed(colors='Linux');exit(1);
         
         attention_outputs = []
+        attention_maps = []
         for i in range(int(self.args.num_intent_clusters)):
             #use chunking
             start_idx = i * chunk_size
@@ -442,16 +472,23 @@ class Clustered_Attention_Chunking(nn.Module):
             chunk_attention_mask_ = attention_mask[start_idx:end_idx,: , :, :]
 
             #check validity, if score does not improve change query R wxd Key,Value to R wx2d
-            attention_output = self.attention(chunk_seq,chunk_attention_mask_)
+            attention_output,map = self.attention(chunk_seq,chunk_attention_mask_)
             attention_outputs.append(attention_output)
+            attention_maps.append(map)
 
         outputs = torch.cat(attention_outputs, dim=0)
-            
+        attention_maps = torch.cat(attention_maps, dim=0)
+        map = attention_maps.view(N,-1) 
+
         # concat after attention
         reverse_indices = torch.argsort(sorted_indices)
         seq_sort = outputs.view(N,-1)
         output = seq_sort[reverse_indices].view(N,C,E)
 
+        seq_sort_map = outputs.view(N,-1)
+        output_map = seq_sort_map[reverse_indices].view(N,C,E)
+        plot_attention_map(output_map[0].detach().cpu().numpy(),self.args)
+        
         # start_idx = torch.arange(0, N, chunk_size)
         # end_idx = start_idx + chunk_size
         # chunk_seq = seq_sorted[start_idx[:, None], end_idx[:, None], :].reshape(-1, C, E)
@@ -531,7 +568,7 @@ class SelfAttention(nn.Module):
         hidden_state = self.output_dropout(hidden_state)
         hidden_state = self.layernorm(hidden_state + seq)
 
-        return hidden_state 
+        return hidden_state, attention_prob
 
 
 

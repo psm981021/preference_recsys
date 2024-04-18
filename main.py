@@ -37,6 +37,9 @@ def main():
     parser.add_argument("--do_eval", action="store_true")
     parser.add_argument("--model_idx", default="test", type=str, help="model idenfier")
     parser.add_argument("--gpu_id", type=str, default="0", help="gpu_id")
+    
+    parser.add_argument("--embedding", action="store_true")
+    parser.add_argument("--attention_map", action="store_true")
 
     # data augmentation args
     parser.add_argument(
@@ -199,7 +202,6 @@ def main():
     if args.do_eval:
         trainer.args.train_matrix = test_rating_matrix
         trainer.load(args.checkpoint_path)
-        args.pca = "True"
         print(f"Load model from {args.checkpoint_path} for test!")
         scores, result_info = trainer.test(0, full_sort=True)
 
@@ -210,7 +212,6 @@ def main():
         early_stopping = EarlyStopping(args.log_file,args.checkpoint_path, args.patience, verbose=True)
         args.start_epochs = 0
         if os.path.exists(args.checkpoint_path):
-            
             trainer.load(args.checkpoint_path)
         for epoch in range(args.epochs):
             trainer.train(epoch)

@@ -2,7 +2,7 @@ for augment_type in mask
 do
     for gamma in 0.7
     do
-        for n_views in 2 3 4
+        for n_views in 3 4
         do
             python main.py \
                 --model_name="UPTRec" \
@@ -24,7 +24,7 @@ for augment_type in mask
 do
     for gamma in 0.7
     do
-        for n_views in 2 3 4
+        for n_views in 2 4
         do
             python main.py \
                 --model_name="UPTRec" \
