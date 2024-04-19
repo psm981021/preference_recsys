@@ -5543,3 +5543,4 @@ EarlyStopping counter: 100 out of 100
 UPTRec-Beauty-UPTRec_Clustered_Attention_IntentCL-16-256
 {'Epoch': 0, 'HIT@5': '0.040365', 'NDCG@5': '0.026375', 'HIT@10': '0.063398', 'NDCG@10': '0.033758', 'HIT@15': '0.081762', 'NDCG@15': '0.038616', 'HIT@20': '0.096848', 'NDCG@20': '0.042176'}
 To run Epoch:115 , It took 1 hours, 56 minutes, 59 seconds
+------------------------------ Continue Training ------------------------------ 

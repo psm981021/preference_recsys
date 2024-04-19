@@ -419,8 +419,8 @@ class NTXent(nn.Module):
         return loss
     
 def plot_attention_map(attention_map,args):
-    x_labels = [f'{index}' if index % 5 == 0 else '' for index in range(attention_map.shape[1])]
-    y_labels = [f'{index}' if index % 5 == 0 else '' for index in range(attention_map.shape[1])]
+    x_labels = [f'{index}' if index % 5 == 0 else '' for index in range(50)]
+    y_labels = [f'{index}' if index % 5 == 0 else '' for index in range(50)]
 
     plt.figure(figsize=(15, 15))
     sns.heatmap(attention_map, cmap='viridis', annot=False, xticklabels=x_labels, yticklabels=y_labels)
@@ -461,7 +461,6 @@ class Clustered_Attention_Chunking(nn.Module):
             print("\nClustered Attention Debugging");import IPython; IPython.embed(colors='Linux');exit(1);
         
         attention_outputs = []
-        attention_maps = []
         for i in range(int(self.args.num_intent_clusters)):
             #use chunking
             start_idx = i * chunk_size
@@ -472,22 +471,16 @@ class Clustered_Attention_Chunking(nn.Module):
             chunk_attention_mask_ = attention_mask[start_idx:end_idx,: , :, :]
 
             #check validity, if score does not improve change query R wxd Key,Value to R wx2d
-            attention_output,map = self.attention(chunk_seq,chunk_attention_mask_)
+            attention_output = self.attention(chunk_seq,chunk_attention_mask_)
+            
             attention_outputs.append(attention_output)
-            attention_maps.append(map)
 
         outputs = torch.cat(attention_outputs, dim=0)
-        attention_maps = torch.cat(attention_maps, dim=0)
-        map = attention_maps.view(N,-1) 
 
         # concat after attention
         reverse_indices = torch.argsort(sorted_indices)
         seq_sort = outputs.view(N,-1)
         output = seq_sort[reverse_indices].view(N,C,E)
-
-        seq_sort_map = outputs.view(N,-1)
-        output_map = seq_sort_map[reverse_indices].view(N,C,E)
-        plot_attention_map(output_map[0].detach().cpu().numpy(),self.args)
         
         # start_idx = torch.arange(0, N, chunk_size)
         # end_idx = start_idx + chunk_size
@@ -568,7 +561,7 @@ class SelfAttention(nn.Module):
         hidden_state = self.output_dropout(hidden_state)
         hidden_state = self.layernorm(hidden_state + seq)
 
-        return hidden_state, attention_prob
+        return hidden_state
 
 
 

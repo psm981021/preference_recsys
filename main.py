@@ -37,7 +37,7 @@ def main():
     parser.add_argument("--do_eval", action="store_true")
     parser.add_argument("--model_idx", default="test", type=str, help="model idenfier")
     parser.add_argument("--gpu_id", type=str, default="0", help="gpu_id")
-    
+
     parser.add_argument("--embedding", action="store_true")
     parser.add_argument("--attention_map", action="store_true")
 
@@ -295,7 +295,6 @@ main()
 # Hyper parameter
 # scripts/Beauty/Cluster_Attention_IntentCL_hyper.sh 
 # scripts/Beauty/Cluster_Attention_Hybrid_hyper.sh
-# scripts/Beauty/Cluster_Attention_IntentCL_hyper.sh
 
 # ---------- Amazon Toys_and_Games -------------------
 

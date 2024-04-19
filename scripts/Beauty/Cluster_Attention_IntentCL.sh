@@ -16,3 +16,14 @@ do
 
     done
 done
+
+
+# python main.py \
+#     --model_name="UPTRec" \
+#     --data_name="Beauty"  \
+#     --output_dir="output_custom/Beauty/Cluster_Attention_IntentCL" \
+#     --contrast_type="IntentCL" \
+#     --seq_representation_type="concatenate" \
+#     --attention_type="Cluster" \
+#     --model_idx="UPTRec_Clustered_Attention_IntentCL" \
+#     --num_intent_clusters=16 --gpu_id=0 --epochs=1000 --patience=500 --warm_up_epoches=40 --do_eval --embedding

@@ -459,7 +459,7 @@ class UPTRecTrainer(Trainer):
                     plt.figure(figsize=(20, 20))
                     plt.scatter(embedding_2d[:, 0], embedding_2d[:, 1], alpha=0.5)
                     plt.tight_layout() 
-                    plt.savefig(f'{self.args.model_idx}_item_embedding_Baseline.png')
+                    plt.savefig(f'{self.args.model_idx}_item_embedding_Contrastive.png')
                     plt.show()
 
                 #### --------- embedding ------------ ###
