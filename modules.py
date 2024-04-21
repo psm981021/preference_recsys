@@ -350,9 +350,9 @@ class NCELoss(nn.Module):
         # sim11 = self.cossim(batch_sample_one.unsqueeze(-2), batch_sample_one.unsqueeze(-3)) / self.temperature
         # sim22 = self.cossim(batch_sample_two.unsqueeze(-2), batch_sample_two.unsqueeze(-3)) / self.temperature
         # sim12 = self.cossim(batch_sample_one.unsqueeze(-2), batch_sample_two.unsqueeze(-3)) / self.temperature
-        sim11 = torch.matmul(batch_sample_one, batch_sample_one.T) #/ self.temperature
-        sim22 = torch.matmul(batch_sample_two, batch_sample_two.T) #/ self.temperature
-        sim12 = torch.matmul(batch_sample_one, batch_sample_two.T) #/ self.temperature
+        sim11 = torch.matmul(batch_sample_one, batch_sample_one.T) / self.temperature
+        sim22 = torch.matmul(batch_sample_two, batch_sample_two.T) / self.temperature
+        sim12 = torch.matmul(batch_sample_one, batch_sample_two.T) / self.temperature
         d = sim12.shape[-1]
         # avoid contrast against positive intents
         if intent_ids is not None:
