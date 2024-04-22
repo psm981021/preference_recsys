@@ -22,7 +22,7 @@ from models import UPTRec, OfflineItemSimilarity, OnlineItemSimilarity
 from utils import *
 
 
-def show_args_info(args):
+def show_args_info(args,log_file):
     print(f"--------------------Configure Info:------------")
     for arg in vars(args):
         print(f"{arg:<30} : {getattr(args, arg):>35}")
@@ -96,7 +96,7 @@ def main():
         help="Ways of considering contexutal information using input_ids \
             Supports 'item_embedding' for low-dimensional representations and 'encoder' for high-dimensional representations"
     )
-    
+
     parser.add_argument(
         "--num_intent_clusters",
         default="256",
@@ -169,7 +169,7 @@ def main():
     args_str = f"{args.model_name}-{args.data_name}-{args.model_idx}-{args.num_intent_clusters}-{args.batch_size}"
     args.log_file = os.path.join(args.output_dir, args_str + ".txt")
 
-    show_args_info(args)
+    show_args_info(args,args.log_file)
 
 
     # set item score in train set to `0` in validation
@@ -219,10 +219,11 @@ def main():
 
         print(f"Train UPTRec")
         early_stopping = EarlyStopping(args.log_file,args.checkpoint_path, args.patience, verbose=True)
-        args.start_epochs = 0
         if os.path.exists(args.checkpoint_path):
+            print("Load pth")
             trainer.load(args.checkpoint_path)
         for epoch in range(args.epochs):
+            
             trainer.train(epoch)
             
             # evaluate on NDCG@20

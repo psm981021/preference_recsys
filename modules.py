@@ -540,34 +540,55 @@ class SelfAttention(nn.Module):
         return x.permute(0, 2, 1, 3)
     
     def forward(self, seq, attention_mask,key=None):
-        mix_query = self.query(seq)
-        mix_key = self.key(key)
-        mix_value = self.value(key)
-
-        query = self.transpose_for_scores(mix_query)
-        key = self.transpose_for_scores(mix_key)
-        value = self.transpose_for_scores(mix_value)
-
         if key is not None:
+
+            mix_query = self.query(seq)
+            mix_key = self.key(key)
+            mix_value = self.value(key)
+
+            query = self.transpose_for_scores(mix_query)
+            key = self.transpose_for_scores(mix_key)
+            value = self.transpose_for_scores(mix_value)
+
             b, h, l, _ = key.shape
             key_slice = torch.split(key, b // 2)
+            value_slice = torch.split(value, b // 2)
                                            
             attention_score1 = torch.matmul(query,key_slice[0].transpose(-1,-2)) / self.sqrt_scale 
             attention_score2 = torch.matmul(query,key_slice[1].transpose(-1,-2)) / self.sqrt_scale
 
-            # change
-            attention_score = (attention_score1 + attention_score2) / 2.0
-            
+            attention_score1 = attention_score1 + attention_mask
+            attention_prob_1 = nn.Softmax( dim=-1)(attention_score1)
+            attention_prob_1 = self.attn_dropout(attention_prob_1)
+
+            attention_score2 = attention_score2 + attention_mask
+            attention_prob_2 = nn.Softmax( dim=-1)(attention_score2)
+            attention_prob_2 = self.attn_dropout(attention_prob_2)
+
+            context_1 = torch.matmul(attention_prob_1, value_slice[0])
+            context_2 = torch.matmul(attention_prob_2, value_slice[1])
+
+            context = (context_1 + context_2) / 2.0
+            context = context.permute(0,2,1,3).contiguous() 
+
         else:
+            mix_query = self.query(seq)
+            mix_key = self.key(seq)
+            mix_value = self.value(seq)
+
+            query = self.transpose_for_scores(mix_query)
+            key = self.transpose_for_scores(mix_key)
+            value = self.transpose_for_scores(mix_value)
+
             attention_score = torch.matmul(query,key.transpose(-1,-2)) / self.sqrt_scale
-            
-        attention_score = attention_score + attention_mask
 
-        attention_prob = nn.Softmax( dim=-1)(attention_score)
-        attention_prob = self.attn_dropout(attention_prob)
+            attention_score = attention_score + attention_mask
 
-        context = torch.matmul(attention_prob, value)
-        context = context.permute(0,2,1,3).contiguous() 
+            attention_prob = nn.Softmax( dim=-1)(attention_score)
+            attention_prob = self.attn_dropout(attention_prob)
+
+            context = torch.matmul(attention_prob, value)
+            context = context.permute(0,2,1,3).contiguous() 
 
         new_context_layer_shape = context.size()[:-2] + (self.all_head_size,)
         context = context.view(*new_context_layer_shape)

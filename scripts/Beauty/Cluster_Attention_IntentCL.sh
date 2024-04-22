@@ -7,14 +7,19 @@ do
             --data_name="Beauty"  \
             --output_dir="output_custom/Beauty/Cluster_Attention_IntentCL" \
             --contrast_type="IntentCL" \
-            --context="encoder" \
+            --context="item_embedding" \
             --seq_representation_type="concatenate" \
             --attention_type="Cluster" \
-            --model_idx="UPTRec_Clustered_Attention_IntentCL_${augment_type}_${gamma}_nviews_3_temperature_0.3" \
+            --model_idx="UPTRec_Clustered_Attention_IntentCL_${augment_type}_${gamma}_item_embedding" \
             --augment_type=$augment_type \
             --gamma=$gamma \
-            --n_views=3\
-            --num_intent_clusters=16 --temperature=0.3 --gpu_id=1 --epochs=1000 --patience=500 --warm_up_epoches=40 \
+            --gpu_id=0 \
+            --n_views=3 \
+            --epochs=1000 \
+            --temperature=0.5 \
+            --patience=500 \
+            --warm_up_epoches=100 \
+            --num_intent_clusters=16 \
 
     done
 done
