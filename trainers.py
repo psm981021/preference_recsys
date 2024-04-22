@@ -212,7 +212,7 @@ class UPTRecTrainer(Trainer):
         #intent_ids = torch.cat((intent_ids[0], intent_ids[0]), dim=0)
 
         cl_batch = cl_batch.to(self.device)
-        cl_sequence_output = self.model(cl_batch,self.args)
+        cl_sequence_output = self.model(cl_batch,self.args, intent_ids)
         # cf_sequence_output = cf_sequence_output[:, -1, :]
 
         if self.args.seq_representation_instancecl_type == "mean":
@@ -247,6 +247,7 @@ class UPTRecTrainer(Trainer):
         
         cl_output_slice = torch.split(cl_sequence_flatten, bsz)
         #PCLoss
+
         if self.args.de_noise: 
             cl_loss = self.pcl_criterion(cl_output_slice[0], cl_output_slice[1], intents=intents, intent_ids=intent_ids)
         else:
@@ -261,7 +262,7 @@ class UPTRecTrainer(Trainer):
 
         if train:
             # ------ intentions clustering ----- #
-            if self.args.contrast_type in ["IntentCL", "Hybrid","None"]:
+            if self.args.contrast_type in ["IntentCL", "Hybrid","None"] and epoch >= self.args.warm_up_epoches :
                 print("Preparing Clustering:")
                 self.model.eval()
                 kmeans_training_data = []
@@ -270,11 +271,16 @@ class UPTRecTrainer(Trainer):
                     
                     rec_batch = tuple(t.to(self.device) for t in rec_batch)
                     _, input_ids, target_pos, target_neg, _ = rec_batch
-                    #sequence_output = self.model(input_ids,self.args) #[Batch max_length hidden]
-                    item_embedding = self.model.item_embedding(input_ids)
-                    item_embedding = item_embedding.view(item_embedding.shape[0], -1).detach().cpu().numpy() # [Batch max_length x hidden ]
-                    
-                    kmeans_training_data.append(item_embedding) #[len(cluster_dataloader) Batch hidden]
+
+                    if self.args.context == "encoder":
+                        sequence_output = self.model(input_ids,self.args)
+                        sequence_output = sequence_output.view(sequence_output.shape[0],-1).detach().cpu().numpy()
+                    if self.args.context == "item_embedding":
+                        sequence_output = self.model.item_embedding(input_ids)
+                        sequence_output = sequence_output.view(item_embedding.shape[0], -1).detach().cpu().numpy()
+
+
+                    kmeans_training_data.append(sequence_output) #[len(cluster_dataloader) Batch hidden]
                 
                 kmeans_training_data = np.concatenate(kmeans_training_data, axis=0) #[* hidden]
                 # train multiple clusters
@@ -288,7 +294,7 @@ class UPTRecTrainer(Trainer):
 
                 gc.collect()
                              
-        #train
+            #train
                 # ------ model training -----#
                 print("Model Training")
                 self.model.train()
@@ -312,27 +318,33 @@ class UPTRecTrainer(Trainer):
                     rec_batch = tuple(t.to(self.device) for t in rec_batch)
                     _, input_ids, target_pos, target_neg, _ = rec_batch
 
-                    
-                    item_embedding = self.model.item_embedding(input_ids)
-                    item_embedding = item_embedding.view(item_embedding.shape[0], -1)
-                    item_embedding = item_embedding.detach().cpu().numpy()
+                    if self.args.context == "encoder":
+                        sequence_output = self.model(input_ids,self.args)
+                        sequence_output = sequence_output.view(sequence_output.shape[0],-1).detach().cpu().numpy()
+                    if self.args.context == "item_embedding":
+                        sequence_output = self.model.item_embedding(input_ids)
+                        sequence_output = sequence_output.view(item_embedding.shape[0], -1).detach().cpu().numpy()
 
                     # query on multiple clusters
                     for cluster in self.clusters:
                         seq2intents = []
                         intent_ids = []
-                        intent_id, seq2intent = cluster.query(item_embedding)
+                        intent_id, seq2intent = cluster.query(sequence_output)
                         seq2intents.append(seq2intent)
                         intent_ids.append(intent_id)
                     #self.args.cluster_id = intent_id
 
                     # ---------- recommendation task ---------------#
-                    
-                    sequence_output = self.model(input_ids,self.args,intent_ids)
+                    if self.args.attention_type == "Cluster":
+                        sequence_output = self.model(input_ids,self.args,intent_ids)
+                    if self.args.attention_type == "Base":
+                        sequence_output = self.model(input_ids,self.args)
                 
+
                     rec_loss = self.cross_entropy(sequence_output, target_pos, target_neg)
 
                     if self.args.contrast_type in ["None"]:
+                        # ---------- Do not perform contrastive learning task -------------#
                         self.optim.zero_grad()
                         rec_loss.backward()
                         self.optim.step()
@@ -344,8 +356,9 @@ class UPTRecTrainer(Trainer):
 
                         # ---------- contrastive learning task -------------#
                         cl_losses = []
+
+                        
                         for cl_batch in cl_batches:
-                            
                             if self.args.contrast_type == "InstanceCL":
                                 
                                 cl_loss = self._instance_cl_one_pair_contrastive_learning(
@@ -356,17 +369,24 @@ class UPTRecTrainer(Trainer):
                                 # ------ performing clustering for getting users' intentions ----#
                                 # average sum
                                 if epoch >= self.args.warm_up_epoches:
-                                    # if self.args.seq_representation_type == "mean":
-                                    #     sequence_output = torch.mean(sequence_output, dim=1, keepdim=False)
-                                    item_embedding = self.model.item_embedding(input_ids)
-                                    item_embedding = item_embedding.view(item_embedding.shape[0], -1).detach().cpu().numpy() # [Batch max_length x hidden ]
-                                        
+
+                                    if self.args.context == "encoder":
+                                        sequence_output = self.model(input_ids,self.args)
+                                        sequence_output = sequence_output.view(sequence_output.shape[0],-1).detach().cpu().numpy()
+                                    if self.args.context == "item_embedding":
+                                        sequence_output = self.model.item_embedding(input_ids)
+                                        sequence_output = sequence_output.view(item_embedding.shape[0], -1).detach().cpu().numpy()
+
+                                    if self.args.seq_representation_type == "mean":
+                                        sequence_output = torch.mean(sequence_output, dim=1, keepdim=False)
 
                                     # query on multiple clusters
+
+                                    # add cluster allignment loss
                                     for cluster in self.clusters:
                                         seq2intents = []
                                         intent_ids = []
-                                        intent_id, seq2intent = cluster.query(item_embedding)
+                                        intent_id, seq2intent = cluster.query(sequence_output)
                                         seq2intents.append(seq2intent)
                                         intent_ids.append(intent_id)
                                     
@@ -387,15 +407,18 @@ class UPTRecTrainer(Trainer):
                                     )
                                     cl_losses.append(self.args.cf_weight * cl_loss1)
 
-                                    item_embedding = self.model.item_embedding(input_ids)
-                                    item_embedding = item_embedding.view(item_embedding.shape[0], -1).detach().cpu().numpy() # [Batch max_length x hidden ]
-                                        
+                                    if self.args.context == "encoder":
+                                        sequence_output = self.model(input_ids,self.args)
+                                        sequence_output = sequence_output.view(sequence_output.shape[0],-1).detach().cpu().numpy()
+                                    if self.args.context == "item_embedding":
+                                        sequence_output = self.model.item_embedding(input_ids)
+                                        sequence_output = sequence_output.view(item_embedding.shape[0], -1).detach().cpu().numpy()
 
                                     # query on multiple clusters
                                     for cluster in self.clusters:
                                         seq2intents = []
                                         intent_ids = []
-                                        intent_id, seq2intent = cluster.query(item_embedding)
+                                        intent_id, seq2intent = cluster.query(sequence_output)
                                         seq2intents.append(seq2intent)
                                         intent_ids.append(intent_id)
                                     

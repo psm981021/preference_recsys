@@ -376,7 +376,7 @@ class NCELoss(nn.Module):
             # sim22[..., range(d), range(d)] = float('-inf')
 
         raw_scores1 = torch.cat([sim12, sim11], dim=-1) #positive
-        raw_scores2 = torch.cat([sim22, sim12.transpose(-1, -2)], dim=-1)/self.temperature #negative
+        raw_scores2 = torch.cat([sim22, sim12.transpose(-1, -2)], dim=-1)#/self.temperature #negative
         logits = torch.cat([raw_scores1, raw_scores2], dim=-2)
         labels = torch.arange(2 * d, dtype=torch.long, device=logits.device)
         nce_loss = self.criterion(logits, labels)
@@ -466,12 +466,17 @@ class Clustered_Attention_Chunking(nn.Module):
             start_idx = i * chunk_size
             end_idx = min((i + 1) * chunk_size, N)
 
+            key_start_idx = max((i - 1) * chunk_size, 0)
+            key_end_idx = min(((i + 1) * chunk_size if i > 1 else 2*chunk_size), N)
+        
+            query_chunk_seq = seq_sorted[start_idx:end_idx, :, :]
+            key_chunk_seq = seq_sorted[key_start_idx:key_end_idx, :, :]
+
             chunk_seq = seq_sorted[start_idx:end_idx,:, :]
-            
             chunk_attention_mask_ = attention_mask[start_idx:end_idx,: , :, :]
 
             #check validity, if score does not improve change query R wxd Key,Value to R wx2d
-            attention_output = self.attention(chunk_seq,chunk_attention_mask_)
+            attention_output = self.attention(query_chunk_seq,chunk_attention_mask_,key_chunk_seq)
             
             attention_outputs.append(attention_output)
 
@@ -534,18 +539,28 @@ class SelfAttention(nn.Module):
 
         return x.permute(0, 2, 1, 3)
     
-    def forward(self, seq, attention_mask):
-
-        
+    def forward(self, seq, attention_mask,key=None):
         mix_query = self.query(seq)
-        mix_key= self.key(seq)
-        mix_value = self.value(seq)
+        mix_key = self.key(key)
+        mix_value = self.value(key)
 
         query = self.transpose_for_scores(mix_query)
         key = self.transpose_for_scores(mix_key)
         value = self.transpose_for_scores(mix_value)
-        
-        attention_score = torch.matmul(query,key.transpose(-1,-2)) / self.sqrt_scale
+
+        if key is not None:
+            b, h, l, _ = key.shape
+            key_slice = torch.split(key, b // 2)
+                                           
+            attention_score1 = torch.matmul(query,key_slice[0].transpose(-1,-2)) / self.sqrt_scale 
+            attention_score2 = torch.matmul(query,key_slice[1].transpose(-1,-2)) / self.sqrt_scale
+
+            # change
+            attention_score = (attention_score1 + attention_score2) / 2.0
+            
+        else:
+            attention_score = torch.matmul(query,key.transpose(-1,-2)) / self.sqrt_scale
+            
         attention_score = attention_score + attention_mask
 
         attention_prob = nn.Softmax( dim=-1)(attention_score)

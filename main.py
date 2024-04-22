@@ -88,6 +88,15 @@ def main():
         help="Ways of performing Attention Mechanism\
             Supports 'Base' for Self-Attention and 'Cluster' for Clustered Atteniton"
     )
+
+    parser.add_argument(
+        "--context",
+        default ="item_embedding",
+        type=str,
+        help="Ways of considering contexutal information using input_ids \
+            Supports 'item_embedding' for low-dimensional representations and 'encoder' for high-dimensional representations"
+    )
+    
     parser.add_argument(
         "--num_intent_clusters",
         default="256",
