@@ -10,16 +10,17 @@ do
             --context="item_embedding" \
             --seq_representation_type="concatenate" \
             --attention_type="Cluster" \
-            --model_idx="UPTRec_Clustered_Attention_IntentCL_${augment_type}_${gamma}_test" \
+            --model_idx="UPTRec_Clustered_Attention_IntentCL_${augment_type}_${gamma}_nviews_3" \
             --augment_type=$augment_type \
             --gamma=$gamma \
-            --gpu_id=0 \
+            --gpu_id=1 \
             --n_views=3 \
-            --epochs=1000 \
+            --epochs=20 \
             --temperature=0.5 \
             --patience=500 \
             --warm_up_epoches=0 \
             --num_intent_clusters=16 \
+            --do_eval
 
     done
 done

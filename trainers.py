@@ -151,17 +151,94 @@ class Trainer:
             
             # Save other necessary components...
         }, file_name)
-
-        #torch.save(self.model.cpu().state_dict(), file_name)
-
         self.model.to(self.device)
 
     def load(self, file_name):
         self.model.load_state_dict(torch.load(file_name))
-        # checkpoint = torch.load(file_name)
-        # self.model.load_state_dict(checkpoint['model_state_dict'])
-        # self.args.start_epochs = checkpoint['epochs']
 
+
+    def embedding_plot(self,cluster_dataloader ):
+    
+        kmeans_training_data = []
+        rec_cf_data_iter = tqdm(enumerate(cluster_dataloader), total=len(cluster_dataloader))
+        for i, (rec_batch, _, _) in rec_cf_data_iter:
+            
+            rec_batch = tuple(t.to(self.device) for t in rec_batch)
+            _, input_ids, target_pos, target_neg, _ = rec_batch
+
+            if self.args.context == "encoder":
+                sequence_output = self.model(input_ids,self.args)
+                sequence_output = sequence_output.view(sequence_output.shape[0],-1).detach().cpu().numpy()
+            if self.args.context == "item_embedding":
+                sequence_output = self.model.item_embedding(input_ids)
+                sequence_output = sequence_output.view(sequence_output.shape[0], -1).detach().cpu().numpy()
+
+            kmeans_training_data.append(sequence_output)
+
+        kmeans_training_data = np.concatenate(kmeans_training_data, axis=0)
+
+        tsne = TSNE(n_components=2, perplexity=30.0)
+        embedding_2d = tsne.fit_transform(kmeans_training_data)
+        
+        
+        plt.figure(figsize=(20, 20))
+        plt.scatter(embedding_2d[:, 0], embedding_2d[:, 1], alpha=0.5)
+        plt.tight_layout() 
+        plt.savefig(f'{self.args.model_idx}_item_embedding_Contrastive.png')
+        plt.show()
+
+
+    def attention_map_plot(self, cluster_dataloader):
+
+        kmeans_training_data = []
+        rec_cf_data_iter = tqdm(enumerate(cluster_dataloader), total=len(cluster_dataloader))
+        for i, (rec_batch, _, _) in rec_cf_data_iter:
+            
+            rec_batch = tuple(t.to(self.device) for t in rec_batch)
+            _, input_ids, target_pos, target_neg, _ = rec_batch
+
+            if self.args.context == "encoder":
+                sequence_output = self.model(input_ids,self.args)
+                sequence_output = sequence_output.view(sequence_output.shape[0],-1).detach().cpu().numpy()
+            if self.args.context == "item_embedding":
+                sequence_output = self.model.item_embedding(input_ids)
+                sequence_output = sequence_output.view(sequence_output.shape[0], -1).detach().cpu().numpy()
+            
+            kmeans_training_data.append(sequence_output) #[len(cluster_dataloader) Batch hidden]
+        
+        kmeans_training_data = np.concatenate(kmeans_training_data, axis=0) #[* hidden]
+        # train multiple clusters
+        print("Training Clusters:")
+        for i, cluster in tqdm(enumerate(self.clusters), total=len(self.clusters)):
+            cluster.train(kmeans_training_data)
+            self.clusters[i] = cluster
+        # clean memory
+        del kmeans_training_data
+
+        rec_cf_data_iter = tqdm(enumerate(cluster_dataloader), total=len(cluster_dataloader))
+        for i, (rec_batch, _, _) in rec_cf_data_iter:
+            
+            rec_batch = tuple(t.to(self.device) for t in rec_batch)
+            _, input_ids, target_pos, target_neg, _ = rec_batch
+
+            if self.args.context == "encoder":
+                sequence_output = self.model(input_ids,self.args)
+                sequence_output = sequence_output.view(sequence_output.shape[0],-1).detach().cpu().numpy()
+            if self.args.context == "item_embedding":
+                sequence_output = self.model.item_embedding(input_ids)
+                sequence_output = sequence_output.view(sequence_output.shape[0], -1).detach().cpu().numpy()
+            
+            for cluster in self.clusters:
+                seq2intents = []
+                intent_ids = []
+                intent_id, seq2intent = cluster.query(sequence_output)
+                seq2intents.append(seq2intent)
+                intent_ids.append(intent_id)
+
+        recommend_output = self.model(input_ids,self.args,intent_ids)
+
+        return recommend_output
+    
     def cross_entropy(self, seq_out, pos_ids, neg_ids):
         # [batch seq_len hidden_size]
         pos_emb = self.model.item_embedding(pos_ids)
@@ -262,8 +339,8 @@ class UPTRecTrainer(Trainer):
 
         if train:
             # ------ intentions clustering ----- #
-            if self.args.contrast_type in ["IntentCL", "Hybrid","None"] and epoch >= self.args.warm_up_epoches :
-                print("Preparing Clustering:")
+            if self.args.contrast_type in ["IntentCL", "Hybrid"] and epoch >= self.args.warm_up_epoches :
+                print("[Train] Preparing Clustering:")
                 self.model.eval()
                 kmeans_training_data = []
                 rec_cf_data_iter = tqdm(enumerate(cluster_dataloader), total=len(cluster_dataloader))
@@ -353,11 +430,9 @@ class UPTRecTrainer(Trainer):
 
 
                 else: 
-
                     # ---------- contrastive learning task -------------#
                     cl_losses = []
 
-                    
                     for cl_batch in cl_batches:
                         if self.args.contrast_type == "InstanceCL":
                             
@@ -458,15 +533,13 @@ class UPTRecTrainer(Trainer):
             self.model.eval()
             pred_list = None
             if full_sort:
-                #### --------- embedding ------------ ###
 
-                if self.args.embedding :
+                if self.args.contrast_type in ["IntentCL", "Hybrid"] and epoch >= self.args.warm_up_epoches :
                     kmeans_training_data = []
-                    rec_cf_data_iter = tqdm(enumerate(cluster_dataloader), total=len(cluster_dataloader))
-                    for i, (rec_batch, _, _) in rec_cf_data_iter:
-                        
-                        rec_batch = tuple(t.to(self.device) for t in rec_batch)
-                        _, input_ids, target_pos, target_neg, _ = rec_batch
+                    for i, batch in rec_data_iter:
+                        # 0. batch_data will be sent into the device(GPU or cpu)
+                        batch = tuple(t.to(self.device) for t in batch)
+                        user_ids, input_ids, target_pos, target_neg, answers = batch
 
                         if self.args.context == "encoder":
                             sequence_output = self.model(input_ids,self.args)
@@ -477,83 +550,28 @@ class UPTRecTrainer(Trainer):
 
                         kmeans_training_data.append(sequence_output)
 
-                    kmeans_training_data = np.concatenate(kmeans_training_data, axis=0)
+                        kmeans_training_data = np.concatenate(kmeans_training_data, axis=0)
+                        print("Training Clusters:")
+                        for i, cluster in tqdm(enumerate(self.clusters), total=len(self.clusters)):
+                            cluster.train(kmeans_training_data)
+                            self.clusters[i] = cluster
+                        # clean memory
+                        del kmeans_training_data
+                        import gc
 
-                    tsne = TSNE(n_components=2, perplexity=30.0)
-                    embedding_2d = tsne.fit_transform(kmeans_training_data)
-                    
-                    
-                    plt.figure(figsize=(20, 20))
-                    plt.scatter(embedding_2d[:, 0], embedding_2d[:, 1], alpha=0.5)
-                    plt.tight_layout() 
-                    plt.savefig(f'{self.args.model_idx}_item_embedding_Contrastive.png')
-                    plt.show()
-
-                #### --------- embedding ------------ ###
-
-                #### ---------- attention map --------- ####
-
-                if self.args.attention_map:
-
-                    kmeans_training_data = []
-                    rec_cf_data_iter = tqdm(enumerate(cluster_dataloader), total=len(cluster_dataloader))
-                    for i, (rec_batch, _, _) in rec_cf_data_iter:
-                        
-                        rec_batch = tuple(t.to(self.device) for t in rec_batch)
-                        _, input_ids, target_pos, target_neg, _ = rec_batch
-
-                        if self.args.context == "encoder":
-                            sequence_output = self.model(input_ids,self.args)
-                            sequence_output = sequence_output.view(sequence_output.shape[0],-1).detach().cpu().numpy()
-                        if self.args.context == "item_embedding":
-                            sequence_output = self.model.item_embedding(input_ids)
-                            sequence_output = sequence_output.view(sequence_output.shape[0], -1).detach().cpu().numpy()
-                        
-                        kmeans_training_data.append(sequence_output) #[len(cluster_dataloader) Batch hidden]
-                    
-                    kmeans_training_data = np.concatenate(kmeans_training_data, axis=0) #[* hidden]
-                    # train multiple clusters
-                    print("Training Clusters:")
-                    for i, cluster in tqdm(enumerate(self.clusters), total=len(self.clusters)):
-                        cluster.train(kmeans_training_data)
-                        self.clusters[i] = cluster
-                    # clean memory
-                    del kmeans_training_data
-
-
-                    rec_cf_data_iter = tqdm(enumerate(cluster_dataloader), total=len(cluster_dataloader))
-                    for i, (rec_batch, _, _) in rec_cf_data_iter:
-                        
-                        rec_batch = tuple(t.to(self.device) for t in rec_batch)
-                        _, input_ids, target_pos, target_neg, _ = rec_batch
-
-                        if self.args.context == "encoder":
-                            sequence_output = self.model(input_ids,self.args)
-                            sequence_output = sequence_output.view(sequence_output.shape[0],-1).detach().cpu().numpy()
-                        if self.args.context == "item_embedding":
-                            sequence_output = self.model.item_embedding(input_ids)
-                            sequence_output = sequence_output.view(sequence_output.shape[0], -1).detach().cpu().numpy()
-                        
-                        for cluster in self.clusters:
-                            seq2intents = []
-                            intent_ids = []
-                            intent_id, seq2intent = cluster.query(sequence_output)
-                            seq2intents.append(seq2intent)
-                            intent_ids.append(intent_id)
-
-                    recommend_output = self.model(input_ids,self.args,intent_ids)
-
+                        gc.collect()
 
 
                 answer_list = None
-
-
+                rec_data_iter = tqdm(enumerate(dataloader), total=len(dataloader))
+                print("Model Eval & Test")
+                
                 for i, batch in rec_data_iter:
                     # 0. batch_data will be sent into the device(GPU or cpu)
                     batch = tuple(t.to(self.device) for t in batch)
                     user_ids, input_ids, target_pos, target_neg, answers = batch
 
-                    if epoch >= self.args.warm_up_epoches:
+                    if self.args.attention_type in ["Cluster"] and epoch >= self.args.warm_up_epoches:
                         if self.args.context == "encoder":
                             sequence_output = self.model(input_ids,self.args)
                             sequence_output = sequence_output.view(sequence_output.shape[0],-1).detach().cpu().numpy()
@@ -568,11 +586,9 @@ class UPTRecTrainer(Trainer):
                             seq2intents.append(seq2intent)
                             intent_ids.append(intent_id)
                     
-                    
                         recommend_output = self.model(input_ids,self.args,intent_ids)
                     else:
                         recommend_output = self.model(input_ids, self.args)
-                        
                     recommend_output = recommend_output[:, -1, :]
                     # recommendation results
 
@@ -608,8 +624,6 @@ class UPTRecTrainer(Trainer):
                         seq2intents.append(seq2intent)
                         intent_ids.append(intent_id)
 
-
-                    # self.args.cluster_id = intent_id
                     recommend_output = self.model.finetune(input_ids,self.args,intent_ids)
                     test_neg_items = torch.cat((answers, sample_negs), -1)
                     recommend_output = recommend_output[:, -1, :]

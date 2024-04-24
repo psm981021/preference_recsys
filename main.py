@@ -40,7 +40,7 @@ def main():
 
     parser.add_argument("--embedding", action="store_true")
     parser.add_argument("--attention_map", action="store_true")
-
+    parser.add_argument("--vanilla_attention", action="store_true",help="whether to use two blocks for key")
     # data augmentation args
     parser.add_argument(
         "--noise_ratio",
@@ -212,7 +212,7 @@ def main():
         trainer.args.train_matrix = test_rating_matrix
         trainer.load(args.checkpoint_path)
         print(f"Load model from {args.checkpoint_path} for test!")
-        scores, result_info = trainer.test(0, full_sort=True)
+        scores, result_info = trainer.test(args.epochs, full_sort=True)
 
     else:
         start_time = time.time()
@@ -237,7 +237,7 @@ def main():
         print("---------------Change to test_rating_matrix!-------------------")
         # load the best model
         trainer.model.load_state_dict(torch.load(args.checkpoint_path))
-        scores, result_info = trainer.test(0, full_sort=True)
+        scores, result_info = trainer.test(args.epochs, full_sort=True)
 
         end_time = time.time()
         execution_time = end_time - start_time
@@ -246,15 +246,15 @@ def main():
         minutes = int((execution_time % 3600) // 60)
         seconds = int(execution_time % 60)
 
-    print(args_str)
-    print(result_info)
-    with open(args.log_file, "a") as f:
-        f.write(args_str + "\n")
-        f.write(result_info + "\n")
-        try:
-            f.write(f"To run Epoch:{save_epoch} , It took {hours} hours, {minutes} minutes, {seconds} seconds\n")
-        except:
-            f.write(f"To run Epoch:{args.epochs} , It took {hours} hours, {minutes} minutes, {seconds} seconds\n")
+        print(args_str)
+        print(result_info)
+        with open(args.log_file, "a") as f:
+            f.write(args_str + "\n")
+            f.write(result_info + "\n")
+            try:
+                f.write(f"To run Epoch:{save_epoch} , It took {hours} hours, {minutes} minutes, {seconds} seconds\n")
+            except:
+                f.write(f"To run Epoch:{args.epochs} , It took {hours} hours, {minutes} minutes, {seconds} seconds\n")
 
 
 main()

@@ -475,8 +475,11 @@ class Clustered_Attention_Chunking(nn.Module):
             chunk_seq = seq_sorted[start_idx:end_idx,:, :]
             chunk_attention_mask_ = attention_mask[start_idx:end_idx,: , :, :]
 
-            #check validity, if score does not improve change query R wxd Key,Value to R wx2d
-            attention_output = self.attention(query_chunk_seq,chunk_attention_mask_,key_chunk_seq)
+            
+            if self.args.vanilla_attention == True:
+                attention_output = self.attention(query_chunk_seq,chunk_attention_mask_,key_chunk_seq)
+            else:
+                attention_output = self.attention(chunk_seq,chunk_attention_mask_)
             
             attention_outputs.append(attention_output)
 
