@@ -95,7 +95,7 @@ class Trainer:
         self.iteration(epoch, self.train_dataloader, self.cluster_dataloader)
 
     def valid(self, epoch, full_sort=False):
-        return self.iteration(epoch, self.eval_dataloader, full_sort=full_sort, train=False)
+        return self.iteration(epoch, self.eval_dataloader,self.cluster_dataloader, full_sort=full_sort, train=False)
 
     def test(self, epoch, full_sort=False):
         return self.iteration(epoch, self.test_dataloader,self.cluster_dataloader, full_sort=full_sort, train=False)
@@ -149,6 +149,7 @@ class Trainer:
             'epochs': self.args.epochs,
             'model_state_dict': self.model.cpu().state_dict(),
             
+            # Save cluster
             # Save other necessary components...
         }, file_name)
         self.model.to(self.device)
@@ -339,7 +340,7 @@ class UPTRecTrainer(Trainer):
 
         if train:
             # ------ intentions clustering ----- #
-            if self.args.contrast_type in ["IntentCL", "Hybrid"] and epoch >= self.args.warm_up_epoches :
+            if self.args.contrast_type in ["IntentCL", "Hybrid","None"] and epoch >= self.args.warm_up_epoches :
                 print("[Train] Preparing Clustering:")
                 self.model.eval()
                 kmeans_training_data = []
@@ -361,7 +362,7 @@ class UPTRecTrainer(Trainer):
                 
                 kmeans_training_data = np.concatenate(kmeans_training_data, axis=0) #[* hidden]
                 # train multiple clusters
-                print("Training Clusters:")
+                print("[Train] Training Clusters:")
                 for i, cluster in tqdm(enumerate(self.clusters), total=len(self.clusters)):
                     cluster.train(kmeans_training_data)
                     self.clusters[i] = cluster
@@ -529,17 +530,18 @@ class UPTRecTrainer(Trainer):
                 f.write(str(post_fix) + "\n")
 
         else: # for valid and test
-            rec_data_iter = tqdm(enumerate(dataloader), total=len(dataloader))
+            rec_cf_data_iter = tqdm(enumerate(cluster_dataloader), total=len(cluster_dataloader))
             self.model.eval()
             pred_list = None
             if full_sort:
 
-                if self.args.contrast_type in ["IntentCL", "Hybrid"] and epoch >= self.args.warm_up_epoches :
+                if self.args.contrast_type in ["IntentCL", "Hybrid","None"] and epoch >= self.args.warm_up_epoches :
                     kmeans_training_data = []
-                    for i, batch in rec_data_iter:
+                    print("[Eval&Test] Preparing Clustering:")
+                    for i, (rec_batch, _, _) in rec_cf_data_iter:
                         # 0. batch_data will be sent into the device(GPU or cpu)
-                        batch = tuple(t.to(self.device) for t in batch)
-                        user_ids, input_ids, target_pos, target_neg, answers = batch
+                        rec_batch = tuple(t.to(self.device) for t in rec_batch)
+                        _, input_ids, target_pos, target_neg, _ = rec_batch
 
                         if self.args.context == "encoder":
                             sequence_output = self.model(input_ids,self.args)
@@ -550,21 +552,21 @@ class UPTRecTrainer(Trainer):
 
                         kmeans_training_data.append(sequence_output)
 
-                        kmeans_training_data = np.concatenate(kmeans_training_data, axis=0)
-                        print("Training Clusters:")
-                        for i, cluster in tqdm(enumerate(self.clusters), total=len(self.clusters)):
-                            cluster.train(kmeans_training_data)
-                            self.clusters[i] = cluster
-                        # clean memory
-                        del kmeans_training_data
-                        import gc
+                    kmeans_training_data = np.concatenate(kmeans_training_data, axis=0)
+                    print("[Eval&Test] Training Clusters:")
+                    for i, cluster in tqdm(enumerate(self.clusters), total=len(self.clusters)):
+                        cluster.train(kmeans_training_data)
+                        self.clusters[i] = cluster
+                    # clean memory
+                    del kmeans_training_data
+                    import gc
 
-                        gc.collect()
+                    gc.collect()
 
 
                 answer_list = None
-                rec_data_iter = tqdm(enumerate(dataloader), total=len(dataloader))
                 print("Model Eval & Test")
+                rec_data_iter = tqdm(enumerate(dataloader), total=len(dataloader))
                 
                 for i, batch in rec_data_iter:
                     # 0. batch_data will be sent into the device(GPU or cpu)
