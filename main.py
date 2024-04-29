@@ -41,7 +41,7 @@ def main():
     parser.add_argument("--embedding", action="store_true")
     parser.add_argument("--attention_map", action="store_true")
     parser.add_argument("--vanilla_attention", action="store_true",help="whether to use two blocks for key")
-    
+    parser.add_argument("--alignment_loss", action="store_true", help="Alignment Loss from SimCLR.")
     # data augmentation args
     parser.add_argument(
         "--noise_ratio",

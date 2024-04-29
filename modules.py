@@ -453,6 +453,7 @@ class Clustered_Attention_Chunking(nn.Module):
                 cluster_id = torch.cat((cluster_id[0], cluster_id[0]), dim=0)
                 sorted_indices = torch.argsort(cluster_id)
         else:
+            cluster_id = torch.cat((cluster_id,cluster_id),dim=0)
             sorted_indices = torch.argsort(cluster_id)
 
         try:    

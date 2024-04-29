@@ -1,0 +1,24 @@
+Namespace(adam_beta1=0.9, adam_beta2=0.999, alignment_loss=False, attention_map=False, attention_probs_dropout_prob=0.5, attention_type='Cluster', augment_type='mask', batch_size=512, beta=0.2, cf_weight=0.1, checkpoint_path='output_custom/Beauty/Cluster_Attention_Hybrid/UPTRec-Beauty-UPTRec_Clustered_Attention_Hybrid_mask_0.7_encoder_vanilla-128-512.pt', context='item_embedding', contrast_type='Hybrid', cuda_condition=True, data_dir='data/', data_file='data/Beauty.txt', data_name='Beauty', de_noise=False, device='cuda:1', do_eval=False, embedding=False, epochs=2000, gamma=0.7, gpu_id='0', hidden_act='gelu', hidden_dropout_prob=0.5, hidden_size=64, initializer_range=0.02, intent_cf_weight=0.3, item_size=12103, log_file='output_custom/Beauty/Cluster_Attention_Hybrid/UPTRec-Beauty-UPTRec_Clustered_Attention_Hybrid_mask_0.7_encoder_vanilla-128-512.txt', log_freq=1, lr=0.001, mask_id=12102, max_seq_length=50, model_idx='UPTRec_Clustered_Attention_Hybrid_mask_0.7_encoder_vanilla', model_name='UPTRec', n_views=3, no_cuda=False, noise_ratio=0.0, num_attention_heads=2, num_hidden_layers=2, num_intent_clusters='128', output_dir='output_custom/Beauty/Cluster_Attention_Hybrid', patience=500, rec_weight=1.0, save_pt='False', seed=1, seq_representation_instancecl_type='concatenate', seq_representation_type='concatenate', tao=0.2, temperature=0.1, train_matrix=<22363x12103 sparse matrix of type '<class 'numpy.int64'>'
+	with 153776 stored elements in Compressed Sparse Row format>, training_data_ratio=1.0, vanilla_attention=True, warm_up_epoches=200.0, weight_decay=0.0)
+{'epoch': 0, 'rec_avg_loss': '7.01311', 'joint_avg_loss': '182.424927'}
+{'Epoch': 0, 'HIT@5': '0.000454', 'NDCG@5': '0.000275', 'HIT@10': '0.000772', 'NDCG@10': '0.000381', 'HIT@15': '0.001272', 'NDCG@15': '0.000509', 'HIT@20': '0.001953', 'NDCG@20': '0.000670'}
+{'epoch': 1, 'rec_avg_loss': '6.36844', 'joint_avg_loss': '99.311907'}
+{'Epoch': 1, 'HIT@5': '0.000545', 'NDCG@5': '0.000353', 'HIT@10': '0.000863', 'NDCG@10': '0.000453', 'HIT@15': '0.001635', 'NDCG@15': '0.000658', 'HIT@20': '0.002453', 'NDCG@20': '0.000852'}
+{'epoch': 2, 'rec_avg_loss': '5.65015', 'joint_avg_loss': '69.938364'}
+{'Epoch': 2, 'HIT@5': '0.000681', 'NDCG@5': '0.000437', 'HIT@10': '0.001226', 'NDCG@10': '0.000613', 'HIT@15': '0.001908', 'NDCG@15': '0.000792', 'HIT@20': '0.002316', 'NDCG@20': '0.000888'}
+{'epoch': 3, 'rec_avg_loss': '5.04104', 'joint_avg_loss': '52.578943'}
+{'Epoch': 3, 'HIT@5': '0.000772', 'NDCG@5': '0.000481', 'HIT@10': '0.001363', 'NDCG@10': '0.000672', 'HIT@15': '0.001999', 'NDCG@15': '0.000840', 'HIT@20': '0.002498', 'NDCG@20': '0.000958'}
+{'epoch': 4, 'rec_avg_loss': '4.52095', 'joint_avg_loss': '41.533872'}
+{'Epoch': 4, 'HIT@5': '0.000727', 'NDCG@5': '0.000391', 'HIT@10': '0.001681', 'NDCG@10': '0.000694', 'HIT@15': '0.002089', 'NDCG@15': '0.000801', 'HIT@20': '0.002634', 'NDCG@20': '0.000929'}
+EarlyStopping counter: 1 out of 500
+{'epoch': 5, 'rec_avg_loss': '4.05319', 'joint_avg_loss': '33.886174'}
+{'Epoch': 5, 'HIT@5': '0.001045', 'NDCG@5': '0.000540', 'HIT@10': '0.001681', 'NDCG@10': '0.000744', 'HIT@15': '0.002135', 'NDCG@15': '0.000863', 'HIT@20': '0.002498', 'NDCG@20': '0.000949'}
+EarlyStopping counter: 2 out of 500
+{'epoch': 6, 'rec_avg_loss': '3.64581', 'joint_avg_loss': '28.166101'}
+{'Epoch': 6, 'HIT@5': '0.000999', 'NDCG@5': '0.000508', 'HIT@10': '0.001726', 'NDCG@10': '0.000745', 'HIT@15': '0.002044', 'NDCG@15': '0.000830', 'HIT@20': '0.002498', 'NDCG@20': '0.000938'}
+EarlyStopping counter: 3 out of 500
+{'epoch': 7, 'rec_avg_loss': '3.27255', 'joint_avg_loss': '23.684559'}
+{'Epoch': 7, 'HIT@5': '0.001181', 'NDCG@5': '0.000600', 'HIT@10': '0.001590', 'NDCG@10': '0.000735', 'HIT@15': '0.002089', 'NDCG@15': '0.000864', 'HIT@20': '0.002725', 'NDCG@20': '0.001015'}
+{'epoch': 8, 'rec_avg_loss': '2.92419', 'joint_avg_loss': '20.147520'}
+{'Epoch': 8, 'HIT@5': '0.001226', 'NDCG@5': '0.000615', 'HIT@10': '0.001590', 'NDCG@10': '0.000730', 'HIT@15': '0.002135', 'NDCG@15': '0.000873', 'HIT@20': '0.002544', 'NDCG@20': '0.000969'}
+EarlyStopping counter: 1 out of 500

@@ -90,6 +90,7 @@ class Trainer:
 
         self.cf_criterion = NCELoss(self.args.temperature, self.device)
         self.pcl_criterion = PCLoss(self.args.temperature, self.device)
+        self.criterion = torch.nn.CrossEntropyLoss().to(self.args.device)
 
     def train(self, epoch):
         self.iteration(epoch, self.train_dataloader, self.cluster_dataloader)
@@ -285,26 +286,35 @@ class UPTRecTrainer(Trainer):
         inputs: [batch1_augmented_data, batch2_augmentated_data]
         """
         cl_batch = torch.cat(inputs, dim=0)
-        
-        # self.args.cluster_id = torch.cat((intent_ids, intent_ids), dim=0)
-        #intent_ids = torch.cat((intent_ids[0], intent_ids[0]), dim=0)
 
         cl_batch = cl_batch.to(self.device)
         cl_sequence_output = self.model(cl_batch,self.args, intent_ids)
-        # cf_sequence_output = cf_sequence_output[:, -1, :]
+        
+        #cf_sequence_output = cl_sequence_output[:, -1, :]
 
         if self.args.seq_representation_instancecl_type == "mean":
             cl_sequence_output = torch.mean(cl_sequence_output, dim=1, keepdim=False)
 
         cl_sequence_flatten = cl_sequence_output.view(cl_batch.shape[0], -1)
-        # cf_output = self.projection(cf_sequence_flatten)
+        cf_sequence_flatten = cl_sequence_output.view(cl_batch.shape[0], -1)
+        
+        cf_output = self.projection(cf_sequence_flatten)
 
         batch_size = cl_batch.shape[0] // 2
         cl_output_slice = torch.split(cl_sequence_flatten, batch_size)
+        cf_output_slice = torch.split(cf_sequence_flatten, batch_size)
+
         if self.args.de_noise:
-            cl_loss = self.cf_criterion(cl_output_slice[0], cl_output_slice[1], intent_ids=intent_ids)
+            if self.args.alignment_loss == True:
+                cl_loss = self.cf_criterion(cf_output_slice[0], cf_output_slice[1], intent_ids=intent_ids)
+            else:
+                cl_loss = self.cf_criterion(cl_output_slice[0], cl_output_slice[1], intent_ids=intent_ids)
         else:
-            cl_loss = self.cf_criterion(cl_output_slice[0], cl_output_slice[1], intent_ids=None)
+            if self.args.alignment_loss == True:
+                cl_loss = self.cf_criterion(cf_output_slice[0], cf_output_slice[1], intent_ids=intent_ids)
+            else:
+                cl_loss = self.cf_criterion(cl_output_slice[0], cl_output_slice[1], intent_ids=intent_ids)
+
         return cl_loss
 
     def _pcl_one_pair_contrastive_learning(self, inputs, intents, intent_ids):
@@ -433,8 +443,10 @@ class UPTRecTrainer(Trainer):
                 else: 
                     # ---------- contrastive learning task -------------#
                     cl_losses = []
-
+                    align_losses =[]
+                    
                     for cl_batch in cl_batches:
+                        
                         if self.args.contrast_type == "InstanceCL":
                             
                             cl_loss = self._instance_cl_one_pair_contrastive_learning(
@@ -444,6 +456,8 @@ class UPTRecTrainer(Trainer):
                         elif self.args.contrast_type == "IntentCL":
                             # ------ performing clustering for getting users' intentions ----#
                             # average sum
+                            
+        
                             if epoch >= self.args.warm_up_epoches:
 
                                 if self.args.context == "encoder":
@@ -467,7 +481,7 @@ class UPTRecTrainer(Trainer):
                                     intent_ids.append(intent_id)
                                 
                                 cl_loss = self._pcl_one_pair_contrastive_learning(cl_batch, intents=seq2intents, intent_ids=intent_ids)
-                                
+                                    
                                 cl_losses.append(self.args.intent_cf_weight * cl_loss)
                             else:
                                 continue

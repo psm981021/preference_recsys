@@ -5,8 +5,8 @@ do
         python main.py \
             --model_name="UPTRec" \
             --data_name="Beauty"  \
-            --output_dir="output_custom/Beauty/Cluster_Attention_IntentCL" \
-            --contrast_type="IntentCL" \
+            --output_dir="output_custom/Beauty/Cluster_Attention_Hybrid" \
+            --contrast_type="Hybrid" \
             --context="item_embedding" \
             --seq_representation_type="concatenate" \
             --attention_type="Cluster" \
@@ -16,13 +16,12 @@ do
             --gpu_id=0 \
             --n_views=3 \
             --epochs=2000 \
-            --intent_cf_weight=0.5 \
-            --temperature=0.5 \
+            --temperature=0.1 \
             --patience=500 \
             --warm_up_epoches=200 \
             --vanilla_attention \
             --num_intent_clusters=128 \
-            --model_idx="UPTRec_Clustered_Attention_IntentCL_${augment_type}_${gamma}_encoder_vanilla"
+            --model_idx="UPTRec_Clustered_Attention_Hybrid_${augment_type}_${gamma}_encoder_vanilla"
 
     done
 done
