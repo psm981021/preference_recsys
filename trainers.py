@@ -288,7 +288,7 @@ class UPTRecTrainer(Trainer):
         cl_batch = torch.cat(inputs, dim=0)
 
         cl_batch = cl_batch.to(self.device)
-        cl_sequence_output = self.model(cl_batch,self.args, intent_ids)
+        cl_sequence_output = self.model(cl_batch,self.args)
         
         #cf_sequence_output = cl_sequence_output[:, -1, :]
 
