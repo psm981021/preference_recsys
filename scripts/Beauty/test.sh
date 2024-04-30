@@ -6,7 +6,7 @@ do
             --model_name="UPTRec" \
             --data_name="Beauty"  \
             --output_dir="output_custom/Beauty/" \
-            --contrast_type="Hybrid" \
+            --contrast_type="IntentCL" \
             --context="item_embedding" \
             --seq_representation_type="concatenate" \
             --attention_type="Cluster" \
@@ -20,6 +20,7 @@ do
             --patience=500 \
             --warm_up_epoches=0 \
             --num_intent_clusters=16 \
-            --alignment_loss
+            --alignment_loss \
+            --de_noise
     done
 done

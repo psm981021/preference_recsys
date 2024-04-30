@@ -356,17 +356,18 @@ class NCELoss(nn.Module):
         d = sim12.shape[-1]
         # avoid contrast against positive intents
         if intent_ids is not None:
+            print("de-noise nce debug");import IPython; IPython.embed(colors='Linux');exit(1);
             #intent_ids should be list
-            intent_ids = intent_ids.contiguous().view(-1, 1)
 
+            intent_ids = intent_ids.contiguous().view(-1, 1)
             mask_11_22 = torch.eq(intent_ids, intent_ids.T).long().to(self.device)
             sim11[mask_11_22 == 1] = float("-inf")
             sim22[mask_11_22 == 1] = float("-inf")
             eye_metrix = torch.eye(d, dtype=torch.long).to(self.device)
             mask_11_22[eye_metrix == 1] = 0
             sim12[mask_11_22 == 1] = float("-inf")
+
         else:
-            
             mask = torch.eye(d, dtype=torch.long).to(self.device)
             sim11[mask == 1] = float("-inf")
             if sim22.shape != torch.Size([1]):
@@ -375,8 +376,8 @@ class NCELoss(nn.Module):
             # sim11[..., range(d), range(d)] = float('-inf')
             # sim22[..., range(d), range(d)] = float('-inf')
 
-        raw_scores1 = torch.cat([sim12, sim11], dim=-1) #positive
-        raw_scores2 = torch.cat([sim22, sim12.transpose(-1, -2)], dim=-1)#/self.temperature #negative
+        raw_scores1 = torch.cat([sim12, sim11], dim=-1) # positive
+        raw_scores2 = torch.cat([sim22, sim12.transpose(-1, -2)], dim=-1) # negative
         logits = torch.cat([raw_scores1, raw_scores2], dim=-2)
         labels = torch.arange(2 * d, dtype=torch.long, device=logits.device)
         nce_loss = self.criterion(logits, labels)

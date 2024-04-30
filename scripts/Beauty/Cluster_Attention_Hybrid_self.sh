@@ -13,13 +13,15 @@ do
             --augment_type=$augment_type \
             --gamma=$gamma \
             --batch_size=512 \
-            --gpu_id=1 \
+            --gpu_id=0 \
             --n_views=3 \
             --epochs=2000 \
             --temperature=0.1 \
-            --patience=500 \
+            --patience=300 \
             --warm_up_epoches=200 \
-            --num_intent_clusters=128 \
+            --num_intent_clusters=64 \
+            --de_noise \
+            --alignment_loss \
             --model_idx="UPTRec_Clustered_Attention_Hybrid_${augment_type}_${gamma}_encoder_self-attention"
     done
 done
