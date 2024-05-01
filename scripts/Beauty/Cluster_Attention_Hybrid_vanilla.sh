@@ -22,8 +22,7 @@ do
             --num_intent_clusters=64 \
             --vanilla_attention \
             --de_noise \
-            --alignment_loss \ 
+            --alignment_loss \
             --model_idx="UPTRec_Clustered_Attention_Hybrid_${augment_type}_${gamma}_encoder_vanilla"
-
     done
 done

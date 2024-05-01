@@ -356,7 +356,6 @@ class NCELoss(nn.Module):
         d = sim12.shape[-1]
         # avoid contrast against positive intents
         if intent_ids is not None:
-            print("de-noise nce debug");import IPython; IPython.embed(colors='Linux');exit(1);
             #intent_ids should be list
 
             intent_ids = intent_ids.contiguous().view(-1, 1)
