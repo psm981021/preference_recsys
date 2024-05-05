@@ -406,7 +406,7 @@ class UPTRecTrainer(Trainer):
                 rec_batch = tuple(t.to(self.device) for t in rec_batch)
                 _, input_ids, target_pos, target_neg, _ = rec_batch
 
-                if epoch >= self.args.warm_up_epoches:
+                if epoch >= self.args.warm_up_epoches and self.args.attention_type in ["Cluster"]:
                     if self.args.context == "encoder":
                         sequence_output = self.model(input_ids,self.args)
                         sequence_output = sequence_output.view(sequence_output.shape[0],-1).detach().cpu().numpy()
@@ -431,7 +431,7 @@ class UPTRecTrainer(Trainer):
 
                 rec_loss = self.cross_entropy(sequence_output, target_pos, target_neg)
 
-                if self.args.contrast_type in ["None"]:
+                if self.args.contrast_type in ["None", "SASRec"]:
                     # ---------- Do not perform contrastive learning task -------------#
                     self.optim.zero_grad()
                     rec_loss.backward()
