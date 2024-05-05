@@ -21,6 +21,7 @@ from trainers import UPTRecTrainer
 from models import UPTRec, OfflineItemSimilarity, OnlineItemSimilarity
 from utils import *
 
+import wandb
 
 def show_args_info(args,log_file):
     print(f"--------------------Configure Info:------------")
@@ -29,6 +30,7 @@ def show_args_info(args,log_file):
 
 
 def main():
+
     parser = argparse.ArgumentParser()
     # system args
     parser.add_argument("--data_dir", default="data/", type=str)
@@ -132,7 +134,7 @@ def main():
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.5, help="hidden dropout p")
     parser.add_argument("--initializer_range", type=float, default=0.02)
     parser.add_argument("--max_seq_length", default=50, type=int)
-
+    parser.add_argument("--cluster_train", default=1, type=int)
     # train args
     parser.add_argument("--save_pt",type=str, default="False")
     parser.add_argument("--lr", type=float, default=0.001, help="learning rate of adam")
@@ -216,8 +218,12 @@ def main():
         scores, result_info = trainer.test(args.epochs, full_sort=True)
 
     else:
-        start_time = time.time()
+        wandb.init(project="preference_rec",
+                   name=f"{args.data_name}_{args.model_idx}_{args.batch_size}_{args.num_intent_clusters}_{args.epochs}",
+                   config=args)
+        args = wandb.config
 
+        start_time = time.time()
         print(f"Train UPTRec")
         early_stopping = EarlyStopping(args.log_file,args.checkpoint_path, args.patience, verbose=True)
         if os.path.exists(args.checkpoint_path):
@@ -234,7 +240,9 @@ def main():
                 save_epoch = epoch
                 print("Early stopping")
                 break
+            wandb.log({"score":scores})
         trainer.args.train_matrix = test_rating_matrix
+
         print("---------------Change to test_rating_matrix!-------------------")
         # load the best model
         trainer.model.load_state_dict(torch.load(args.checkpoint_path))
@@ -256,7 +264,7 @@ def main():
                 f.write(f"To run Epoch:{save_epoch} , It took {hours} hours, {minutes} minutes, {seconds} seconds\n")
             except:
                 f.write(f"To run Epoch:{args.epochs} , It took {hours} hours, {minutes} minutes, {seconds} seconds\n")
-
+        wandb.finish()
 
 main()
 

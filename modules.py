@@ -490,21 +490,6 @@ class Clustered_Attention_Chunking(nn.Module):
         reverse_indices = torch.argsort(sorted_indices)
         seq_sort = outputs.view(N,-1)
         output = seq_sort[reverse_indices].view(N,C,E)
-        
-        # start_idx = torch.arange(0, N, chunk_size)
-        # end_idx = start_idx + chunk_size
-        # chunk_seq = seq_sorted[start_idx[:, None], end_idx[:, None], :].reshape(-1, C, E)
-
-        # chunk_attention_mask_ = attention_mask[start_idx[:, None], :, :, :]
-        # chunk_attention_mask_ = chunk_attention_mask_.reshape(-1, chunk_attention_mask_.shape[2], chunk_attention_mask_.shape[3])
-
-        # attention_output = self.attention(chunk_seq, chunk_attention_mask_)
-        # outputs = attention_output.reshape(self.args.num_intent_clusters, chunk_size, C, E)
-
-        # reverse_indices = torch.argsort(sorted_indices)
-        # seq_sort = outputs.view(N, -1)
-        # output = seq_sort[reverse_indices].view(N, C, E)
-    
 
         return output
         
@@ -583,7 +568,7 @@ class SelfAttention(nn.Module):
             query = self.transpose_for_scores(mix_query)
             key = self.transpose_for_scores(mix_key)
             value = self.transpose_for_scores(mix_value)
-
+            
             attention_score = torch.matmul(query,key.transpose(-1,-2)) / self.sqrt_scale
 
             attention_score = attention_score + attention_mask

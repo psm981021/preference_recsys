@@ -1,22 +1,4 @@
 
-# python main.py \
-#     --model_name="UPTRec" \
-#     --data_name="Beauty"  \
-#     --output_dir="output_custom/Beauty/Cluster_Attention" \
-#     --contrast_type="None" \
-#     --seq_representation_type="concatenate" \
-#     --attention_type="Cluster" \
-#     --batch_size=256 \
-#     --model_idx="UPTRec_Cluster_Attention_vanilla_attention" \
-#     --num_intent_clusters=16 \
-#     --warm_up_epoches=150 \
-#     --epochs=1000 \
-#     --patience=500 \
-#     --vanilla_attention \
-#     --context="item_embedding" \
-#     --gpu_id=0 
-
-
 python main.py \
     --model_name="UPTRec" \
     --data_name="Beauty"  \
@@ -24,11 +6,31 @@ python main.py \
     --contrast_type="None" \
     --seq_representation_type="concatenate" \
     --attention_type="Cluster" \
-    --batch_size=256 \
-    --model_idx="UPTRec_Cluster_Attention_self_attention" \
-    --num_intent_clusters=16 \
-    --warm_up_epoches=150 \
-    --epochs=1500 \
+    --batch_size=512 \
+    --num_intent_clusters=64 \
+    --epochs=2000 \
     --patience=500 \
     --context="item_embedding" \
-    --gpu_id=1
+    --gpu_id=0\
+    --cluster_train=5 \
+    --model_idx="UPTRec_Cluster_Attention_5" \
+    --alignment_loss 
+    
+
+
+# python main.py \
+#     --model_name="UPTRec" \
+#     --data_name="Beauty"  \
+#     --output_dir="output_custom/Beauty/Cluster_Attention" \
+#     --contrast_type="None" \
+#     --seq_representation_type="concatenate" \
+#     --attention_type="Cluster" \
+#     --batch_size=512 \
+#     --num_intent_clusters=64 \
+#     --epochs=2000 \
+#     --patience=500 \
+#     --context="item_embedding" \
+#     --gpu_id=1 \
+#     --cluster_train=10 \
+#     --model_idx="UPTRec_Cluster_Attention_10" \
+#     --alignment_loss 
