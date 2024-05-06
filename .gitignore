@@ -13,6 +13,7 @@ data/preprocess.ipynb
 
 #result log
 result_log/
+wandb/
 
 #recbole results
 log/

@@ -232,15 +232,25 @@ def main():
         for epoch in range(args.epochs):
             
             trainer.train(epoch)
-            
+
             # evaluate on NDCG@20
             scores, _ = trainer.valid(epoch, full_sort=True)
+            
             early_stopping(np.array(scores[-1:]), trainer.model)
             if early_stopping.early_stop:
                 save_epoch = epoch
                 print("Early stopping")
                 break
-            wandb.log({"score":scores})
+            
+            wandb.log({
+                "HIT@5": scores[0],
+                "NDCG@5": scores[1],
+                "HIT@10": scores[2],
+                "NDCG@10": scores[3],
+                "HIT@15": scores[4],
+                "NDCG@15": scores[5],
+                "HIT@20": scores[6],
+                "NDCG@20": scores[7]}, step=epoch)
         trainer.args.train_matrix = test_rating_matrix
 
         print("---------------Change to test_rating_matrix!-------------------")

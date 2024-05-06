@@ -526,7 +526,9 @@ class UPTRecTrainer(Trainer):
             if epoch % self.args.cluster_train ==0 and epoch > 0 :
                 for before, after in zip(self.args.nmi_assignment, nmi_assignment):
                     nmi_assignment_loss += self.nmi(before, after)
-            
+                self.args.nmi_assignment_loss = nmi_assignment_loss
+            if nmi_assignment_loss == 0.0 and epoch > self.args.cluster_train:
+                nmi_assignment_loss = self.args.nmi_assignment_loss
             self.args.nmi_assignment = nmi_assignment
 
 
@@ -536,8 +538,8 @@ class UPTRecTrainer(Trainer):
                     "rec_avg_loss": "{:.6}".format(rec_avg_loss / len(rec_cf_data_iter)),
                     "NMI_cluster_reassignment": "{:.6f}".format(nmi_assignment_loss / len(rec_cf_data_iter)),
                 }
-                wandb.log({'rec_avg_loss':rec_avg_loss / len(rec_cf_data_iter)}, step=epoch+1)
-                wandb.log({'NMI_cluster_reassignment': nmi_assignment_loss / len(rec_cf_data_iter)}, step=epoch // self.args.cluster_train)
+                wandb.log({'rec_avg_loss':rec_avg_loss / len(rec_cf_data_iter)}, step=epoch)
+                wandb.log({'NMI_cluster_reassignment': nmi_assignment_loss / len(rec_cf_data_iter)}, step=epoch)
             
             elif self.args.contrast_type in ["Hybrid","IntentCL"]:
                 post_fix = {
@@ -547,10 +549,10 @@ class UPTRecTrainer(Trainer):
                     "Align_loss": "{:.6f}".format(align_losses / len(rec_cf_data_iter)),
                     "NMI_cluster_reassignment": "{:.6f}".format(nmi_assignment_loss / len(rec_cf_data_iter)),
                 }
-                wandb.log({'rec_avg_loss':rec_avg_loss / len(rec_cf_data_iter)}, step=epoch+1)
-                wandb.log({'joint_avg_loss': joint_avg_loss / len(rec_cf_data_iter)}, step=epoch+1)
-                wandb.log({'Align_loss': align_losses / len(rec_cf_data_iter)}, step=epoch+1)
-                wandb.log({'NMI_cluster_reassignment': nmi_assignment_loss / len(rec_cf_data_iter)}, step=epoch // self.args.cluster_train + 1)
+                wandb.log({'rec_avg_loss':rec_avg_loss / len(rec_cf_data_iter)}, step=epoch)
+                wandb.log({'joint_avg_loss': joint_avg_loss / len(rec_cf_data_iter)}, step=epoch)
+                wandb.log({'Align_loss': align_losses / len(rec_cf_data_iter)}, step=epoch)
+                wandb.log({'NMI_cluster_reassignment': nmi_assignment_loss / len(rec_cf_data_iter)}, step=epoch)
 
             if (epoch + 1) % self.args.log_freq == 0:
                 print(str(post_fix))
