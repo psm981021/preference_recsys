@@ -418,19 +418,6 @@ class NTXent(nn.Module):
         loss = -logprob[np.repeat(np.arange(n), m - 1), labels].sum() / n / (m - 1) / self.norm
         return loss
     
-def plot_attention_map(attention_map,args):
-    x_labels = [f'{index}' if index % 5 == 0 else '' for index in range(50)]
-    y_labels = [f'{index}' if index % 5 == 0 else '' for index in range(50)]
-
-    plt.figure(figsize=(15, 15))
-    sns.heatmap(attention_map, cmap='viridis', annot=False, xticklabels=x_labels, yticklabels=y_labels)
-    plt.xlabel('Item Index')
-    plt.ylabel('Item Index')
-    plt.title('Attention Map')
-    
-    # Save the figure with a random index, model_idx seems to be missing, using a placeholder
-    plt.savefig(f'attention_map_{random.randint(0, 100)}.png')
-    plt.show()
 
 class Clustered_Attention_Chunking(nn.Module):
     def __init__(self, args):
@@ -462,6 +449,7 @@ class Clustered_Attention_Chunking(nn.Module):
             print("\nClustered Attention Debugging");import IPython; IPython.embed(colors='Linux');exit(1);
         
         attention_outputs = []
+        attention_probs =[]
         for i in range(int(self.args.num_intent_clusters)):
             #use chunking
             start_idx = i * chunk_size
@@ -478,20 +466,24 @@ class Clustered_Attention_Chunking(nn.Module):
 
             
             if self.args.vanilla_attention == True:
-                attention_output = self.attention(query_chunk_seq,chunk_attention_mask_,key_chunk_seq)
+                attention_output,attention_prob = self.attention(query_chunk_seq,chunk_attention_mask_,key_chunk_seq)
             else:
-                attention_output = self.attention(chunk_seq,chunk_attention_mask_)
+                attention_output, attention_prob = self.attention(chunk_seq,chunk_attention_mask_)
             
             attention_outputs.append(attention_output)
+            attention_probs.append(attention_prob)
 
         outputs = torch.cat(attention_outputs, dim=0)
+        attention_prob = torch.cat(attention_probs, dim=0)
+        
 
         # concat after attention
         reverse_indices = torch.argsort(sorted_indices)
         seq_sort = outputs.view(N,-1)
         output = seq_sort[reverse_indices].view(N,C,E)
-
-        return output
+        
+        sorted_attention_map = attention_prob[reverse_indices]
+        return output, sorted_attention_map
         
 
         
@@ -499,7 +491,7 @@ class Clustered_Attention_Chunking(nn.Module):
 class SelfAttention(nn.Module):
     def __init__(self, args):
         super(SelfAttention,self).__init__()
-
+        self.args = args
         self.num_heads = args.num_hidden_layers
         self.hidden_units = args.hidden_size #+ args.user_hidden_units
         self.attention_head_size = int(self.hidden_units/args.num_hidden_layers)
@@ -557,6 +549,7 @@ class SelfAttention(nn.Module):
             context_1 = torch.matmul(attention_prob_1, value_slice[0])
             context_2 = torch.matmul(attention_prob_2, value_slice[1])
 
+            attention_prob = (attention_prob_1 + attention_prob_2 ) /2.0
             context = (context_1 + context_2) / 2.0
             context = context.permute(0,2,1,3).contiguous() 
 
@@ -573,9 +566,9 @@ class SelfAttention(nn.Module):
 
             attention_score = attention_score + attention_mask
 
-            attention_prob = nn.Softmax( dim=-1)(attention_score)
+            attention_prob = nn.Softmax(dim=-1)(attention_score)
             attention_prob = self.attn_dropout(attention_prob)
-
+            
             context = torch.matmul(attention_prob, value)
             context = context.permute(0,2,1,3).contiguous() 
 
@@ -586,7 +579,9 @@ class SelfAttention(nn.Module):
         hidden_state = self.output_dropout(hidden_state)
         hidden_state = self.layernorm(hidden_state + seq)
 
-        return hidden_state
+        attention_map = torch.mean(attention_prob, dim=1) 
+        
+        return hidden_state, attention_map
 
 
 
@@ -627,15 +622,15 @@ class EncoderLayer(nn.Module):
         if cluster_id is not None:
         # if args.attention_type == "Cluster" and hasattr(args, 'cluster_id'):
             # perform Clustered Attention
-            attention_output = self.cluster_attention_chunking(hidden_state, attention_mask,cluster_id)
+            attention_output, attention_map = self.cluster_attention_chunking(hidden_state, attention_mask,cluster_id)
 
         else:
             # perform Self-Attention
-            attention_output = self.base_attention(hidden_state, attention_mask) 
+            attention_output, attention_map = self.base_attention(hidden_state, attention_mask) 
 
         feedforward_output = self.feedforward(attention_output)
 
-        return feedforward_output
+        return feedforward_output, attention_map
 
 
 
@@ -650,7 +645,7 @@ class Encoder(nn.Module):
         all_encoder_layer = []
 
         for layer_module in self.layer:
-            hidden_state = layer_module(hidden_state, attention_mask,args,cluster_id)
+            hidden_state,attention_map = layer_module(hidden_state, attention_mask,args,cluster_id)
             all_encoder_layer.append(hidden_state)
 
-        return all_encoder_layer
+        return all_encoder_layer, attention_map

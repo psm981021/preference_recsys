@@ -44,6 +44,9 @@ def main():
     parser.add_argument("--attention_map", action="store_true")
     parser.add_argument("--vanilla_attention", action="store_true",help="whether to use two blocks for key")
     parser.add_argument("--alignment_loss", action="store_true", help="Alignment Loss from SimCLR.")
+    parser.add_argument("--wandb", action="store_true", help="activate wandb.")
+    parser.add_argument("--wandb", action="store_true", help="activate wandb.")
+    
     # data augmentation args
     parser.add_argument(
         "--noise_ratio",
@@ -135,6 +138,8 @@ def main():
     parser.add_argument("--initializer_range", type=float, default=0.02)
     parser.add_argument("--max_seq_length", default=50, type=int)
     parser.add_argument("--cluster_train", default=1, type=int)
+   
+    
     # train args
     parser.add_argument("--save_pt",type=str, default="False")
     parser.add_argument("--lr", type=float, default=0.001, help="learning rate of adam")
@@ -218,10 +223,11 @@ def main():
         scores, result_info = trainer.test(args.epochs, full_sort=True)
 
     else:
-        wandb.init(project="preference_rec",
-                   name=f"{args.data_name}_{args.model_idx}_{args.batch_size}_{args.num_intent_clusters}_{args.epochs}",
-                   config=args)
-        args = wandb.config
+        if args.wandb == True:
+            wandb.init(project="preference_rec",
+                    name=f"{args.data_name}_{args.model_idx}_{args.batch_size}_{args.num_intent_clusters}_{args.epochs}",
+                    config=args)
+            args = wandb.config
 
         start_time = time.time()
         print(f"Train UPTRec")
@@ -241,16 +247,16 @@ def main():
                 save_epoch = epoch
                 print("Early stopping")
                 break
-            
-            wandb.log({
-                "HIT@5": scores[0],
-                "NDCG@5": scores[1],
-                "HIT@10": scores[2],
-                "NDCG@10": scores[3],
-                "HIT@15": scores[4],
-                "NDCG@15": scores[5],
-                "HIT@20": scores[6],
-                "NDCG@20": scores[7]}, step=epoch)
+            if args.wandb == True:
+                wandb.log({
+                    "HIT@5": scores[0],
+                    "NDCG@5": scores[1],
+                    "HIT@10": scores[2],
+                    "NDCG@10": scores[3],
+                    "HIT@15": scores[4],
+                    "NDCG@15": scores[5],
+                    "HIT@20": scores[6],
+                    "NDCG@20": scores[7]}, step=epoch)
         trainer.args.train_matrix = test_rating_matrix
 
         print("---------------Change to test_rating_matrix!-------------------")
@@ -274,7 +280,8 @@ def main():
                 f.write(f"To run Epoch:{save_epoch} , It took {hours} hours, {minutes} minutes, {seconds} seconds\n")
             except:
                 f.write(f"To run Epoch:{args.epochs} , It took {hours} hours, {minutes} minutes, {seconds} seconds\n")
-        wandb.finish()
+        if args.wandb == True:
+            wandb.finish()
 
 main()
 

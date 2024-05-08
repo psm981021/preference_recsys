@@ -14,6 +14,8 @@ data/preprocess.ipynb
 #result log
 result_log/
 wandb/
+output_custom/Beauty/Test
+output_custom/Beauty/Cluster_Attention
 
 #recbole results
 log/

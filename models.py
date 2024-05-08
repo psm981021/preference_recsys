@@ -340,10 +340,10 @@ class UPTRec(torch.nn.Module):
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
 
         sequence_embedding = self.UPTembedding(input_ids)
-        encoder_layer = self.encoder(sequence_embedding, extended_attention_mask,args,cluster_id)
+        encoder_layer, attention_prob = self.encoder(sequence_embedding, extended_attention_mask,args,cluster_id)
         sequence_output = encoder_layer[-1]
         
-        return sequence_output 
+        return sequence_output, attention_prob
 
 
 
