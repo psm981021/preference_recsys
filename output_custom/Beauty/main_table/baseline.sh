@@ -7,8 +7,8 @@ python main.py \
     --seq_representation_type="concatenate" \
     --attention_type="Base" \
     --batch_size=512 \
-    --epochs=2000 \
-    --patience=300 \
+    --epochs=4000 \
+    --patience=500 \
     --gpu_id=0 \
     --model_idx="UPTRec-Self-Attention"
 

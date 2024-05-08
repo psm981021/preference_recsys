@@ -190,13 +190,16 @@ class Trainer:
         """
         Plot attention map for the i-th sample in the batch
         """
+        data = attention_map[i].detach().cpu().numpy()
+
         plt.figure(figsize=(10, 10))
-       
-        plt.imshow(attention_map[i].detach().cpu().numpy(), cmap='Greens', vmin=0, vmax=1)
+        plt.imshow(data, cmap='Greens', vmin=0, vmax=0.5)
+
         plt.xlabel('Item index')
         plt.ylabel('Item index')
         plt.title(f'Attention Map (Epoch: {epoch}, {i}-th sample)')
         plt.colorbar()
+        plt.gca().invert_yaxis()
 
         output_file = f'{self.args.output_dir}/Attention map {i}-th sample, Epoch:{epoch}.png'
         plt.savefig(output_file)
@@ -390,7 +393,11 @@ class UPTRecTrainer(Trainer):
                     nmi_assignment.append(intent_ids[0])
 
                 # embedding visualization
-                if self.args.embedding == True and epoch % 200 == 0 and i in [0,10,20]:
+                if self.args.embedding == True and epoch % self.args.visualization_epoch == 0 and i in [0,10,20]:
+                    
+                    # check how single batch cluster assignment changes
+                    if i == 10:
+                        self.args.user_list.append(intent_ids[0].view(self.args.batch_size, -1))
                     self.embedding_plot(epoch, i, sequence_context, intent_ids[0])
 
                 # ---------- recommendation task ---------------#
@@ -401,9 +408,21 @@ class UPTRecTrainer(Trainer):
                     sequence_output,attention_map = self.model(input_ids,self.args)
                 
                 # attention map visualization
-                if self.args.attention_map == True and epoch % 200 == 0 and i in [0,10,20]:
+                if self.args.attention_map == True and epoch % self.args.visualization_epoch == 0 and i in [0,10,20]:
                     attention_map = attention_map.to(self.device)
-                    self.attention_map_plot(epoch, i, attention_map)
+
+                    if i == 0:
+                        index = [172,186,276,297]
+                        for user in index:
+                            self.attention_map_plot(epoch, user, attention_map)
+                    if i == 10:
+                        index = [133,470]
+                        for user in index:
+                            self.attention_map_plot(epoch, user, attention_map)
+                    if i == 20:
+                        index = [123,196,234]
+                        for user in index:
+                            self.attention_map_plot(epoch, user, attention_map)
 
                 rec_loss = self.cross_entropy(sequence_output, target_pos, target_neg)
 
@@ -505,16 +524,19 @@ class UPTRecTrainer(Trainer):
 
 
             if self.args.contrast_type in ["None"]:
+
                 post_fix = {
                     "epoch": epoch,
                     "rec_avg_loss": "{:.6}".format(rec_avg_loss / len(rec_cf_data_iter)),
                     "NMI_cluster_reassignment": "{:.6f}".format(nmi_assignment_score / len(rec_cf_data_iter)),
                 }
+
                 if self.args.wandb == True:
                     wandb.log({'rec_avg_loss':rec_avg_loss / len(rec_cf_data_iter)}, step=epoch)
                     wandb.log({'NMI_cluster_reassignment': nmi_assignment_score / len(rec_cf_data_iter)}, step=epoch)
                 
             elif self.args.contrast_type in ["Hybrid","IntentCL"]:
+
                 post_fix = {
                     "epoch": epoch,
                     "rec_avg_loss": "{:.6}".format(rec_avg_loss / len(rec_cf_data_iter)),
@@ -522,16 +544,19 @@ class UPTRecTrainer(Trainer):
                     "Align_loss": "{:.6f}".format(align_losses / len(rec_cf_data_iter)),
                     "NMI_cluster_reassignment": "{:.6f}".format(nmi_assignment_score / len(rec_cf_data_iter)),
                 }
+
                 if self.args.wandb == True:
                     wandb.log({'rec_avg_loss':rec_avg_loss / len(rec_cf_data_iter)}, step=epoch)
                     wandb.log({'joint_avg_loss': joint_avg_loss / len(rec_cf_data_iter)}, step=epoch)
                     wandb.log({'Align_loss': align_losses / len(rec_cf_data_iter)}, step=epoch)
                     wandb.log({'NMI_cluster_reassignment': nmi_assignment_score / len(rec_cf_data_iter)}, step=epoch)
             else:
+
                 post_fix = {
                     "epoch": epoch,
                     "rec_avg_loss": "{:.6}".format(rec_avg_loss / len(rec_cf_data_iter)),
                 }
+
             if (epoch + 1) % self.args.log_freq == 0:
                 print(str(post_fix))
 
@@ -544,65 +569,77 @@ class UPTRecTrainer(Trainer):
             pred_list = None
             if full_sort:
 
-                if self.args.contrast_type in ["IntentCL", "Hybrid", "None"] and epoch % self.args.cluster_train == 0 :
-                    kmeans_training_data = []
-                    print("[Eval&Test] Preparing Clustering:")
-                    for i, (rec_batch, _, _) in rec_cf_data_iter:
-                        # 0. batch_data will be sent into the device(GPU or cpu)
-                        rec_batch = tuple(t.to(self.device) for t in rec_batch)
-                        _, input_ids, target_pos, target_neg, _ = rec_batch
-
-                        if self.args.context == "encoder":
-                            sequence_output,_ = self.model(input_ids,self.args)
-                            sequence_output = sequence_output.view(sequence_output.shape[0],-1).detach().cpu().numpy()
-                        if self.args.context == "item_embedding":
-                            sequence_output = self.model.item_embedding(input_ids)
-                            sequence_output = sequence_output.view(sequence_output.shape[0], -1).detach().cpu().numpy()
-
-                        kmeans_training_data.append(sequence_output)
-
-                    kmeans_training_data = np.concatenate(kmeans_training_data, axis=0)
-                    print("[Eval&Test] Training Clusters:")
-                    for i, cluster in tqdm(enumerate(self.clusters), total=len(self.clusters)):
-                        cluster.train(kmeans_training_data)
-                        self.clusters[i] = cluster
-                    # clean memory
-                    del kmeans_training_data
-                    import gc
-
-                    gc.collect()
-
-
                 answer_list = None
                 print("Model Eval & Test")
                 rec_data_iter = tqdm(enumerate(dataloader), total=len(dataloader))
-                
+
+                # -------------perfrom valid, test on cluster-attention-------------- #
+                if self.args.valid_attention == False:
+                    if self.args.contrast_type in ["IntentCL", "Hybrid", "None"] and epoch % self.args.cluster_train == 0:
+                        kmeans_training_data = []
+                        print("[Eval&Test] Preparing Clustering:")
+                        for i, (rec_batch, _, _) in rec_cf_data_iter:
+                            # 0. batch_data will be sent into the device(GPU or cpu)
+                            rec_batch = tuple(t.to(self.device) for t in rec_batch)
+                            _, input_ids, target_pos, target_neg, _ = rec_batch
+
+                            if self.args.context == "encoder":
+                                sequence_output,_ = self.model(input_ids,self.args)
+                                sequence_output = sequence_output.view(sequence_output.shape[0],-1).detach().cpu().numpy()
+                            
+                            if self.args.context == "item_embedding":
+                                sequence_output = self.model.item_embedding(input_ids)
+                                sequence_output = sequence_output.view(sequence_output.shape[0], -1).detach().cpu().numpy()
+
+                            kmeans_training_data.append(sequence_output)
+
+                        kmeans_training_data = np.concatenate(kmeans_training_data, axis=0)
+                        print("[Eval&Test] Training Clusters:")
+                        for i, cluster in tqdm(enumerate(self.clusters), total=len(self.clusters)):
+                            cluster.train(kmeans_training_data)
+                            self.clusters[i] = cluster
+                        # clean memory
+                        del kmeans_training_data
+                        import gc
+
+                        gc.collect()
+
+                    
                 for i, batch in rec_data_iter:
                     # 0. batch_data will be sent into the device(GPU or cpu)
                     batch = tuple(t.to(self.device) for t in batch)
                     user_ids, input_ids, target_pos, target_neg, answers = batch
+                    if self.args.valid_attention == False:
+                        if self.args.attention_type in ["Cluster"] and epoch >= self.args.warm_up_epoches:
 
-                    if self.args.attention_type in ["Cluster"] and epoch >= self.args.warm_up_epoches:
-                        if self.args.context == "encoder":
-                            sequence_context,_ = self.model(input_ids,self.args)
-                            sequence_context = sequence_context.view(sequence_context.shape[0],-1).detach().cpu().numpy()
-                        if self.args.context == "item_embedding":
-                            sequence_context = self.model.item_embedding(input_ids)
-                            sequence_context = sequence_context.view(sequence_context.shape[0], -1).detach().cpu().numpy()
+                            if self.args.context == "encoder":
+                                sequence_context,_ = self.model(input_ids,self.args)
+                                sequence_context = sequence_context.view(sequence_context.shape[0],-1).detach().cpu().numpy()
+                            
+                            if self.args.context == "item_embedding":
+                                sequence_context = self.model.item_embedding(input_ids)
+                                sequence_context = sequence_context.view(sequence_context.shape[0], -1).detach().cpu().numpy()
 
-                        for cluster in self.clusters:
-                            seq2intents = []
-                            intent_ids = []
-                            intent_id, seq2intent = cluster.query(sequence_context)
-                            seq2intents.append(seq2intent)
-                            intent_ids.append(intent_id)
-                    
-                        recommend_output,_ = self.model(input_ids,self.args,intent_ids)
+                            for cluster in self.clusters:
+                                seq2intents = []
+                                intent_ids = []
+                                intent_id, seq2intent = cluster.query(sequence_context)
+                                seq2intents.append(seq2intent)
+                                intent_ids.append(intent_id)
+                        
+                            recommend_output,_ = self.model(input_ids,self.args,intent_ids)
+                        else:
+                            recommend_output,_ = self.model(input_ids, self.args)
+                        
                     else:
+                        
                         recommend_output,_ = self.model(input_ids, self.args)
-                    recommend_output = recommend_output[:, -1, :]
-                    # recommendation results
 
+                    recommend_output = recommend_output[:, -1, :]
+
+
+                    # recommendation results
+        
                     rating_pred = self.predict_full(recommend_output)
 
                     rating_pred = rating_pred.cpu().data.numpy().copy()
@@ -621,7 +658,7 @@ class UPTRecTrainer(Trainer):
                     else:
                         pred_list = np.append(pred_list, batch_pred_list, axis=0)
                         answer_list = np.append(answer_list, answers.cpu().data.numpy(), axis=0)
-                
+            
                 return self.get_full_sort_score(epoch, answer_list, pred_list)
 
             else:

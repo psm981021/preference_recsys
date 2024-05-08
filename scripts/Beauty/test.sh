@@ -16,14 +16,18 @@ do
             --batch_size=512 \
             --gpu_id=1 \
             --n_views=2 \
-            --epochs=200 \
+            --epochs=5 \
             --temperature=0.5 \
             --patience=500 \
-            --warm_up_epoches=100 \
+            --warm_up_epoches=0 \
             --num_intent_clusters=4 \
             --alignment_loss  \
+            --attention_map \
             --embedding \
-            --attention_map 
+            --visualization_epoch=1 
 
     done
 done
+
+
+#scripts/Beauty/test.sh

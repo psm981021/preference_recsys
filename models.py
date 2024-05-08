@@ -263,18 +263,32 @@ class KMeans(object):
         index = faiss.GpuIndexFlatL2(res, hidden_size, cfg)
         return clus, index
 
+    # 원본 train code 5/8/24
+    # def train(self, x):
+    #     # train to get centroids
+    #     if x.shape[0] > self.num_cluster:
+    #         self.clus.train(x, self.index)
+
+    #     # get cluster centroids [num_cluster, *]
+    #     centroids = faiss.vector_to_array(self.clus.centroids).reshape(self.num_cluster, self.hidden_size)
+
+    #     # convert to cuda Tensors for broadcast
+    #     centroids = torch.Tensor(centroids).to(self.device)
+    #     self.centroids = nn.functional.normalize(centroids, p=2, dim=1)
+
     def train(self, x):
-        # train to get centroids
+        # trian to get centroids
         if x.shape[0] > self.num_cluster:
             self.clus.train(x, self.index)
+            centroids = faiss.vector_to_array(self.clus.centroids).reshape(self.num_cluster, self.hidden_size)
 
-        # get cluster centroids [num_cluster, *]
-        centroids = faiss.vector_to_array(self.clus.centroids).reshape(self.num_cluster, self.hidden_size)
+            self.index.reset()
+            self.index.add(centroids)
 
-        # convert to cuda Tensors for broadcast
-        centroids = torch.Tensor(centroids).to(self.device)
-        self.centroids = nn.functional.normalize(centroids, p=2, dim=1)
+            centroids = torch.Tensor(centroids).to(self.device)
+            self.centroids = nn.functional.normalize(centroids, p=2, dim=1)
 
+            
     def query(self, x):
         # self.index.add(x)
         D, I = self.index.search(x, 1)  # for each sample, find cluster distance and assignments

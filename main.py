@@ -45,7 +45,7 @@ def main():
     parser.add_argument("--vanilla_attention", action="store_true",help="whether to use two blocks for key")
     parser.add_argument("--alignment_loss", action="store_true", help="Alignment Loss from SimCLR.")
     parser.add_argument("--wandb", action="store_true", help="activate wandb.")
-    parser.add_argument("--wandb", action="store_true", help="activate wandb.")
+    parser.add_argument("--valid_attention", action="store_true", help="valid,test on self-attention if activated.")
     
     # data augmentation args
     parser.add_argument(
@@ -138,7 +138,7 @@ def main():
     parser.add_argument("--initializer_range", type=float, default=0.02)
     parser.add_argument("--max_seq_length", default=50, type=int)
     parser.add_argument("--cluster_train", default=1, type=int)
-   
+    parser.add_argument("--visualization_epoch", default=1, type=int)
     
     # train args
     parser.add_argument("--save_pt",type=str, default="False")
@@ -235,6 +235,10 @@ def main():
         if os.path.exists(args.checkpoint_path):
             print("Load pth")
             trainer.load(args.checkpoint_path)
+
+        # saves reassignments of user cluster ID
+        args.user_list = []
+
         for epoch in range(args.epochs):
             
             trainer.train(epoch)
@@ -258,6 +262,11 @@ def main():
                     "HIT@20": scores[6],
                     "NDCG@20": scores[7]}, step=epoch)
         trainer.args.train_matrix = test_rating_matrix
+
+        # convert cluster reassignment 
+        user_array = np.concatenate([item.cpu().numpy().astype(int) for item in args.user_list], axis=1)
+        csv_file_name = f"{args.output_dir}/{args.model_idx}_cluster_reassignment.csv"
+        np.savetxt(csv_file_name, user_array, delimiter=",", fmt='%d')
 
         print("---------------Change to test_rating_matrix!-------------------")
         # load the best model
