@@ -398,6 +398,7 @@ class UPTRecTrainer(Trainer):
                     # check how single batch cluster assignment changes
                     if i == 10:
                         self.args.user_list.append(intent_ids[0].view(self.args.batch_size, -1))
+                        
                     self.embedding_plot(epoch, i, sequence_context, intent_ids[0])
 
                 # ---------- recommendation task ---------------#

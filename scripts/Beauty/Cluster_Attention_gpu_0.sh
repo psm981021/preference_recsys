@@ -12,11 +12,13 @@ python main.py \
     --patience=500 \
     --context="item_embedding" \
     --gpu_id=0 \
-    --cluster_train=5 \
+    --cluster_train=50 \
+    --visualization_epoch=50 \
     --model_idx="UPTRec_Cluster_Attention-50" \
     --rec_weight=1.5 \
     --alignment_loss \
     --embedding \
+    --user_list=[] \
     --attention_map \
     --wandb
 

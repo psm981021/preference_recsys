@@ -23,10 +23,15 @@ from utils import *
 
 import wandb
 
-def show_args_info(args,log_file):
-    print(f"--------------------Configure Info:------------")
+def show_args_info(args, log_file=None):
+    print("Arguments:")
     for arg in vars(args):
-        print(f"{arg:<30} : {getattr(args, arg):>35}")
+        if arg == "user_list":
+            value = getattr(args, arg)
+            value_str = ', '.join(map(str, value)) if value else '[]'
+            print(f"{arg:<30} : {value_str:>35}")
+        else:
+            print(f"{arg:<30} : {getattr(args, arg):>35}")
 
 
 def main():
@@ -139,7 +144,8 @@ def main():
     parser.add_argument("--max_seq_length", default=50, type=int)
     parser.add_argument("--cluster_train", default=1, type=int)
     parser.add_argument("--visualization_epoch", default=1, type=int)
-    
+    parser.add_argument('--user_list', nargs='+', default=[], help='List to store user data')
+
     # train args
     parser.add_argument("--save_pt",type=str, default="False")
     parser.add_argument("--lr", type=float, default=0.001, help="learning rate of adam")
@@ -237,7 +243,6 @@ def main():
             trainer.load(args.checkpoint_path)
 
         # saves reassignments of user cluster ID
-        args.user_list = []
 
         for epoch in range(args.epochs):
             
