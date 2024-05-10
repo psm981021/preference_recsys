@@ -268,11 +268,6 @@ def main():
                     "NDCG@20": scores[7]}, step=epoch)
         trainer.args.train_matrix = test_rating_matrix
 
-        # convert cluster reassignment 
-        user_array = np.concatenate([item.cpu().numpy().astype(int) for item in args.user_list], axis=1)
-        csv_file_name = f"{args.output_dir}/{args.model_idx}_cluster_reassignment.csv"
-        np.savetxt(csv_file_name, user_array, delimiter=",", fmt='%d')
-
         print("---------------Change to test_rating_matrix!-------------------")
         # load the best model
         trainer.model.load_state_dict(torch.load(args.checkpoint_path))
@@ -296,6 +291,12 @@ def main():
                 f.write(f"To run Epoch:{args.epochs} , It took {hours} hours, {minutes} minutes, {seconds} seconds\n")
         if args.wandb == True:
             wandb.finish()
+
+        # convert cluster reassignment 
+        if len(args.user_list) > 0:
+            user_array = np.concatenate([item.cpu().numpy().astype(int) for item in args.user_list], axis=1)
+            csv_file_name = f"{args.output_dir}/{args.model_idx}_cluster_reassignment.csv"
+            np.savetxt(csv_file_name, user_array, delimiter=",", fmt='%d')
 
 main()
 

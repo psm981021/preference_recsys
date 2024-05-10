@@ -357,7 +357,7 @@ class UPTRecTrainer(Trainer):
             cl_individual_avg_losses = [0.0 for i in range(self.total_augmentaion_pairs)]
             cl_sum_avg_loss = 0.0
             joint_avg_loss = 0.0
-            align_losses = 0.0
+            align_nmi_assignment = 0.0
             nmi_assignment = []
 
             print(f"rec dataset length: {len(dataloader)}")
@@ -459,7 +459,7 @@ class UPTRecTrainer(Trainer):
                                 intent_id, seq2intent = cluster.query(cl_sequence_context)
                                 cl_seq2intents.append(seq2intent)
                                 cl_intent_ids.append(intent_id)
-                            align_losses +=(self.nmi(intent_ids[0], cl_intent_ids[0]))
+                            align_nmi_assignment +=(self.nmi(intent_ids[0], cl_intent_ids[0]))
 
 
                         if self.args.contrast_type == "InstanceCL":
@@ -542,14 +542,14 @@ class UPTRecTrainer(Trainer):
                     "epoch": epoch,
                     "rec_avg_loss": "{:.6}".format(rec_avg_loss / len(rec_cf_data_iter)),
                     "joint_avg_loss": "{:.6f}".format(joint_avg_loss / len(rec_cf_data_iter)),
-                    "Align_loss": "{:.6f}".format(align_losses / len(rec_cf_data_iter)),
+                    "Align_NMI_Cluster_Reassignment": "{:.6f}".format(align_nmi_assignment / len(rec_cf_data_iter)),
                     "NMI_cluster_reassignment": "{:.6f}".format(nmi_assignment_score / len(rec_cf_data_iter)),
                 }
 
                 if self.args.wandb == True:
                     wandb.log({'rec_avg_loss':rec_avg_loss / len(rec_cf_data_iter)}, step=epoch)
                     wandb.log({'joint_avg_loss': joint_avg_loss / len(rec_cf_data_iter)}, step=epoch)
-                    wandb.log({'Align_loss': align_losses / len(rec_cf_data_iter)}, step=epoch)
+                    wandb.log({'Align_NMI_Cluster_Reassignment': align_nmi_assignment / len(rec_cf_data_iter)}, step=epoch)
                     wandb.log({'NMI_cluster_reassignment': nmi_assignment_score / len(rec_cf_data_iter)}, step=epoch)
             else:
 

@@ -16,7 +16,7 @@ do
             --batch_size=512 \
             --gpu_id=1 \
             --n_views=2 \
-            --epochs=5 \
+            --epochs=10 \
             --temperature=0.5 \
             --patience=500 \
             --warm_up_epoches=0 \

@@ -16,6 +16,7 @@ result_log/
 wandb/
 output_custom/Beauty/Test
 output_custom/Beauty/Cluster_Attention
+output_custom/Beauty/main_table/*.png
 
 #recbole results
 log/
