@@ -17,7 +17,8 @@ wandb/
 output_custom/Beauty/Test
 output_custom/Beauty/Cluster_Attention
 output_custom/Beauty/main_table/*.png
-
+output_custom/Beauty/Cluster_Attention_Hybrid/Hybrid-K(16)-R(200)/*.png
+output_custom/Beauty/Cluster_Attention_IntentCL/IntentCL-K(16)-R(200)/*.png
 #recbole results
 log/
 log_tensorboard/

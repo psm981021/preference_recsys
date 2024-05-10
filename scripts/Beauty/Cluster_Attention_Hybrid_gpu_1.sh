@@ -22,7 +22,7 @@ do
             --patience=500 \
             --warm_up_epoches=300 \
             --num_intent_clusters=16 \
-            --cluster_train=200 \
+            --cluster_train=100 \
             --visualization_epoch=100 \
             --alignment_loss \
             --embedding \

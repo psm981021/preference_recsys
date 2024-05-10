@@ -294,7 +294,7 @@ def main():
 
         # convert cluster reassignment 
         if len(args.user_list) > 0:
-            user_array = np.concatenate([item.cpu().numpy().astype(int) for item in args.user_list], axis=1)
+            user_array = np.concatenate([item.numpy().astype(int) for item in args.user_list], axis=1)
             csv_file_name = f"{args.output_dir}/{args.model_idx}_cluster_reassignment.csv"
             np.savetxt(csv_file_name, user_array, delimiter=",", fmt='%d')
 
