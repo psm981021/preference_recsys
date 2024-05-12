@@ -563,7 +563,7 @@ class UPTRecTrainer(Trainer):
                 if self.args.wandb == True:
                     wandb.log({'rec_avg_loss':rec_avg_loss / len(rec_cf_data_iter)}, step=epoch)
                     wandb.log({'joint_avg_loss': joint_avg_loss / len(rec_cf_data_iter)}, step=epoch)
-                    wandb.log({'Align_avg_loss': sum(align_sum_avg_loss) / len(rec_cf_data_iter)}, step=epoch)
+                    wandb.log({'Align_avg_loss': align_sum_avg_loss / len(rec_cf_data_iter)}, step=epoch)
                     wandb.log({'Align_NMI_Cluster_Reassignment': align_nmi_assignment / len(rec_cf_data_iter)}, step=epoch)
                     wandb.log({'NMI_cluster_reassignment': nmi_assignment_score / len(rec_cf_data_iter)}, step=epoch)
             else:

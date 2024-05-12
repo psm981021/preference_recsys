@@ -17,6 +17,7 @@ do
             --gpu_id=1 \
             --n_views=3 \
             --epochs=4000 \
+            --num_hidden_layers=1 \
             --intent_cf_weight=0.5 \
             --temperature=0.1 \
             --patience=500 \

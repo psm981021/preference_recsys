@@ -18,6 +18,7 @@ do
             --n_views=3 \
             --epochs=4000 \
             --intent_cf_weight=0.5 \
+            --num_hidden_layers=1 \
             --temperature=0.1 \
             --patience=500 \
             --warm_up_epoches=400 \
