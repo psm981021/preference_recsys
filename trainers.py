@@ -517,7 +517,7 @@ class UPTRecTrainer(Trainer):
 
                     for i, cl_loss in enumerate(cl_losses):
                         cl_sum_avg_loss += cl_loss.item()
-                    for i, align_loss in enumerate(align_losses):
+                    for align_loss in enumerate(align_losses):
                         align_sum_avg_loss += align_loss.item()
                     joint_avg_loss += joint_loss.item()
 
