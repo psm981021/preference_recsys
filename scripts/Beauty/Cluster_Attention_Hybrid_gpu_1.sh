@@ -20,7 +20,7 @@ do
             --intent_cf_weight=0.5 \
             --temperature=0.1 \
             --patience=500 \
-            --warm_up_epoches=300 \
+            --warm_up_epoches=400 \
             --num_intent_clusters=16 \
             --cluster_train=100 \
             --visualization_epoch=100 \

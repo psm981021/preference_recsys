@@ -18,7 +18,7 @@ from torchmetrics.clustering import NormalizedMutualInfoScore
 
 from models import KMeans
 from datasets import RecWithContrastiveLearningDataset
-from modules import NCELoss, NTXent, SupConLoss, PCLoss
+from modules import NCELoss, NTXent, SupConLoss, PCLoss, AlignmentLossWithSinkhorn
 from utils import *
 
 import matplotlib.pyplot as plt
@@ -94,6 +94,7 @@ class Trainer:
         self.pcl_criterion = PCLoss(self.args.temperature, self.device)
         self.criterion = torch.nn.CrossEntropyLoss().to(self.args.device)
         self.nmi = NormalizedMutualInfoScore().to(self.device)
+        self.align_criterion = AlignmentLossWithSinkhorn().to(self.args.device)
 
     def train(self, epoch):
         self.iteration(epoch, self.train_dataloader, self.cluster_dataloader)
@@ -356,6 +357,7 @@ class UPTRecTrainer(Trainer):
             rec_avg_loss = 0.0
             cl_individual_avg_losses = [0.0 for i in range(self.total_augmentaion_pairs)]
             cl_sum_avg_loss = 0.0
+            align_sum_avg_loss = 0.0
             joint_avg_loss = 0.0
             align_nmi_assignment = 0.0
             nmi_assignment = []
@@ -436,9 +438,10 @@ class UPTRecTrainer(Trainer):
 
                     rec_avg_loss += rec_loss.item()
 
-                else: 
+                if self.args.contrast_type in ["Hybrid", "IntentCL"]:
                     # ---------- contrastive learning task -------------#
                     cl_losses = []
+                    align_losses = []
                     
                     for cl_batch in cl_batches:
                         if self.args.alignment_loss == True:
@@ -473,7 +476,7 @@ class UPTRecTrainer(Trainer):
         
                             if epoch >= self.args.warm_up_epoches:
                                 
-                                cl_loss = self._pcl_one_pair_contrastive_learning(cl_batch, intents=seq2intents, intent_ids=intent_ids)
+                                cl_loss = self._pcl_one_pair_contrastive_learning(cl_batch, intents=cl_seq2intents, intent_ids=cl_intent_ids)
                                     
                                 cl_losses.append(self.args.intent_cf_weight * cl_loss)
                             else:
@@ -491,13 +494,21 @@ class UPTRecTrainer(Trainer):
                                 cl_losses.append(self.args.cf_weight * cl_loss1)
                                 
                                 cl_loss3 = self._pcl_one_pair_contrastive_learning(
-                                    cl_batch, intents=seq2intents, intent_ids=intent_ids
+                                    cl_batch, intents=cl_seq2intents, intent_ids=cl_intent_ids
                                 )
                                 cl_losses.append(self.args.intent_cf_weight * cl_loss3)
+
+                                align_loss = self.align_criterion(cl_seq2intents[0],seq2intents[0])
+                                align_losses.append(align_loss)
+
                     
                     joint_loss = self.args.rec_weight * rec_loss
                     for cl_loss in cl_losses:
                         joint_loss += cl_loss
+
+                    for align_loss in align_losses:
+                        joint_loss += align_loss
+
                     self.optim.zero_grad()
                     joint_loss.backward()
                     self.optim.step()
@@ -506,6 +517,8 @@ class UPTRecTrainer(Trainer):
 
                     for i, cl_loss in enumerate(cl_losses):
                         cl_sum_avg_loss += cl_loss.item()
+                    for i, align_loss in enumerate(align_losses):
+                        align_sum_avg_loss += align_loss.item()
                     joint_avg_loss += joint_loss.item()
 
             # end of for statements in model training
@@ -542,6 +555,7 @@ class UPTRecTrainer(Trainer):
                     "epoch": epoch,
                     "rec_avg_loss": "{:.6}".format(rec_avg_loss / len(rec_cf_data_iter)),
                     "joint_avg_loss": "{:.6f}".format(joint_avg_loss / len(rec_cf_data_iter)),
+                    "Align_avg_loss": "{:.6f}".format( align_sum_avg_loss / len(rec_cf_data_iter)),
                     "Align_NMI_Cluster_Reassignment": "{:.6f}".format(align_nmi_assignment / len(rec_cf_data_iter)),
                     "NMI_cluster_reassignment": "{:.6f}".format(nmi_assignment_score / len(rec_cf_data_iter)),
                 }
@@ -549,6 +563,7 @@ class UPTRecTrainer(Trainer):
                 if self.args.wandb == True:
                     wandb.log({'rec_avg_loss':rec_avg_loss / len(rec_cf_data_iter)}, step=epoch)
                     wandb.log({'joint_avg_loss': joint_avg_loss / len(rec_cf_data_iter)}, step=epoch)
+                    wandb.log({'Align_avg_loss': sum(align_sum_avg_loss) / len(rec_cf_data_iter)}, step=epoch)
                     wandb.log({'Align_NMI_Cluster_Reassignment': align_nmi_assignment / len(rec_cf_data_iter)}, step=epoch)
                     wandb.log({'NMI_cluster_reassignment': nmi_assignment_score / len(rec_cf_data_iter)}, step=epoch)
             else:

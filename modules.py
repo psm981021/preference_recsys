@@ -350,6 +350,10 @@ class NCELoss(nn.Module):
         # sim11 = self.cossim(batch_sample_one.unsqueeze(-2), batch_sample_one.unsqueeze(-3)) / self.temperature
         # sim22 = self.cossim(batch_sample_two.unsqueeze(-2), batch_sample_two.unsqueeze(-3)) / self.temperature
         # sim12 = self.cossim(batch_sample_one.unsqueeze(-2), batch_sample_two.unsqueeze(-3)) / self.temperature
+
+        batch_sample_one = F.normalize(batch_sample_one, p=2, dim=1)
+        batch_sample_two = F.normalize(batch_sample_two, p=2, dim=1)
+
         sim11 = torch.matmul(batch_sample_one, batch_sample_one.T) / self.temperature
         sim22 = torch.matmul(batch_sample_two, batch_sample_two.T) / self.temperature
         sim12 = torch.matmul(batch_sample_one, batch_sample_two.T) / self.temperature
@@ -379,8 +383,52 @@ class NCELoss(nn.Module):
         raw_scores2 = torch.cat([sim22, sim12.transpose(-1, -2)], dim=-1) # negative
         logits = torch.cat([raw_scores1, raw_scores2], dim=-2)
         labels = torch.arange(2 * d, dtype=torch.long, device=logits.device)
+        
+
         nce_loss = self.criterion(logits, labels)
         return nce_loss
+    
+class AlignmentLossWithSinkhorn(nn.Module):
+    def __init__(self, sinkhorn_iterations=20, epsilon=0.05):
+        super(AlignmentLossWithSinkhorn, self).__init__()
+        self.epsilon = epsilon
+        self.sinkhorn_iterations = sinkhorn_iterations
+
+    def compute_similarity(self, cl_seq2intents, seq2intents):
+        # Dot product and exponential scaling
+        
+        scores = torch.matmul(cl_seq2intents, seq2intents.t())  # [K, K] if K is the number of prototypes/intents
+        scores = torch.exp(scores / self.epsilon)  # Apply exponential scaling
+        return scores
+
+    def distributed_sinkhorn(self, out):
+        Q = out.t()  # Transpose for consistency (prototypes x samples)
+        B = Q.shape[1]  # number of samples (from seq2intents)
+        K = Q.shape[0]  # number of prototypes (from cl_seq2intents)
+
+        sum_Q = torch.sum(Q)
+        Q /= sum_Q
+
+        for it in range(self.sinkhorn_iterations):
+            Q /= torch.sum(Q, dim=1, keepdim=True)
+            Q /= K
+            Q /= torch.sum(Q, dim=0, keepdim=True)
+            Q /= B
+
+        Q *= B
+        return Q.t()
+
+    def compute_alignment_loss(self, cl_seq2intents, seq2intents, assignment_matrix):
+        aligned_intents = torch.matmul(assignment_matrix, seq2intents)  # Re-order seq2intents as per assignments
+        loss = F.mse_loss(aligned_intents, cl_seq2intents)
+        return loss
+    
+    def forward(self, cl_seq2intents, seq2intents):
+        # Compute similarity and apply Sinkhorn normalization
+        similarity_scores = self.compute_similarity(cl_seq2intents, seq2intents)
+        assignment_matrix = self.distributed_sinkhorn(similarity_scores)
+        loss = self.compute_alignment_loss(cl_seq2intents, seq2intents, assignment_matrix)
+        return loss
 
 class NTXent(nn.Module):
     """

@@ -317,6 +317,8 @@ class UPTRec(torch.nn.Module):
         self.criterion = nn.BCELoss(reduction="none")
         self.loss_ce = nn.CrossEntropyLoss()
 
+        # check item embedding 생성 당시 random 하게 생성하지 않고, nn.init을 통해 초기화
+
     def UPTembedding(self,input_ids):
 
             
