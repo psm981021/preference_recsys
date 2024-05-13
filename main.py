@@ -37,6 +37,17 @@ def show_args_info(args, log_file=None):
 def main():
 
     parser = argparse.ArgumentParser()
+
+    #parser added
+    parser.add_argument("--embedding", action="store_true")
+    parser.add_argument("--attention_map", action="store_true")
+    parser.add_argument("--vanilla_attention", action="store_true",help="whether to use two blocks for key")
+    parser.add_argument("--alignment_loss", action="store_true", help="Alignment Loss from SimCLR.")
+    parser.add_argument("--wandb", action="store_true", help="activate wandb.")
+    parser.add_argument("--valid_attention", action="store_true", help="valid,test on self-attention if activated.")
+
+
+
     # system args
     parser.add_argument("--data_dir", default="data/", type=str)
     parser.add_argument("--output_dir", default="output_custom/", type=str)
@@ -45,12 +56,21 @@ def main():
     parser.add_argument("--model_idx", default="test", type=str, help="model idenfier")
     parser.add_argument("--gpu_id", type=str, default="0", help="gpu_id")
 
-    parser.add_argument("--embedding", action="store_true")
-    parser.add_argument("--attention_map", action="store_true")
-    parser.add_argument("--vanilla_attention", action="store_true",help="whether to use two blocks for key")
-    parser.add_argument("--alignment_loss", action="store_true", help="Alignment Loss from SimCLR.")
-    parser.add_argument("--wandb", action="store_true", help="activate wandb.")
-    parser.add_argument("--valid_attention", action="store_true", help="valid,test on self-attention if activated.")
+    parser.add_argument(
+        "--attention_type",
+        default ="Base",
+        type=str,
+        help="Ways of performing Attention Mechanism\
+            Supports 'Base' for Self-Attention and 'Cluster' for Clustered Atteniton"
+    )
+
+    parser.add_argument(
+        "--context",
+        default ="item_embedding",
+        type=str,
+        help="Ways of considering contexutal information using input_ids \
+            Supports 'item_embedding' for low-dimensional representations and 'encoder' for high-dimensional representations"
+    )
     
     # data augmentation args
     parser.add_argument(
@@ -91,21 +111,6 @@ def main():
         type=str,
         help="Ways to contrastive of. \
                         Support InstanceCL and ShortInterestCL, IntentCL, and Hybrid types, None",
-    )
-    parser.add_argument(
-        "--attention_type",
-        default ="Base",
-        type=str,
-        help="Ways of performing Attention Mechanism\
-            Supports 'Base' for Self-Attention and 'Cluster' for Clustered Atteniton"
-    )
-
-    parser.add_argument(
-        "--context",
-        default ="item_embedding",
-        type=str,
-        help="Ways of considering contexutal information using input_ids \
-            Supports 'item_embedding' for low-dimensional representations and 'encoder' for high-dimensional representations"
     )
 
     parser.add_argument(
