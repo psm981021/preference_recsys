@@ -10,201 +10,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import random
 
-class _GroupQueries(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, Q, clusters, counts, lengths):
-        factors = 1./counts.float()
-        q_grouped = clustered_aggregate(Q, clusters, factors, lengths)
-        ctx.save_for_backward(clusters, counts, factors)
-
-        return q_grouped
-
-    @staticmethod
-    def backward(ctx, grad_q_grouped):
-        clusters, counts, factors = ctx.saved_tensors
-        grad_q = clustered_broadcast(grad_q_grouped, clusters, counts, factors)
-
-        return grad_q, None, None, None
-
-class _BroadcastValues(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, v_grouped, clusters, counts, lengths):
-        
-        """
-        factors N H C
-        v_grouped N H C E
-        counts N H C
-        """
-        # N x H x C
-        factors = torch.ones_like(counts, dtype=v_grouped.dtype)
-
-        # N x H x L x E
-        V = clustered_broadcast(v_grouped, clusters, counts, factors)
-        ctx.save_for_backward(clusters, counts, factors, lengths)
-
-        return V
-    @staticmethod
-    def backward(ctx, grad_v):
-        clusters, counts, factors, lengths = ctx.saved_tensors
-        grad_v_grouped = clustered_aggregate(grad_v, clusters, factors, lengths)
-
-        return grad_v_grouped, None, None, None
-
-class Clustered_Attention(nn.Module):
-    """
-    original code from https://github.com/idiap/fast-transformers/tree/master
-
-    Use LSH and clustering in Hamming space to group query - minimal L2 distance
-
-    Given Q, K, V cluster the Q into groups in "C" and compute the "C" query centroids Q_c
-
-    We now use to the centroids Q_c to compute the attention using:
-
-        V'_c = softmax(Q_c.mm(K.t()), dim=-1).mm(V).
-
-    Now the computed values V'_c are "broadcasted" back to the query members
-    of the corresponding cluster.
-
-    """
-    #iterations change to 10
-    def __init__(self, args, iterations =5, bits =32):
-        super(Clustered_Attention, self).__init__()
-
-        self.args = args
-        self.num_heads = args.num_hidden_layers
-        self.hidden_units = args.hidden_size
-        self.attention_head_size = int(self.hidden_units / self.num_heads)
-        self.all_head_size = self.num_heads * self.attention_head_size
-        
-        self.clusters = args.num_intent_clusters
-        self.bits = bits
-        self.iterations =iterations
-        self.dropout = nn.Dropout(args.hidden_dropout_prob)
-        self.softmax = nn.Softmax(dim=-1)
-
-        self.query = nn.Linear(self.hidden_units, self.all_head_size)
-        self.key = nn.Linear(self.hidden_units, self.all_head_size)
-        self.value = nn.Linear(self.hidden_units, self.all_head_size)
-    
-    def transpose_for_scores(self,x): #not currently used due to concat of user, item embedding
-        new_x_shape = x.size()[:-1] + (self.num_heads, self.attention_head_size)
-        x = x.view(*new_x_shape)
-
-        return x.permute(0, 2, 1, 3)
-    
-    def _create_query_groups(self, Q, query_lengths):
-        N, H, L, E = Q.shape
-
-
-        planes = Q.new_empty((self.bits, E+1)) # assign number of hashes for representation 
-        torch.nn.init.normal_(planes) #initialize with normal distributuon
-
-        planes[:,-1] = 0
-        
-        Q = Q.contiguous() #in order to use view, since stride is not working properly
-        Q_reshaped = Q.view(N*H*L, E)
-       
-
-        hashes_ = compute_hashes(Q_reshaped, planes) # [N*H*L] shape
-        hashes = hashes_.view(N,H,L)
-
-        clusters, counts =  cluster(
-            hashes,
-            query_lengths,
-            self.args,
-            iterations=self.iterations,
-            bits=self.bits
-        ) 
-        # clusters N H L
-        # counts N H C 
-
-        # sorted_clusters, sorted_indx: N, H, L
-        sorted_clusters, sorted_indx = torch.sort(clusters, dim=-1)
-        return (sorted_clusters, counts), sorted_indx
-
-    def _group_queries(self, Q, groups, lengths):
-        """
-        Aggregate the Qs based on the index of cluster they belong to. Make
-        sure to allow for gradient propagation backwards from the grouped
-        queries to each query.
-        """
-
-        q_grouped = _GroupQueries.apply(Q, *groups, lengths) 
-        
-        return q_grouped
-    
-    def _broadcast_values(self, V, groups, lengths):
-        """
-        Broadcast the values back to the correct positions but make sure
-        that the gradient flows properly.
-
-        """
-        V_new = _BroadcastValues.apply(V.contiguous(), *groups, lengths)
-        return V_new
-
-
-    def forward(self, seq, attn_mask):
-        
-        # cluster attention does not use attention mask
-        
-        mix_query = self.query(seq)
-        mix_key= self.key(seq)
-        mix_value = self.value(seq)
-
-        queries = self.transpose_for_scores(mix_query)
-        keys = self.transpose_for_scores(mix_key)
-        values = self.transpose_for_scores(mix_value)
-
-        
-        N, H, L, E = queries.shape
-        _, _, S, D = values.shape
-
-        softmax_temp = 1./math.sqrt(E)
-
-        # initalize query_length to match the query length
-        query_lengths = torch.full((N * H * L,), L, dtype=torch.int64)
-
-        # used as cluster lengths, sequence length for each sequence in hashes
-        key_lengths = torch.full((N , H , L), L, dtype=torch.int64).unsqueeze(2).to(seq.device)
-
-        # cluster the queries into groups
-        groups, sorted_indx = self._create_query_groups(queries, query_lengths)
-
-        # Re-organize queries so that first group belong to first cluster
-        # next to second cluster and so on. This improves kernel implementations
-        
-        q_offset = torch.arange(N*H, device=queries.device).unsqueeze(-1) * L
-        q_flat = (sorted_indx.view(N*H, -1) + q_offset).reshape(-1)
-        s_queries = queries.reshape(-1, E).index_select(0, q_flat).view(N,H,L,E)
-
-
-        # Aggregate the re-arranged queries
-        
-        Q_grouped_ = self._group_queries(s_queries, groups, query_lengths)
-        Q_grouped = Q_grouped_.view(N,H,-1,E) # N H C E 
-
-        
-        # Compute attention
-
-        QK = torch.einsum("nhle,nhse->nhls", Q_grouped, keys)
-        
-        A = self.dropout(torch.softmax(softmax_temp * QK, dim=-1)) # N H C E
-        V = torch.einsum("nhls,nhsd->nhld", A, values) # N H C E 
-
-        # Broadcast grouped attention
-        V_broadcast = self._broadcast_values(V, groups, query_lengths) # N H L E
-        
-        # Reverse the privious mapping
-
-        rev_indx = torch.argsort(sorted_indx, dim=-1)
-        q_rev_flat = (rev_indx.view(N*H, -1) + q_offset).reshape(-1)
-        V_new = V_broadcast.reshape(-1, D).index_select(0, q_rev_flat).view(N,H,L,D)
-        V_new = V_new.permute(0, 2, 1, 3).contiguous().view(N,L,-1) # N L H C
-        
-        # add normalization , dropout residual connection if needed
-        return V_new
-    
-
 
 class SupConLoss(nn.Module):
     """Supervised Contrastive Learning: https://arxiv.org/pdf/2004.11362.pdf.
@@ -296,8 +101,44 @@ class SupConLoss(nn.Module):
         loss = loss.view(anchor_count, batch_size).mean()
 
         return loss
+
+class NTXent(nn.Module):
     
-    
+    """
+    Contrastive loss with distributed data parallel support
+    code: https://github.com/AndrewAtanov/simclr-pytorch/blob/master/models/losses.py
+    """
+
+    LARGE_NUMBER = 1e9
+
+    def __init__(self, tau=1.0, gpu=None, multiplier=2, distributed=False):
+        super().__init__()
+        self.tau = tau
+        self.multiplier = multiplier
+        self.distributed = distributed
+        self.norm = 1.0
+
+    def forward(self, batch_sample_one, batch_sample_two):
+        z = torch.cat([batch_sample_one, batch_sample_two], dim=0)
+        n = z.shape[0]
+        assert n % self.multiplier == 0
+
+        z = F.normalize(z, p=2, dim=1) / np.sqrt(self.tau)
+        logits = z @ z.t()
+        logits[np.arange(n), np.arange(n)] = -self.LARGE_NUMBER
+
+        logprob = F.log_softmax(logits, dim=1)
+
+        # choose all positive objects for an example, for i it would be (i + k * n/m), where k=0...(m-1)
+        m = self.multiplier
+        labels = (np.repeat(np.arange(n), m) + np.tile(np.arange(m) * n // m, n)) % n
+        # remove labels pointet to itself, i.e. (i, i)
+        labels = labels.reshape(n, m)[:, 1:].reshape(-1)
+
+        # TODO: maybe different terms for each process should only be computed here...
+        loss = -logprob[np.repeat(np.arange(n), m - 1), labels].sum() / n / (m - 1) / self.norm
+        return loss
+
 class PCLoss(nn.Module):
     """ Reference: https://github.com/salesforce/PCL/blob/018a929c53fcb93fd07041b1725185e1237d2c0e/pcl/builder.py#L168
     """
@@ -351,8 +192,9 @@ class NCELoss(nn.Module):
         # sim22 = self.cossim(batch_sample_two.unsqueeze(-2), batch_sample_two.unsqueeze(-3)) / self.temperature
         # sim12 = self.cossim(batch_sample_one.unsqueeze(-2), batch_sample_two.unsqueeze(-3)) / self.temperature
 
-        batch_sample_one = F.normalize(batch_sample_one, p=2, dim=1)
-        batch_sample_two = F.normalize(batch_sample_two, p=2, dim=1)
+        # check validity
+        # batch_sample_one = F.normalize(batch_sample_one, p=2, dim=1)
+        # batch_sample_two = F.normalize(batch_sample_two, p=2, dim=1)
 
         sim11 = torch.matmul(batch_sample_one, batch_sample_one.T) / self.temperature
         sim22 = torch.matmul(batch_sample_two, batch_sample_two.T) / self.temperature
@@ -373,8 +215,8 @@ class NCELoss(nn.Module):
         else:
             mask = torch.eye(d, dtype=torch.long).to(self.device)
             sim11[mask == 1] = float("-inf")
-            if sim22.shape != torch.Size([1]):
-                sim22[mask == 1] = float("-inf")
+            # if sim22.shape != torch.Size([1]):
+            #     sim22[mask == 1] = float("-inf")
             # sim22 = sim22.masked_fill_(mask, -np.inf)
             # sim11[..., range(d), range(d)] = float('-inf')
             # sim22[..., range(d), range(d)] = float('-inf')
@@ -430,43 +272,6 @@ class AlignmentLossWithSinkhorn(nn.Module):
         loss = self.compute_alignment_loss(cl_seq2intents, seq2intents, assignment_matrix)
         return loss
 
-class NTXent(nn.Module):
-    """
-    Contrastive loss with distributed data parallel support
-    code: https://github.com/AndrewAtanov/simclr-pytorch/blob/master/models/losses.py
-    """
-
-    LARGE_NUMBER = 1e9
-
-    def __init__(self, tau=1.0, gpu=None, multiplier=2, distributed=False):
-        super().__init__()
-        self.tau = tau
-        self.multiplier = multiplier
-        self.distributed = distributed
-        self.norm = 1.0
-
-    def forward(self, batch_sample_one, batch_sample_two):
-        z = torch.cat([batch_sample_one, batch_sample_two], dim=0)
-        n = z.shape[0]
-        assert n % self.multiplier == 0
-
-        z = F.normalize(z, p=2, dim=1) / np.sqrt(self.tau)
-        logits = z @ z.t()
-        logits[np.arange(n), np.arange(n)] = -self.LARGE_NUMBER
-
-        logprob = F.log_softmax(logits, dim=1)
-
-        # choose all positive objects for an example, for i it would be (i + k * n/m), where k=0...(m-1)
-        m = self.multiplier
-        labels = (np.repeat(np.arange(n), m) + np.tile(np.arange(m) * n // m, n)) % n
-        # remove labels pointet to itself, i.e. (i, i)
-        labels = labels.reshape(n, m)[:, 1:].reshape(-1)
-
-        # TODO: maybe different terms for each process should only be computed here...
-        loss = -logprob[np.repeat(np.arange(n), m - 1), labels].sum() / n / (m - 1) / self.norm
-        return loss
-    
-
 class Clustered_Attention_Chunking(nn.Module):
     def __init__(self, args):
         super(Clustered_Attention_Chunking, self).__init__()
@@ -514,15 +319,15 @@ class Clustered_Attention_Chunking(nn.Module):
 
             
             if self.args.vanilla_attention == True:
-                attention_output,attention_prob = self.attention(query_chunk_seq,chunk_attention_mask_,key_chunk_seq)
+                attention_output = self.attention(query_chunk_seq,chunk_attention_mask_,key_chunk_seq)
             else:
-                attention_output, attention_prob = self.attention(chunk_seq,chunk_attention_mask_)
+                attention_output = self.attention(chunk_seq,chunk_attention_mask_)
             
             attention_outputs.append(attention_output)
-            attention_probs.append(attention_prob)
+            # attention_probs.append(attention_prob)
 
         outputs = torch.cat(attention_outputs, dim=0)
-        attention_prob = torch.cat(attention_probs, dim=0)
+        # attention_prob = torch.cat(attention_probs, dim=0)
         
 
         # concat after attention
@@ -530,118 +335,80 @@ class Clustered_Attention_Chunking(nn.Module):
         seq_sort = outputs.view(N,-1)
         output = seq_sort[reverse_indices].view(N,C,E)
         
-        sorted_attention_map = attention_prob[reverse_indices]
-        return output, sorted_attention_map
+        # sorted_attention_map = attention_prob[reverse_indices]
+        return output
         
-
-        
-
 class SelfAttention(nn.Module):
     def __init__(self, args):
-        super(SelfAttention,self).__init__()
-        self.args = args
-        self.num_heads = args.num_hidden_layers
-        self.hidden_units = args.hidden_size #+ args.user_hidden_units
-        self.attention_head_size = int(self.hidden_units/args.num_hidden_layers)
-        self.all_head_size = self.num_heads * self.attention_head_size
-        self.sqrt_scale = math.sqrt(self.hidden_units)
+        super(SelfAttention, self).__init__()
+        if args.hidden_size % args.num_attention_heads != 0:
+            raise ValueError(
+                "The hidden size (%d) is not a multiple of the number of attention "
+                "heads (%d)" % (args.hidden_size, args.num_attention_heads)
+            )
+        self.num_attention_heads = args.num_attention_heads
+        self.attention_head_size = int(args.hidden_size / args.num_attention_heads)
+        self.all_head_size = self.num_attention_heads * self.attention_head_size
 
-        self.query = nn.Linear(self.hidden_units, self.all_head_size)
-        self.key = nn.Linear(self.hidden_units, self.all_head_size)
-        self.value = nn.Linear(self.hidden_units, self.all_head_size)
+        self.query = nn.Linear(args.hidden_size, self.all_head_size)
+        self.key = nn.Linear(args.hidden_size, self.all_head_size)
+        self.value = nn.Linear(args.hidden_size, self.all_head_size)
 
-        # reuse when MHA is not necessary
-        # self.query = nn.Linear(self.hidden_units, self.hidden_units)
-        # self.key = nn.Linear(self.hidden_units, self.hidden_units)
-        # self.value = nn.Linear(self.hidden_units, self.hidden_units)
-    
-        self.softmax = nn.Softmax(dim=-1)
         self.attn_dropout = nn.Dropout(args.attention_probs_dropout_prob)
-        self.output_dropout = nn.Dropout(args.hidden_dropout_prob)
 
-        self.dense = nn.Linear(self.hidden_units, self.hidden_units)
-        self.layernorm = nn.LayerNorm(self.hidden_units, eps=1e-12)
-        
-    def transpose_for_scores(self,x): #not currently used due to concat of user, item embedding
-        new_x_shape = x.size()[:-1] + (self.num_heads, self.attention_head_size)
+        # 做完self-attention 做一个前馈全连接 LayerNorm 输出
+        self.dense = nn.Linear(args.hidden_size, args.hidden_size)
+        self.LayerNorm = LayerNorm(args.hidden_size, eps=1e-12)
+        self.out_dropout = nn.Dropout(args.hidden_dropout_prob)
+
+    def transpose_for_scores(self, x):
+        new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
         x = x.view(*new_x_shape)
-
         return x.permute(0, 2, 1, 3)
-    
-    def forward(self, seq, attention_mask,key=None):
-        if key is not None:
 
-            mix_query = self.query(seq)
-            mix_key = self.key(key)
-            mix_value = self.value(key)
+    def forward(self, input_tensor, attention_mask):
+        mixed_query_layer = self.query(input_tensor)
+        mixed_key_layer = self.key(input_tensor)
+        mixed_value_layer = self.value(input_tensor)
 
-            query = self.transpose_for_scores(mix_query)
-            key = self.transpose_for_scores(mix_key)
-            value = self.transpose_for_scores(mix_value)
+        query_layer = self.transpose_for_scores(mixed_query_layer)
+        key_layer = self.transpose_for_scores(mixed_key_layer)
+        value_layer = self.transpose_for_scores(mixed_value_layer)
 
-            b, h, l, _ = key.shape
-            key_slice = torch.split(key, b // 2)
-            value_slice = torch.split(value, b // 2)
-                                           
-            attention_score1 = torch.matmul(query,key_slice[0].transpose(-1,-2)) / self.sqrt_scale 
-            attention_score2 = torch.matmul(query,key_slice[1].transpose(-1,-2)) / self.sqrt_scale
+        # Take the dot product between "query" and "key" to get the raw attention scores.
+        attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
 
-            attention_score1 = attention_score1 + attention_mask
-            attention_prob_1 = nn.Softmax( dim=-1)(attention_score1)
-            attention_prob_1 = self.attn_dropout(attention_prob_1)
+        attention_scores = attention_scores / math.sqrt(self.attention_head_size)
+        # Apply the attention mask is (precomputed for all layers in BertModel forward() function)
+        # [batch_size heads seq_len seq_len] scores
+        # [batch_size 1 1 seq_len]
+        attention_scores = attention_scores + attention_mask
 
-            attention_score2 = attention_score2 + attention_mask
-            attention_prob_2 = nn.Softmax( dim=-1)(attention_score2)
-            attention_prob_2 = self.attn_dropout(attention_prob_2)
+        # Normalize the attention scores to probabilities.
+        attention_probs = nn.Softmax(dim=-1)(attention_scores)
+        # This is actually dropping out entire tokens to attend to, which might
+        # seem a bit unusual, but is taken from the original Transformer paper.
+        # Fixme
+        attention_probs = self.attn_dropout(attention_probs)
+        context_layer = torch.matmul(attention_probs, value_layer)
+        context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
+        new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
+        context_layer = context_layer.view(*new_context_layer_shape)
+        hidden_states = self.dense(context_layer)
+        hidden_states = self.out_dropout(hidden_states)
+        hidden_states = self.LayerNorm(hidden_states + input_tensor)
 
-            context_1 = torch.matmul(attention_prob_1, value_slice[0])
-            context_2 = torch.matmul(attention_prob_2, value_slice[1])
+        return hidden_states
 
-            attention_prob = (attention_prob_1 + attention_prob_2 ) /2.0
-            context = (context_1 + context_2) / 2.0
-            context = context.permute(0,2,1,3).contiguous() 
-
-        else:
-            mix_query = self.query(seq)
-            mix_key = self.key(seq)
-            mix_value = self.value(seq)
-
-            query = self.transpose_for_scores(mix_query)
-            key = self.transpose_for_scores(mix_key)
-            value = self.transpose_for_scores(mix_value)
-            
-            attention_score = torch.matmul(query,key.transpose(-1,-2)) / self.sqrt_scale
-
-            attention_score = attention_score + attention_mask
-
-            attention_prob = nn.Softmax(dim=-1)(attention_score)
-            attention_prob = self.attn_dropout(attention_prob)
-            
-            context = torch.matmul(attention_prob, value)
-            context = context.permute(0,2,1,3).contiguous() 
-
-        new_context_layer_shape = context.size()[:-2] + (self.all_head_size,)
-        context = context.view(*new_context_layer_shape)
-
-        hidden_state = self.dense(context)
-        hidden_state = self.output_dropout(hidden_state)
-        hidden_state = self.layernorm(hidden_state + seq)
-
-        attention_map = torch.mean(attention_prob, dim=1) 
-        
-        return hidden_state, attention_map
-
-
-
-class FeedForward(nn.Module):
+class Intermediate(nn.Module):
     def __init__(self, args):
-        super(FeedForward,self).__init__()
+        super(Intermediate,self).__init__()
 
         self.hidden_units = args.hidden_size# + args.user_hidden_units
         self.inner_layer = nn.Linear(self.hidden_units,self.hidden_units*4)
         self.activation = nn.GELU()
         self.outer_layer = nn.Linear(self.hidden_units*4,self.hidden_units)
-        self.layernorm = nn.LayerNorm(self.hidden_units, eps=1e-12)
+        self.layernorm = LayerNorm(self.hidden_units, eps=1e-12)
         self.dropout = nn.Dropout(args.hidden_dropout_prob)
 
     def forward(self,seq):
@@ -654,46 +421,58 @@ class FeedForward(nn.Module):
 
         return hidden_state
 
+class LayerNorm(nn.Module):
+    def __init__(self, hidden_size, eps=1e-12):
+        """Construct a layernorm module in the TF style (epsilon inside the square root).
+        """
+        super(LayerNorm, self).__init__()
+        self.weight = nn.Parameter(torch.ones(hidden_size))
+        self.bias = nn.Parameter(torch.zeros(hidden_size))
+        self.variance_epsilon = eps
 
+    def forward(self, x):
+        u = x.mean(-1, keepdim=True)
+        s = (x - u).pow(2).mean(-1, keepdim=True)
+        x = (x - u) / torch.sqrt(s + self.variance_epsilon)
+        return self.weight * x + self.bias
         
-
-class EncoderLayer(nn.Module):
+class Layer(nn.Module):
     def __init__ (self, args):
-        super(EncoderLayer, self).__init__()
+        super(Layer, self).__init__()
 
         self.base_attention = SelfAttention(args)
         #self.cluster_attention = Clustered_Attention(args)
         self.cluster_attention_chunking = Clustered_Attention_Chunking(args)
-        self.feedforward = FeedForward(args)
+        self.feedforward = Intermediate(args)
 
-    def forward(self, hidden_state, attention_mask,args,cluster_id):
+    def forward(self, hidden_state, attention_mask,args,cluster_id=None):
         if cluster_id is not None:
-        # if args.attention_type == "Cluster" and hasattr(args, 'cluster_id'):
             # perform Clustered Attention
-            attention_output, attention_map = self.cluster_attention_chunking(hidden_state, attention_mask,cluster_id)
+            attention_output = self.cluster_attention_chunking(hidden_state, attention_mask,cluster_id)
 
         else:
             # perform Self-Attention
-            attention_output, attention_map = self.base_attention(hidden_state, attention_mask) 
+            attention_output = self.base_attention(hidden_state, attention_mask) 
 
         feedforward_output = self.feedforward(attention_output)
 
-        return feedforward_output, attention_map
-
-
+        return feedforward_output
 
 class Encoder(nn.Module):
     def __init__(self,args):
         super(Encoder, self).__init__()
         self.args =args
-        layer = EncoderLayer(args)
+        layer = Layer(args)
         self.layer = nn.ModuleList([copy.deepcopy(layer) for _ in range(args.num_hidden_layers)])
     
-    def forward(self, hidden_state, attention_mask,args,cluster_id):
-        all_encoder_layer = []
+    def forward(self, hidden_states, attention_mask,args,cluster_id, output_all_encoded_layers=True):
 
+        all_encoder_layers = []
         for layer_module in self.layer:
-            hidden_state,attention_map = layer_module(hidden_state, attention_mask,args,cluster_id)
-            all_encoder_layer.append(hidden_state)
+            hidden_states = layer_module(hidden_states, attention_mask,args, cluster_id)
+            if output_all_encoded_layers:
+                all_encoder_layers.append(hidden_states)
+        if not output_all_encoded_layers:
+            all_encoder_layers.append(hidden_states)
 
-        return all_encoder_layer, attention_map
+        return all_encoder_layers

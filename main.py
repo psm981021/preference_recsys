@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from datasets import RecWithContrastiveLearningDataset, SASRecDataset
 
 from trainers import UPTRecTrainer
-from models import UPTRec, OfflineItemSimilarity, OnlineItemSimilarity
+from models import UPTRec
 from utils import *
 
 import wandb
@@ -45,17 +45,7 @@ def main():
     parser.add_argument("--alignment_loss", action="store_true", help="Alignment Loss from SimCLR.")
     parser.add_argument("--wandb", action="store_true", help="activate wandb.")
     parser.add_argument("--valid_attention", action="store_true", help="valid,test on self-attention if activated.")
-
-
-
-    # system args
-    parser.add_argument("--data_dir", default="data/", type=str)
-    parser.add_argument("--output_dir", default="output_custom/", type=str)
-    parser.add_argument("--data_name", default="Beauty", type=str)
-    parser.add_argument("--do_eval", action="store_true")
-    parser.add_argument("--model_idx", default="test", type=str, help="model idenfier")
-    parser.add_argument("--gpu_id", type=str, default="0", help="gpu_id")
-
+    parser.add_argument("--cluster_valid", action="store_true", help="do not perform Cluster Attention in valid,test if activated.")
     parser.add_argument(
         "--attention_type",
         default ="Base",
@@ -71,6 +61,20 @@ def main():
         help="Ways of considering contexutal information using input_ids \
             Supports 'item_embedding' for low-dimensional representations and 'encoder' for high-dimensional representations"
     )
+
+    parser.add_argument("--cluster_train", default=1, type=int)
+    parser.add_argument("--visualization_epoch", default=1, type=int)
+    parser.add_argument('--user_list', nargs='+', default=[], help='List to store user data')
+
+
+    # system args
+    parser.add_argument("--data_dir", default="data/", type=str)
+    parser.add_argument("--output_dir", default="output_custom/", type=str)
+    parser.add_argument("--data_name", default="Beauty", type=str)
+    parser.add_argument("--do_eval", action="store_true")
+    parser.add_argument("--model_idx", default="test", type=str, help="model idenfier")
+    parser.add_argument("--gpu_id", type=str, default="0", help="gpu_id")
+
     
     # data augmentation args
     parser.add_argument(
@@ -147,12 +151,8 @@ def main():
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.5, help="hidden dropout p")
     parser.add_argument("--initializer_range", type=float, default=0.02)
     parser.add_argument("--max_seq_length", default=50, type=int)
-    parser.add_argument("--cluster_train", default=1, type=int)
-    parser.add_argument("--visualization_epoch", default=1, type=int)
-    parser.add_argument('--user_list', nargs='+', default=[], help='List to store user data')
 
     # train args
-    parser.add_argument("--save_pt",type=str, default="False")
     parser.add_argument("--lr", type=float, default=0.001, help="learning rate of adam")
     parser.add_argument("--batch_size", type=int, default=256, help="number of batch_size")
     parser.add_argument("--epochs", type=int, default=3500, help="number of epochs")
@@ -168,7 +168,6 @@ def main():
     parser.add_argument("--weight_decay", type=float, default=0.0, help="weight_decay of adam")
     parser.add_argument("--adam_beta1", type=float, default=0.9, help="adam first beta value")
     parser.add_argument("--adam_beta2", type=float, default=0.999, help="adam second beta value")
-    parser.add_argument("--device",type=str, default="cuda:1")
     args = parser.parse_args()
 
     set_seed(args.seed)
@@ -274,6 +273,7 @@ def main():
         trainer.args.train_matrix = test_rating_matrix
 
         print("---------------Change to test_rating_matrix!-------------------")
+
         # load the best model
         trainer.model.load_state_dict(torch.load(args.checkpoint_path))
         scores, result_info = trainer.test(args.epochs, full_sort=True)
@@ -307,62 +307,3 @@ main()
 
 # import IPython; IPython.embed(colors='Linux'); exit(1);
 
-
-# test
-#python main.py --model_idx="test_1" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=16 --gpu_id=0 --attention_type="Cluster" --epochs=10
-
-
-# ------- baseline model can be used as SASRec ----------
-# python main.py --model_idx="SASRec" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=1 --gpu_id=1
-
-# eval 
-# python main.py --model_name="ICLRec" --model_idx="Baseline" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=1 --gpu_id=1 --do_eval
-
-#continue training 
-# python main.py --model_idx="SASRec" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=1 --gpu_id=1 --save_pt="True"
-
-
-# ------- Cluster Attention for UPTRec ---------
-# run version - clustering using item embedding
-# python main.py --model_name="UPTRec" --model_idx="UPTRec_Clustered_Attention" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=16 --gpu_id=0 --attention_type="Cluster"
-
-# run version - Clustering using encoder
-#python main.py --model_idx="UPTRec_Clustered_Attention_encoder" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=16 --gpu_id=0 --attention_type="Cluster"
-
-# eval
-# python main.py --model_idx="UPTRec_Clustered_Attention_item_embedding" --contrast_type="None" --seq_representation_type="concatenate" --num_intent_clusters=16 --gpu_id=0 --attention_type="Cluster" --do_eval
-
-
-# ---------- Amazon Beauty --------------
-
-# Basline 
-# scripts/Beauty/Baseline.sh
-
-# Clustered Attention Version
-# scripts/Beauty/Cluster_Attention.sh    
-
-# Clustered Attnetion + IntentCL
-# scripts/Beauty/Cluster_Attention_IntentCL.sh   
-
-# Clustered Attention + Hybrid
-# scripts/Beauty/Cluster_Attention_Hybrid.sh   
-
-
-# Hyper parameter
-# scripts/Beauty/Cluster_Attention_IntentCL_hyper.sh 
-# scripts/Beauty/Cluster_Attention_Hybrid_hyper.sh
-
-# ---------- Amazon Toys_and_Games -------------------
-
-# Clustered Attention Version - epoch 3500
-# scripts/Toys_and_Games/Cluster_Attention.sh    
-
-
-
-# ----------- Amazon Sports_and_Outdoors ---------------
-
-# Clustered Attention Version - epoch 3500
-# scripts/Sports_and_Outdoors/Cluster_Attention.sh  
-
-# Hyper parameter
-# scripts/Beauty/Cluster_Attention_IntentCL_hyper.sh 
