@@ -42,3 +42,4 @@ test.ipynb
 config/ablation_wo.sh
 # fast-transformers
 fast_transformers/
+/wandb/

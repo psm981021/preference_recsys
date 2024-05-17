@@ -63,7 +63,7 @@ def main():
     )
 
     parser.add_argument("--cluster_train", default=1, type=int)
-    parser.add_argument("--visualization_epoch", default=1, type=int)
+    parser.add_argument("--visualization_epoch", default=50, type=int)
     parser.add_argument('--user_list', nargs='+', default=[], help='List to store user data')
 
 
@@ -172,6 +172,9 @@ def main():
 
     set_seed(args.seed)
     check_path(args.output_dir)
+    if args.embedding:
+        embedding_path = os.path.join(args.output_dir, "embedding")
+        check_path(embedding_path)
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
     args.cuda_condition = torch.cuda.is_available() and not args.no_cuda

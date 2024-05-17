@@ -173,7 +173,7 @@ class Trainer:
 
         x_min, x_max = np.min(embedding_2d[:, 0]), np.max(embedding_2d[:, 0])
         plt.xlim(x_min, x_max)
-        output_file = f'{self.args.output_dir}/Embedding Visualization Batch:{i}, Epoch:{epoch}.png'
+        output_file = f'{self.args.output_dir}/Embedding/Embedding Visualization Batch:{i}, Epoch:{epoch}.png'
         plt.savefig(output_file)
         plt.close()
 
@@ -350,7 +350,7 @@ class UPTRecTrainer(Trainer):
             print(f"rec dataset length: {len(dataloader)}")
             rec_cf_data_iter = tqdm(enumerate(dataloader), total=len(dataloader))
 
-            print("Performing Rec model Training (UPTRec):")
+            print("Performing Rec model Training (UPTRec) ")
 
             for i, (rec_batch, cl_batches, seq_class_label_batches) in rec_cf_data_iter:
                 """
@@ -362,7 +362,7 @@ class UPTRecTrainer(Trainer):
                 rec_batch = tuple(t.to(self.device) for t in rec_batch)
                 _, input_ids, target_pos, target_neg, _ = rec_batch
 
-                if self.args.attention_type in ["Cluster"]:
+                if self.args.attention_type in ["Cluster"] and epoch > self.args.warm_up_epoches :
                     if self.args.context == "encoder":
                         sequence_context = self.model(input_ids,self.args)
                     if self.args.context == "item_embedding":
@@ -370,12 +370,15 @@ class UPTRecTrainer(Trainer):
                     if self.args.seq_representation_type == "mean":
                         sequence_context = torch.mean(sequence_context, dim=1, keepdim=False)
                     sequence_context = sequence_context.view(sequence_context.shape[0],-1).detach().cpu().numpy()
-
+                    
                     # query on multiple clusters
                     for cluster in self.clusters:
                         seq2intents = []
                         intent_ids = []
-                        intent_id, seq2intent = cluster.query(sequence_context)
+                        try:
+                            intent_id, seq2intent = cluster.query(sequence_context)
+                        except:
+                            import IPython; IPython.embed(colors='Linux');exit(1);
                         seq2intents.append(seq2intent)
                         intent_ids.append(intent_id)
                     nmi_assignment.append(intent_ids[0])
@@ -384,14 +387,14 @@ class UPTRecTrainer(Trainer):
 
                 # ---------- recommendation task ---------------#
 
-                if self.args.attention_type == "Cluster":
+                if self.args.attention_type == "Cluster" and epoch > self.args.warm_up_epoches:
                     sequence_output = self.model(input_ids,self.args,intent_ids)
                 else:
                     sequence_output = self.model(input_ids,self.args)
                 rec_loss = self.cross_entropy(sequence_output, target_pos, target_neg)
 
                 # embedding visualization
-                if self.args.embedding == True and epoch % self.args.visualization_epoch == 0 and i in [0,10,20]:
+                if self.args.embedding == True and epoch % self.args.visualization_epoch == 0 and i in [0,10,20] and epoch > self.args.warm_up_epoches:
                     self.embedding_plot(epoch, i, sequence_context, intent_ids[0])
 
                 # attention map visualization
@@ -572,7 +575,7 @@ class UPTRecTrainer(Trainer):
 
 
                 answer_list = None
-                print("Model Eval & Test")
+                print("Model Eval ",end=" ")
                 rec_data_iter = tqdm(enumerate(dataloader), total=len(dataloader))
 
                 # -------------perfrom valid, test on cluster-attention-------------- #
@@ -582,7 +585,7 @@ class UPTRecTrainer(Trainer):
                     batch = tuple(t.to(self.device) for t in batch)
                     user_ids, input_ids, target_pos, target_neg, answers = batch
 
-                    if self.args.attention_type in ["Cluster"] and self.args.cluster_valid == False:
+                    if self.args.attention_type in ["Cluster"] and self.args.cluster_valid == False and epoch > self.args.warm_up_epoches :
 
                         if self.args.context == "encoder":
                             sequence_context = self.model(input_ids,self.args)
@@ -600,7 +603,6 @@ class UPTRecTrainer(Trainer):
                             intent_id, seq2intent = cluster.query(sequence_context)
                             seq2intents.append(seq2intent)
                             intent_ids.append(intent_id)
-                    
                         recommend_output = self.model(input_ids,self.args,intent_ids)
                     else:
                         recommend_output = self.model(input_ids, self.args)
