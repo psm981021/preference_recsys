@@ -204,7 +204,7 @@ class ICLRecTrainer(Trainer):
         """
         cl_batch = torch.cat(inputs, dim=0)
         cl_batch = cl_batch.to(self.device)
-        cl_sequence_output = self.model(cl_batch)
+        cl_sequence_output, _ = self.model(cl_batch)
         # cf_sequence_output = cf_sequence_output[:, -1, :]
         if self.args.seq_representation_instancecl_type == "mean":
             cl_sequence_output = torch.mean(cl_sequence_output, dim=1, keepdim=False)
@@ -227,7 +227,7 @@ class ICLRecTrainer(Trainer):
         n_views, (bsz, seq_len) = len(inputs), inputs[0].shape
         cl_batch = torch.cat(inputs, dim=0)
         cl_batch = cl_batch.to(self.device)
-        cl_sequence_output = self.model(cl_batch)
+        cl_sequence_output, _ = self.model(cl_batch)
         if self.args.seq_representation_type == "mean":
             cl_sequence_output = torch.mean(cl_sequence_output, dim=1, keepdim=False)
         cl_sequence_flatten = cl_sequence_output.view(cl_batch.shape[0], -1)
@@ -254,7 +254,7 @@ class ICLRecTrainer(Trainer):
                 for i, (rec_batch, _, _) in rec_cf_data_iter:
                     rec_batch = tuple(t.to(self.device) for t in rec_batch)
                     _, input_ids, target_pos, target_neg, _ = rec_batch
-                    sequence_output = self.model(input_ids)
+                    sequence_output, _ = self.model(input_ids)
                     # average sum
                     if self.args.seq_representation_type == "mean":
                         sequence_output = torch.mean(sequence_output, dim=1, keepdim=False)
@@ -298,7 +298,7 @@ class ICLRecTrainer(Trainer):
                 if self.args.context == 'item_embedding':
                     sequence_output = self.model.item_embeddings(input_ids)
                 elif self.args.context == 'encoder':
-                    sequence_output = self.model(input_ids)
+                    sequence_output, _ = self.model(input_ids)
                 
                 if self.args.seq_representation_type == "mean":
                     sequence_output = torch.mean(sequence_output, dim=1, keepdim=False)
@@ -317,7 +317,7 @@ class ICLRecTrainer(Trainer):
                 if self.args.cluster_attention:
                     sequence_output, attention_map = self.model(input_ids, intent_ids[0])
                 else:
-                    sequence_output = self.model(input_ids)
+                    sequence_output, _ = self.model(input_ids)
 
                 rec_loss = self.cross_entropy(sequence_output, target_pos, target_neg)
 
@@ -437,7 +437,7 @@ class ICLRecTrainer(Trainer):
                     # 0. batch_data will be sent into the device(GPU or cpu)
                     batch = tuple(t.to(self.device) for t in batch)
                     user_ids, input_ids, target_pos, target_neg, answers = batch
-                    recommend_output = self.model(input_ids)
+                    recommend_output, _ = self.model(input_ids)
 
                     recommend_output = recommend_output[:, -1, :]
                     # recommendation results

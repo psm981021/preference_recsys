@@ -208,7 +208,7 @@ def main():
 
     else:
         if args.wandb == True:
-            wandb.init(project="preference_rec",name=f"{args.data_name}_{args.model_idx}_{args.batch_size}_{args.num_intent_clusters}_{args.epochs}",config=args)
+            wandb.init(project="UPTRec(Cluster-Attention)",name=f"{args.data_name}_{args.model_idx}_{args.batch_size}_{args.num_intent_clusters}_{args.epochs}",config=args)
             args = wandb.config
 
         start_time = time.time()

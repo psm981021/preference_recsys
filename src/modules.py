@@ -487,11 +487,11 @@ class Layer(nn.Module):
 
     def forward(self, hidden_states, attention_mask, cluster_id = None):
         if cluster_id is not None:
-            attention_output, attentention_map = self.cluster_attention(hidden_states, attention_mask, cluster_id)
+            attention_output, attention_map = self.cluster_attention(hidden_states, attention_mask, cluster_id)
         else:
-            attention_output, attentention_map = self.attention(hidden_states, attention_mask)
+            attention_output, attention_map = self.attention(hidden_states, attention_mask)
         intermediate_output = self.intermediate(attention_output)
-        return intermediate_output
+        return intermediate_output, attention_map
 
 
 class Encoder(nn.Module):

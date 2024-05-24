@@ -159,10 +159,10 @@ class SASRecModel(nn.Module):
 
         sequence_emb = self.add_position_embedding(input_ids)
 
-        item_encoded_layers = self.item_encoder(sequence_emb, extended_attention_mask, cluster_id, output_all_encoded_layers=True)
+        item_encoded_layers, attention_prob = self.item_encoder(sequence_emb, extended_attention_mask, cluster_id, output_all_encoded_layers=True)
 
         sequence_output = item_encoded_layers[-1]
-        return sequence_output
+        return sequence_output, attention_prob
 
     def init_weights(self, module):
         """ Initialize the weights.
