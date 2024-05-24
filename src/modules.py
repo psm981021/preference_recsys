@@ -286,6 +286,63 @@ class Embeddings(nn.Module):
         embeddings = self.dropout(embeddings)
         return embeddings
 
+class ClusterAttention(nn.Module):
+    def __init__(self, args):
+        super(ClusterAttention, self).__init__()
+
+        self.args = args
+        self.attention = SelfAttention(args)
+
+    def forward(self, input_tensor, attention_mask, cluster_id):
+
+        N,C,E = input_tensor.shape
+        chunk_size = N // int(self.args.num_intent_clusters)
+        
+        seq_sort = input_tensor.view(N,-1)
+
+        sorted_indices = torch.argsort(cluster_id)
+        
+        seq_sorted = seq_sort[sorted_indices].view(N,C,E)
+
+        attention_outputs = []
+        attention_probs =[]
+
+        for i in range(int(self.args.num_intent_clusters)):
+            start_idx = i * chunk_size
+            end_idx = min((i + 1) * chunk_size, N)
+
+            key_start_idx = max((i - 1) * chunk_size, 0)
+            key_end_idx = min(((i + 1) * chunk_size if i > 1 else 2*chunk_size), N)
+        
+            query_chunk_seq = seq_sorted[start_idx:end_idx, :, :]
+            key_chunk_seq = seq_sorted[key_start_idx:key_end_idx, :, :]
+
+            chunk_seq = seq_sorted[start_idx:end_idx,:, :]
+            chunk_attention_mask = attention_mask[start_idx:end_idx,: , :, :]
+        
+            if self.args.vanilla_attention == True:
+                attention_output, attention_prob = self.attention(query_chunk_seq,chunk_attention_mask,key_chunk_seq)
+            else:
+                attention_output, attention_prob = self.attention(chunk_seq,chunk_attention_mask)
+        
+            attention_outputs.append(attention_output)
+            attention_probs.append(attention_prob)
+
+        outputs = torch.cat(attention_outputs, dim=0)
+        attention_prob = torch.cat(attention_probs, dim=0)
+
+        reverse_indices = torch.argsort(sorted_indices)
+        seq_sort = outputs.view(N,-1)
+        output = seq_sort[reverse_indices].view(N,C,E)
+        sorted_attention_map = attention_prob[reverse_indices]
+
+        output = nn.Softmax(dim=-1)(output)
+        
+        return output, sorted_attention_map
+
+
+
+
 
 class SelfAttention(nn.Module):
     def __init__(self, args):
@@ -302,7 +359,8 @@ class SelfAttention(nn.Module):
         self.query = nn.Linear(args.hidden_size, self.all_head_size)
         self.key = nn.Linear(args.hidden_size, self.all_head_size)
         self.value = nn.Linear(args.hidden_size, self.all_head_size)
-
+        
+        self.mlp = nn.Linear(args.batch_size // int(args.num_intent_clusters) * 2, args.batch_size // int(args.num_intent_clusters))
         self.attn_dropout = nn.Dropout(args.attention_probs_dropout_prob)
 
         # 做完self-attention 做一个前馈全连接 LayerNorm 输出
@@ -315,39 +373,84 @@ class SelfAttention(nn.Module):
         x = x.view(*new_x_shape)
         return x.permute(0, 2, 1, 3)
 
-    def forward(self, input_tensor, attention_mask):
-        mixed_query_layer = self.query(input_tensor)
-        mixed_key_layer = self.key(input_tensor)
-        mixed_value_layer = self.value(input_tensor)
+    def forward(self, input_tensor, attention_mask, key=None):
 
-        query_layer = self.transpose_for_scores(mixed_query_layer)
-        key_layer = self.transpose_for_scores(mixed_key_layer)
-        value_layer = self.transpose_for_scores(mixed_value_layer)
+        
+        if key is not None:
 
-        # Take the dot product between "query" and "key" to get the raw attention scores.
-        attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
+            mixed_query_layer = self.query(input_tensor)
+            mixed_key_layer = self.key(key)
+            mixed_value_layer = self.value(input_tensor)
 
-        attention_scores = attention_scores / math.sqrt(self.attention_head_size)
-        # Apply the attention mask is (precomputed for all layers in BertModel forward() function)
-        # [batch_size heads seq_len seq_len] scores
-        # [batch_size 1 1 seq_len]
-        attention_scores = attention_scores + attention_mask
+            query_layer = self.transpose_for_scores(mixed_query_layer)
+            key_layer = self.transpose_for_scores(mixed_key_layer)
+            value_layer = self.transpose_for_scores(mixed_value_layer)
 
-        # Normalize the attention scores to probabilities.
-        attention_probs = nn.Softmax(dim=-1)(attention_scores)
-        # This is actually dropping out entire tokens to attend to, which might
-        # seem a bit unusual, but is taken from the original Transformer paper.
-        # Fixme
-        attention_probs = self.attn_dropout(attention_probs)
-        context_layer = torch.matmul(attention_probs, value_layer)
-        context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
+            b, h, l, _ = key_layer.shape
+            key_slice = torch.split(key_layer, b // 2)
+            #value_slice = torch.split(value_layer, b // 2)
+
+
+                      
+            attention_score1 = torch.matmul(query_layer,key_slice[0].transpose(-1,-2)) / math.sqrt(self.attention_head_size)
+            attention_prob_1 = nn.Softmax( dim=-1)(attention_score1)
+            attention_prob_1 = self.attn_dropout(attention_prob_1)
+
+            attention_score2 = torch.matmul(query_layer,key_slice[1].transpose(-1,-2)) / math.sqrt(self.attention_head_size)
+            attention_prob_2 = nn.Softmax( dim=-1)(attention_score2)
+            attention_prob_2 = self.attn_dropout(attention_prob_2)
+
+            attention_score1 = attention_score1 + attention_mask
+            attention_score2 = attention_score2 + attention_mask
+
+            context_1 = torch.matmul(attention_prob_1, value_layer)
+            context_2 = torch.matmul(attention_prob_2, value_layer)
+
+            attention_probs = torch.concat((attention_prob_1, attention_prob_2), dim=0)
+            
+            context = torch.concat((context_1, context_2), dim=0)
+            context_layer = self.mlp(context.permute(1,2,3,0).contiguous()).permute(-1,1,0,2).contiguous()
+
+
+        else:
+            mixed_query_layer = self.query(input_tensor)
+            mixed_key_layer = self.key(input_tensor)
+            mixed_value_layer = self.value(input_tensor)
+
+            query_layer = self.transpose_for_scores(mixed_query_layer)
+            key_layer = self.transpose_for_scores(mixed_key_layer)
+            value_layer = self.transpose_for_scores(mixed_value_layer)
+            # Take the dot product between "query" and "key" to get the raw attention scores.
+            attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
+
+            attention_scores = attention_scores / math.sqrt(self.attention_head_size)
+            # Apply the attention mask is (precomputed for all layers in BertModel forward() function)
+            # [batch_size heads seq_len seq_len] scores
+            # [batch_size 1 1 seq_len]
+            
+            
+            attention_scores = attention_scores + attention_mask
+
+            # Normalize the attention scores to probabilities.
+            attention_probs = nn.Softmax(dim=-1)(attention_scores)
+            # This is actually dropping out entire tokens to attend to, which might
+            # seem a bit unusual, but is taken from the original Transformer paper.
+            # Fixme
+
+            
+            attention_probs = self.attn_dropout(attention_probs)
+            context_layer = torch.matmul(attention_probs, value_layer)
+            context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
+
+        attention_map = torch.mean(attention_probs, dim=1)
+        
         new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
         context_layer = context_layer.view(*new_context_layer_shape)
         hidden_states = self.dense(context_layer)
         hidden_states = self.out_dropout(hidden_states)
         hidden_states = self.LayerNorm(hidden_states + input_tensor)
 
-        return hidden_states
+        return hidden_states, attention_map
 
 
 class Intermediate(nn.Module):
@@ -379,10 +482,14 @@ class Layer(nn.Module):
     def __init__(self, args):
         super(Layer, self).__init__()
         self.attention = SelfAttention(args)
+        self.cluster_attention = ClusterAttention(args)
         self.intermediate = Intermediate(args)
 
-    def forward(self, hidden_states, attention_mask):
-        attention_output = self.attention(hidden_states, attention_mask)
+    def forward(self, hidden_states, attention_mask, cluster_id = None):
+        if cluster_id is not None:
+            attention_output, attentention_map = self.cluster_attention(hidden_states, attention_mask, cluster_id)
+        else:
+            attention_output, attentention_map = self.attention(hidden_states, attention_mask)
         intermediate_output = self.intermediate(attention_output)
         return intermediate_output
 
@@ -393,12 +500,12 @@ class Encoder(nn.Module):
         layer = Layer(args)
         self.layer = nn.ModuleList([copy.deepcopy(layer) for _ in range(args.num_hidden_layers)])
 
-    def forward(self, hidden_states, attention_mask, output_all_encoded_layers=True):
+    def forward(self, hidden_states, attention_mask, cluster_id=None,  output_all_encoded_layers=True):
         all_encoder_layers = []
         for layer_module in self.layer:
-            hidden_states = layer_module(hidden_states, attention_mask)
+            hidden_states, attention_map = layer_module(hidden_states, attention_mask, cluster_id)
             if output_all_encoded_layers:
                 all_encoder_layers.append(hidden_states)
         if not output_all_encoded_layers:
             all_encoder_layers.append(hidden_states)
-        return all_encoder_layers
+        return all_encoder_layers, attention_map

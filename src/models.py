@@ -140,15 +140,15 @@ class SASRecModel(nn.Module):
         return sequence_emb
 
     # model same as SASRec
-    def forward(self, input_ids):
-
+    def forward(self, input_ids, cluster_id=None):
+        
         attention_mask = (input_ids > 0).long()
-        extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)  # torch.int64
+        extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)  # torch.int64  [B 1 1 50]
         max_len = attention_mask.size(-1)
         attn_shape = (1, max_len, max_len)
         subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1)  # torch.uint8
         subsequent_mask = (subsequent_mask == 0).unsqueeze(1)
-        subsequent_mask = subsequent_mask.long()
+        subsequent_mask = subsequent_mask.long() # [1 1 50 50]
 
         if self.args.cuda_condition:
             subsequent_mask = subsequent_mask.cuda()
@@ -159,7 +159,7 @@ class SASRecModel(nn.Module):
 
         sequence_emb = self.add_position_embedding(input_ids)
 
-        item_encoded_layers = self.item_encoder(sequence_emb, extended_attention_mask, output_all_encoded_layers=True)
+        item_encoded_layers = self.item_encoder(sequence_emb, extended_attention_mask, cluster_id, output_all_encoded_layers=True)
 
         sequence_output = item_encoded_layers[-1]
         return sequence_output

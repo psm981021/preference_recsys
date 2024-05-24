@@ -20,6 +20,8 @@ from datasets import RecWithContrastiveLearningDataset
 from modules import NCELoss, NTXent, SupConLoss, PCLoss
 from utils import recall_at_k, ndcg_k, get_metric, get_user_seqs, nCr
 
+import wandb
+import matplotlib.pyplot as plt
 
 class Trainer:
     def __init__(self, model, train_dataloader, cluster_dataloader, eval_dataloader, test_dataloader, args):
@@ -137,6 +139,25 @@ class Trainer:
     def load(self, file_name):
         self.model.load_state_dict(torch.load(file_name))
 
+    def attention_map_plot(self, epoch, i, attention_map):
+        """
+        Plot attention map for the i-th sample in the batch
+        """
+        data = attention_map[i].detach().cpu().numpy()
+
+        plt.figure(figsize=(10, 10))
+        plt.imshow(data, cmap='Greens', vmin=0, vmax=0.5)
+
+        plt.xlabel('Item index')
+        plt.ylabel('Item index')
+        plt.title(f'Attention Map (Epoch: {epoch}, {i}-th sample)')
+        plt.colorbar()
+        plt.gca().invert_yaxis()
+
+        output_file = f'{self.args.output_dir}/Attention map {i}-th sample, Epoch:{epoch}.png'
+        plt.savefig(output_file)
+        plt.close()
+
     def cross_entropy(self, seq_out, pos_ids, neg_ids):
         # [batch seq_len hidden_size]
         pos_emb = self.model.item_embeddings(pos_ids)
@@ -225,7 +246,7 @@ class ICLRecTrainer(Trainer):
 
         if train:
             # ------ intentions clustering ----- #
-            if self.args.contrast_type in ["IntentCL", "Hybrid"] and epoch >= self.args.warm_up_epoches:
+            if self.args.contrast_type in ["IntentCL", "Hybrid"] and epoch >= self.args.warm_up_epoches and epoch % self.args.cluster_train == 0:
                 print("Preparing Clustering:")
                 self.model.eval()
                 kmeans_training_data = []
@@ -274,13 +295,52 @@ class ICLRecTrainer(Trainer):
                 rec_batch = tuple(t.to(self.device) for t in rec_batch)
                 _, input_ids, target_pos, target_neg, _ = rec_batch
 
+                if self.args.context == 'item_embedding':
+                    sequence_output = self.model.item_embeddings(input_ids)
+                elif self.args.context == 'encoder':
+                    sequence_output = self.model(input_ids)
+                
+                if self.args.seq_representation_type == "mean":
+                    sequence_output = torch.mean(sequence_output, dim=1, keepdim=False)
+                sequence_output = sequence_output.view(sequence_output.shape[0], -1)
+                sequence_output = sequence_output.detach().cpu().numpy()
+                
+                # ---------- Cluster Query ---------------#
+                for cluster in self.clusters:
+                    seq2intents = []
+                    intent_ids = []
+                    intent_id, seq2intent = cluster.query(sequence_output)
+                    seq2intents.append(seq2intent)
+                    intent_ids.append(intent_id)
+                
                 # ---------- recommendation task ---------------#
-                sequence_output = self.model(input_ids)
+                if self.args.cluster_attention:
+                    sequence_output, attention_map = self.model(input_ids, intent_ids[0])
+                else:
+                    sequence_output = self.model(input_ids)
+
                 rec_loss = self.cross_entropy(sequence_output, target_pos, target_neg)
+
+                # attention map visualization
+                if self.args.attention_map == True and epoch % self.args.visualization_epoch == 0 and i in [0,10,20]:
+                    attention_map = attention_map.to(self.device)
+                    if i == 0:
+                        index = [172,186,276,297]
+                        for user in index:
+                            self.attention_map_plot(epoch, user, attention_map)
+                    if i == 10:
+                        index = [133,470]
+                        for user in index:
+                            self.attention_map_plot(epoch, user, attention_map)
+                    if i == 20:
+                        index = [123,196,234]
+                        for user in index:
+                            self.attention_map_plot(epoch, user, attention_map)
 
                 # ---------- contrastive learning task -------------#
                 cl_losses = []
                 for cl_batch in cl_batches:
+                    
                     if self.args.contrast_type == "InstanceCL":
                         cl_loss = self._instance_cl_one_pair_contrastive_learning(
                             cl_batch, intent_ids=seq_class_label_batches
@@ -320,14 +380,16 @@ class ICLRecTrainer(Trainer):
                             )
                             cl_losses.append(self.args.cf_weight * cl_loss1)
                             if self.args.seq_representation_type == "mean":
-                                sequence_output = torch.mean(sequence_output, dim=1, keepdim=False)
-                            sequence_output = sequence_output.view(sequence_output.shape[0], -1)
-                            sequence_output = sequence_output.detach().cpu().numpy()
+                                
+                                sequence_output_ = torch.mean(sequence_output, dim=1, keepdim=False)
+                            
+                            sequence_output_ = sequence_output.view(sequence_output.shape[0], -1)
+                            sequence_output_ = sequence_output_.detach().cpu().numpy()
                             # query on multiple clusters
                             for cluster in self.clusters:
                                 seq2intents = []
                                 intent_ids = []
-                                intent_id, seq2intent = cluster.query(sequence_output)
+                                intent_id, seq2intent = cluster.query(sequence_output_)
                                 seq2intents.append(seq2intent)
                                 intent_ids.append(intent_id)
                             cl_loss3 = self._pcl_one_pair_contrastive_learning(
@@ -353,6 +415,10 @@ class ICLRecTrainer(Trainer):
                 "rec_avg_loss": "{:.4f}".format(rec_avg_loss / len(rec_cf_data_iter)),
                 "joint_avg_loss": "{:.4f}".format(joint_avg_loss / len(rec_cf_data_iter)),
             }
+            if self.args.wandb == True:
+                wandb.log({'rec_avg_loss':rec_avg_loss / len(rec_cf_data_iter)}, step=epoch)
+                wandb.log({'joint_avg_loss': joint_avg_loss / len(rec_cf_data_iter)}, step=epoch)
+
             if (epoch + 1) % self.args.log_freq == 0:
                 print(str(post_fix))
 

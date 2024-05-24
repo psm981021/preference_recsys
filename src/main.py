@@ -19,12 +19,17 @@ from datasets import RecWithContrastiveLearningDataset
 from trainers import ICLRecTrainer
 from models import SASRecModel, OfflineItemSimilarity, OnlineItemSimilarity
 from utils import EarlyStopping, get_user_seqs, get_item2attribute_json, check_path, set_seed
+import wandb
+import time
 
 
-def show_args_info(args):
-    print(f"--------------------Configure Info:------------")
-    for arg in vars(args):
-        print(f"{arg:<30} : {getattr(args, arg):>35}")
+def show_args_info(args,log_file):
+    with open(log_file, 'a') as f:
+        f.write("---------------------- Configure Info: ----------------------\n")
+        for arg in vars(args):
+            # Each attribute and its value are printed on a new line with adjusted alignment
+            f.write(f"{arg:<30} : {getattr(args, arg)}\n")
+        f.write("---------------------- Configure Info: ----------------------\n")
 
 
 def main():
@@ -34,7 +39,7 @@ def main():
     parser.add_argument("--output_dir", default="output/", type=str)
     parser.add_argument("--data_name", default="Sports_and_Outdoors", type=str)
     parser.add_argument("--do_eval", action="store_true")
-    parser.add_argument("--model_idx", default=0, type=int, help="model idenfier 10, 20, 30...")
+    parser.add_argument("--model_idx", default=0, type=str, help="model idenfier 10, 20, 30...")
     parser.add_argument("--gpu_id", type=str, default="0", help="gpu_id")
 
     # data augmentation args
@@ -114,13 +119,20 @@ def main():
     # train args
     parser.add_argument("--lr", type=float, default=0.001, help="learning rate of adam")
     parser.add_argument("--batch_size", type=int, default=256, help="number of batch_size")
-    parser.add_argument("--epochs", type=int, default=300, help="number of epochs")
+    parser.add_argument("--epochs", type=int, default=1000, help="number of epochs")
     parser.add_argument("--no_cuda", action="store_true")
     parser.add_argument("--log_freq", type=int, default=1, help="per epoch print res")
     parser.add_argument("--seed", default=1, type=int)
     parser.add_argument("--cf_weight", type=float, default=0.1, help="weight of contrastive learning task")
     parser.add_argument("--rec_weight", type=float, default=1.0, help="weight of contrastive learning task")
     parser.add_argument("--intent_cf_weight", type=float, default=0.3, help="weight of contrastive learning task")
+    parser.add_argument("--cluster_attention", action="store_true")
+    parser.add_argument("--vanilla_attention", action="store_true")
+    parser.add_argument("--wandb", action="store_true")
+    parser.add_argument("--context", default="item_embedding", type=str)
+    parser.add_argument("--attention_map", action="store_true")
+    parser.add_argument("--visualization_epoch", default=50, type=int)
+    parser.add_argument("--cluster_train", default=1, type=int)
 
     # learning related
     parser.add_argument("--weight_decay", type=float, default=0.0, help="weight_decay of adam")
@@ -146,7 +158,7 @@ def main():
     args_str = f"{args.model_name}-{args.data_name}-{args.model_idx}"
     args.log_file = os.path.join(args.output_dir, args_str + ".txt")
 
-    show_args_info(args)
+    show_args_info(args,args.log_file)
 
     with open(args.log_file, "a") as f:
         f.write(str(args) + "\n")
@@ -158,26 +170,31 @@ def main():
     checkpoint = args_str + ".pt"
     args.checkpoint_path = os.path.join(args.output_dir, checkpoint)
 
-    # training data for node classification
-    cluster_dataset = RecWithContrastiveLearningDataset(
-        args, user_seq[: int(len(user_seq) * args.training_data_ratio)], data_type="train"
-    )
-    cluster_sampler = SequentialSampler(cluster_dataset)
-    cluster_dataloader = DataLoader(cluster_dataset, sampler=cluster_sampler, batch_size=args.batch_size)
+    if os.path.exists(args.checkpoint_path):
+        with open(args.log_file, "a") as f:
+            f.write("------------------------------ Continue Training ------------------------------ \n")
+        
+    else:
+        with open(args.log_file, "a") as f:
+            f.write(str(args) + "\n")
 
-    train_dataset = RecWithContrastiveLearningDataset(
-        args, user_seq[: int(len(user_seq) * args.training_data_ratio)], data_type="train"
-    )
+
+    # training data for node classification
+    cluster_dataset = RecWithContrastiveLearningDataset(args, user_seq[: int(len(user_seq) * args.training_data_ratio)], data_type="train")
+    cluster_sampler = SequentialSampler(cluster_dataset)
+    cluster_dataloader = DataLoader(cluster_dataset, sampler=cluster_sampler, batch_size=args.batch_size, drop_last=True)
+
+    train_dataset = RecWithContrastiveLearningDataset(args, user_seq[: int(len(user_seq) * args.training_data_ratio)], data_type="train")
     train_sampler = RandomSampler(train_dataset)
-    train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.batch_size)
+    train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.batch_size, drop_last=True)
 
     eval_dataset = RecWithContrastiveLearningDataset(args, user_seq, data_type="valid")
     eval_sampler = SequentialSampler(eval_dataset)
-    eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.batch_size)
+    eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.batch_size, drop_last=True)
 
     test_dataset = RecWithContrastiveLearningDataset(args, user_seq, data_type="test")
     test_sampler = SequentialSampler(test_dataset)
-    test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.batch_size)
+    test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.batch_size, drop_last=True)
 
     model = SASRecModel(args=args)
 
@@ -190,27 +207,62 @@ def main():
         scores, result_info = trainer.test(0, full_sort=True)
 
     else:
+        if args.wandb == True:
+            wandb.init(project="preference_rec",name=f"{args.data_name}_{args.model_idx}_{args.batch_size}_{args.num_intent_clusters}_{args.epochs}",config=args)
+            args = wandb.config
+
+        start_time = time.time()
         print(f"Train ICLRec")
         early_stopping = EarlyStopping(args.checkpoint_path, patience=40, verbose=True)
+
+
         for epoch in range(args.epochs):
             trainer.train(epoch)
+
             # evaluate on NDCG@20
             scores, _ = trainer.valid(epoch, full_sort=True)
             early_stopping(np.array(scores[-1:]), trainer.model)
+
             if early_stopping.early_stop:
                 print("Early stopping")
                 break
+
+            if args.wandb == True:
+                wandb.log({
+                    "HIT@5": scores[0],
+                    "NDCG@5": scores[1],
+                    "HIT@10": scores[2],
+                    "NDCG@10": scores[3],
+                    "HIT@15": scores[4],
+                    "NDCG@15": scores[5],
+                    "HIT@20": scores[6],
+                    "NDCG@20": scores[7]}, step=epoch)
+
+
         trainer.args.train_matrix = test_rating_matrix
         print("---------------Change to test_rating_matrix!-------------------")
+
         # load the best model
         trainer.model.load_state_dict(torch.load(args.checkpoint_path))
         scores, result_info = trainer.test(0, full_sort=True)
 
-    print(args_str)
-    print(result_info)
-    with open(args.log_file, "a") as f:
-        f.write(args_str + "\n")
-        f.write(result_info + "\n")
+        end_time = time.time()
+        execution_time = end_time - start_time
+
+        hours = int(execution_time // 3600)
+        minutes = int((execution_time % 3600) // 60)
+        seconds = int(execution_time % 60)
+
+        print(args_str)
+        print(result_info)
+
+        with open(args.log_file, "a") as f:
+            f.write(args_str + "\n")
+            f.write(result_info + "\n")
+            f.write(f"To run Epoch:{args.epochs} , It took {hours} hours, {minutes} minutes, {seconds} seconds\n")
+        
+        if args.wandb == True:
+            wandb.finish()
 
 
 main()
