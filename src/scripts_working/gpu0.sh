@@ -13,7 +13,7 @@ for num_cluster in 4 8 16 32 64 128; do
                     --output_dir UPTRec/${model_idx}/ \
                     --gpu_id 0 \
                     --batch_size 512 \
-                    --model_idx Cluster-Attention-Vanilla-${num_cluster}-${cluster_train}-${n_views} \
+                    --model_idx Cluster-Attention-Vanilla-${cluster_train}-${n_views} \
                     --contrast_type Hybrid \
                     --seq_representation_type concatenate \
                     --cluster_attention \
@@ -40,10 +40,3 @@ done
 
 
 
-
-
-
-
-
-
-# scripts_working/gpu0.sh

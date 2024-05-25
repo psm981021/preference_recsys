@@ -213,7 +213,7 @@ def main():
 
         start_time = time.time()
         print(f"Train ICLRec")
-        early_stopping = EarlyStopping(args.checkpoint_path, patience=40, verbose=True)
+        early_stopping = EarlyStopping(args.log_file, args.checkpoint_path, patience=40, verbose=True)
 
 
         for epoch in range(args.epochs):

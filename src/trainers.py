@@ -120,17 +120,19 @@ class Trainer:
             ndcg.append(ndcg_k(answers, pred_list, k))
         post_fix = {
             "Epoch": epoch,
-            "HIT@5": "{:.4f}".format(recall[0]),
-            "NDCG@5": "{:.4f}".format(ndcg[0]),
-            "HIT@10": "{:.4f}".format(recall[1]),
-            "NDCG@10": "{:.4f}".format(ndcg[1]),
-            "HIT@20": "{:.4f}".format(recall[3]),
-            "NDCG@20": "{:.4f}".format(ndcg[3]),
+            "HIT@5": "{:.5f}".format(recall[0]),
+            "NDCG@5": "{:.5f}".format(ndcg[0]),
+            "HIT@10": "{:.5f}".format(recall[1]),
+            "NDCG@10": "{:.5f}".format(ndcg[1]),
+            "HIT@15": "{:.5f}".format(recall[2]),
+            "NDCG@15": "{:.5f}".format(ndcg[2]),
+            "HIT@20": "{:.5f}".format(recall[3]),
+            "NDCG@20": "{:.5f}".format(ndcg[3]),
         }
         print(post_fix)
         with open(self.args.log_file, "a") as f:
             f.write(str(post_fix) + "\n")
-        return [recall[0], ndcg[0], recall[1], ndcg[1], recall[3], ndcg[3]], str(post_fix)
+        return [recall[0], ndcg[0], recall[1], ndcg[1], recall[2], ndcg[2],recall[3], ndcg[3]], str(post_fix)
 
     def save(self, file_name):
         torch.save(self.model.cpu().state_dict(), file_name)
@@ -412,8 +414,8 @@ class ICLRecTrainer(Trainer):
 
             post_fix = {
                 "epoch": epoch,
-                "rec_avg_loss": "{:.4f}".format(rec_avg_loss / len(rec_cf_data_iter)),
-                "joint_avg_loss": "{:.4f}".format(joint_avg_loss / len(rec_cf_data_iter)),
+                "rec_avg_loss": "{:.5f}".format(rec_avg_loss / len(rec_cf_data_iter)),
+                "joint_avg_loss": "{:.5f}".format(joint_avg_loss / len(rec_cf_data_iter)),
             }
             if self.args.wandb == True:
                 wandb.log({'rec_avg_loss':rec_avg_loss / len(rec_cf_data_iter)}, step=epoch)

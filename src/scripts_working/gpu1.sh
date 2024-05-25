@@ -6,7 +6,7 @@ for num_cluster in 4 8 16 32 64 128; do
 
         for n_views in 2 3 4; do
 
-            for model_idx in Cluster-Attention-Vanilla-${num_cluster}-${cluster_train}-${n_views}; do
+            for model_idx in Cluster-Attention-${num_cluster}-${cluster_train}-${n_views}; do
 
                 python3 main.py \
                     --data_name Beauty \
@@ -14,7 +14,7 @@ for num_cluster in 4 8 16 32 64 128; do
                     --output_dir UPTRec/${model_idx}/ \
                     --gpu_id 1 \
                     --batch_size 512 \
-                    --model_idx Cluster-Attention-${num_cluster}-${cluster_train}-${n_views} \
+                    --model_idx Cluster-Attention-${cluster_train}-${n_views} \
                     --contrast_type Hybrid \
                     --seq_representation_type concatenate \
                     --cluster_attention \

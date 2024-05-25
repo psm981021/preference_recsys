@@ -51,7 +51,7 @@ def neg_sample(item_set, item_size):  # 前闭后闭
 class EarlyStopping:
     """Early stops the training if validation loss doesn't improve after a given patience."""
 
-    def __init__(self, checkpoint_path, patience=7, verbose=False, delta=0):
+    def __init__(self,log_file, checkpoint_path, patience=7, verbose=False, delta=0):
         """
         Args:
             patience (int): How long to wait after last time validation loss improved.
@@ -62,6 +62,7 @@ class EarlyStopping:
                             Default: 0
         """
         self.checkpoint_path = checkpoint_path
+        self.log_file = log_file
         self.patience = patience
         self.verbose = verbose
         self.counter = 0
@@ -85,6 +86,9 @@ class EarlyStopping:
             self.save_checkpoint(score, model)
         elif self.compare(score):
             self.counter += 1
+
+            with open(self.log_file, "a") as f:
+                f.write(f"EarlyStopping counter: {self.counter} out of {self.patience}\n")
             print(f"EarlyStopping counter: {self.counter} out of {self.patience}")
             if self.counter >= self.patience:
                 self.early_stop = True
