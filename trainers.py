@@ -362,7 +362,7 @@ class UPTRecTrainer(Trainer):
                 rec_batch = tuple(t.to(self.device) for t in rec_batch)
                 _, input_ids, target_pos, target_neg, _ = rec_batch
 
-                if self.args.attention_type in ["Cluster"] and epoch > self.args.warm_up_epoches :
+                if self.args.attention_type in ["Cluster"] and epoch >= self.args.warm_up_epoches :
                     if self.args.context == "encoder":
                         sequence_context = self.model(input_ids,self.args)
                     if self.args.context == "item_embedding":
@@ -387,7 +387,7 @@ class UPTRecTrainer(Trainer):
 
                 # ---------- recommendation task ---------------#
 
-                if self.args.attention_type == "Cluster" and epoch > self.args.warm_up_epoches:
+                if self.args.attention_type == "Cluster" and epoch >= self.args.warm_up_epoches:
                     sequence_output = self.model(input_ids,self.args,intent_ids)
                 else:
                     sequence_output = self.model(input_ids,self.args)
@@ -534,6 +534,7 @@ class UPTRecTrainer(Trainer):
                 f.write(str(post_fix) + "\n")
 
         else: # for valid and test
+            rec_data_iter = tqdm(enumerate(dataloader), total=len(dataloader))
             self.model.eval()
 
             pred_list = None
@@ -571,15 +572,11 @@ class UPTRecTrainer(Trainer):
                         import gc
 
                         gc.collect()
-
-
-
+                
                 answer_list = None
-                print("Model Eval ",end=" ")
-                rec_data_iter = tqdm(enumerate(dataloader), total=len(dataloader))
+                print("Model Eval ")
 
                 # -------------perfrom valid, test on cluster-attention-------------- #
-                    
                 for i, batch in rec_data_iter:
                     # 0. batch_data will be sent into the device(GPU or cpu)
                     batch = tuple(t.to(self.device) for t in batch)

@@ -155,14 +155,14 @@ def main():
     # train args
     parser.add_argument("--lr", type=float, default=0.001, help="learning rate of adam")
     parser.add_argument("--batch_size", type=int, default=256, help="number of batch_size")
-    parser.add_argument("--epochs", type=int, default=3500, help="number of epochs")
-    parser.add_argument("--patience", type=int, default=100, help="early stopping patience")
+    parser.add_argument("--epochs", type=int, default=1000, help="number of epochs")
+    parser.add_argument("--patience", type=int, default=50, help="early stopping patience")
     parser.add_argument("--no_cuda", action="store_true")
     parser.add_argument("--log_freq", type=int, default=1, help="per epoch print res")
     parser.add_argument("--seed", default=1, type=int)
     parser.add_argument("--cf_weight", type=float, default=0.1, help="weight of contrastive learning task")
     parser.add_argument("--rec_weight", type=float, default=1.0, help="weight of contrastive learning task")
-    parser.add_argument("--intent_cf_weight", type=float, default=0.3, help="weight of contrastive learning task")
+    parser.add_argument("--intent_cf_weight", type=float, default=0.1, help="weight of contrastive learning task")
 
     # learning related
     parser.add_argument("--weight_decay", type=float, default=0.0, help="weight_decay of adam")

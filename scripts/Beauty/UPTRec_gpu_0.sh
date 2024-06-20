@@ -133,4 +133,4 @@ python main.py \
     --model_idx UPTRec-V9 \
     --output_dir renew_log/Beauty/UPTRec-V9\
     --wandb
-# scripts/Beauty/UPTRec_gpu_1.sh
+# scripts/Beauty/UPTRec_gpu_0.sh
