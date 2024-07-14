@@ -83,9 +83,17 @@ class KMeans(object):
 
     
 class UPTRec(nn.Module):
-    def __init__(self, args):
+    def __init__(self, args, description_embedding = None):
         super(UPTRec, self).__init__()
-        self.item_embeddings = nn.Embedding(args.item_size, args.hidden_size, padding_idx=0)
+
+        if description_embedding is not None:
+            self.item_embeddings = nn.Embedding.from_pretrained(description_embedding, padding_idx = 0)
+            self.transform_layer = nn.Linear(description_embedding.size(1), args.hidden_size)
+
+        else:
+            self.item_embeddings.append(nn.Embedding.from_pretrained(description_embedding, padding_idx = 0))
+            self.transform_layer = None
+            
         self.position_embeddings = nn.Embedding(args.max_seq_length, args.hidden_size)
         self.item_encoder = Encoder(args)
         self.LayerNorm = LayerNorm(args.hidden_size, eps=1e-12)
@@ -102,6 +110,8 @@ class UPTRec(nn.Module):
         position_ids = torch.arange(seq_length, dtype=torch.long, device=sequence.device)
         position_ids = position_ids.unsqueeze(0).expand_as(sequence)
         item_embeddings = self.item_embeddings(sequence)
+        if self.args.description:
+            item_embeddings = self.transform_layer(item_embeddings)
         position_embeddings = self.position_embeddings(position_ids)
         sequence_emb = item_embeddings + position_embeddings
         sequence_emb = self.LayerNorm(sequence_emb)
@@ -122,13 +132,13 @@ class UPTRec(nn.Module):
 
         if self.args.cuda_condition:
             subsequent_mask = subsequent_mask.cuda()
-
+        
         extended_attention_mask = extended_attention_mask * subsequent_mask
         extended_attention_mask = extended_attention_mask.to(dtype=next(self.parameters()).dtype)  # fp16 compatibility
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
 
         sequence_emb = self.add_position_embedding(input_ids)
-
+        
         item_encoded_layers = self.item_encoder(sequence_emb, extended_attention_mask,args,cluster_id, output_all_encoded_layers=True)
 
         sequence_output = item_encoded_layers[-1]
@@ -141,6 +151,7 @@ class UPTRec(nn.Module):
             # Slightly different from the TF version which uses truncated_normal for initialization
             # cf https://github.com/pytorch/pytorch/pull/5617
             module.weight.data.normal_(mean=0.0, std=self.args.initializer_range)
+
         elif isinstance(module, LayerNorm):
             module.bias.data.zero_()
             module.weight.data.fill_(1.0)

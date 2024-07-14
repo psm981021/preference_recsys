@@ -337,6 +337,19 @@ class Clustered_Attention_Chunking(nn.Module):
         
         # sorted_attention_map = attention_prob[reverse_indices]
         return output
+class Clustered_Attention(nn.Module):
+    def __init__(self, args):
+        super(Clustered_Attention, self).__init__()
+        self.args = args
+        self.attention = SelfAttention(args)
+
+    def forward(self, seq, attention_mask, cluster_id= None):
+        N,C,E = seq.shape
+        cluster_id = cluster_id[0]
+
+        
+        pass
+
         
 class SelfAttention(nn.Module):
     def __init__(self, args):
@@ -354,9 +367,8 @@ class SelfAttention(nn.Module):
         self.key = nn.Linear(args.hidden_size, self.all_head_size)
         self.value = nn.Linear(args.hidden_size, self.all_head_size)
 
-        self.attn_dropout = nn.Dropout(args.attention_probs_dropout_prob)
+        self.attn_dropout = nn.Dropout(args.attention_probs)
 
-        # 做完self-attention 做一个前馈全连接 LayerNorm 输出
         self.dense = nn.Linear(args.hidden_size, args.hidden_size)
         self.LayerNorm = LayerNorm(args.hidden_size, eps=1e-12)
         self.out_dropout = nn.Dropout(args.hidden_dropout_prob)
@@ -441,14 +453,15 @@ class Layer(nn.Module):
         super(Layer, self).__init__()
 
         self.base_attention = SelfAttention(args)
-        #self.cluster_attention = Clustered_Attention(args)
+        self.cluster_attention = Clustered_Attention(args)
         self.cluster_attention_chunking = Clustered_Attention_Chunking(args)
         self.feedforward = Intermediate(args)
 
     def forward(self, hidden_state, attention_mask,args,cluster_id=None):
         if cluster_id is not None:
             # perform Clustered Attention
-            attention_output = self.cluster_attention_chunking(hidden_state, attention_mask,cluster_id)
+            attention_output = self.cluster_attention_chunking(hidden_state, attention_mask, cluster_id)
+            # attention_output = self.cluster_attention(hidden_state, attention_mask,cluster_id)
 
         else:
             # perform Self-Attention

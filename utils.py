@@ -10,6 +10,7 @@ import os
 import math 
 from scipy.sparse import csr_matrix
 import torch.nn.functional as F
+from sentence_transformers import SentenceTransformer
 
 # sampler for batch generation
 def random_neq(l, r, s):
@@ -563,3 +564,18 @@ class Reorder(object):
 def nCr(n, r):
     f = math.factorial
     return f(n) // f(r) // f(n - r)
+
+
+def embedding_generator(df, model_name ='paraphrase-MiniLM-L6-v2'):
+    model = SentenceTransformer(model_name)
+
+    descriptions = df['description'].tolist()
+    description_embedding = model.encode(descriptions, convert_to_tensor = True)
+
+    asin_to_embedding = {row['asin']: embedding for row, embedding in zip(df.to_dict(orient='records'), description_embedding)}
+
+    # Convert the dictionary to a tensor with the same order as the DataFrame
+    asin_to_index = {asin: idx for idx, asin in enumerate(df['asin'])}
+    index_to_embedding = torch.stack([asin_to_embedding[asin] for asin in df['asin']])
+    
+    return index_to_embedding

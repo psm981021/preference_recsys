@@ -1,14 +1,26 @@
-
-python3 main.py \
-    --data_name Beauty --cf_weight 0.1 \
-    --model_idx UPTRec-test --gpu_id 1 \
-    --batch_size 512 --contrast_type Hybrid \
-    --output_dir renew_log/Beauty/UPTRec-test \
+python main.py \
+    --model_name UPTRec \
+    --data_name Beauty  \
+    --output_dir Description/Beauty/test\
+    --contrast_type Hybrid  \
     --context item_embedding \
+    --seq_representation_type concatenate \
     --attention_type Base \
-    --num_intent_cluster 8 --seq_representation_type mean \
-    --epochs=2000 \
-    --warm_up_epoches 0 --intent_cf_weight 0.1 --num_hidden_layers 1 --temperature=0.5 \
+    --batch_size 512 \
+    --epochs 2000 \
+    --patience 40 \
+    --warm_up_epoches 0 \
+    --num_intent_clusters 32 \
+    --intent_cf_weight 0.01 \
+    --cf_weight 0.5 \
+    --num_hidden_layers 1 \
+    --cluster_train 1 \
+    --model_idx V1 \
+    --gpu_id 0 \
+    --embedding \
+    --description \
+    --visualization_epoch 2 \
+    --temperature 1 \
+
 
 # scripts/Beauty/test.sh
-# --temperature=0.1 \

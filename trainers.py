@@ -203,7 +203,13 @@ class Trainer:
     def cross_entropy(self, seq_out, pos_ids, neg_ids):
         # [batch seq_len hidden_size]
         pos_emb = self.model.item_embeddings(pos_ids)
+        if self.args.description:
+            pos_emb = self.model.transform_layer(pos_emb)
+
         neg_emb = self.model.item_embeddings(neg_ids)
+        if self.args.description:
+            neg_emb = self.model.transform_layer(neg_emb) 
+
         # [batch*seq_len hidden_size]
         pos = pos_emb.view(-1, pos_emb.size(2))
         neg = neg_emb.view(-1, neg_emb.size(2))
@@ -221,6 +227,7 @@ class Trainer:
     def predict_sample(self, seq_out, test_neg_sample):
         # [batch seq_length hidden_size]
         test_item_emb = self.model.item_embeddings(test_neg_sample)
+        
         # [batch hidden_size]
         test_logits = torch.bmm(test_item_emb, seq_out.unsqueeze(-1)).squeeze(-1)  # [B 100]
         return test_logits
@@ -228,6 +235,8 @@ class Trainer:
     def predict_full(self, seq_out):
         # [item_num hidden_size]
         test_item_emb = self.model.item_embeddings.weight
+        if self.args.description:
+            test_item_emb = self.model.transform_layer(test_item_emb)
         # [batch hidden_size ]
         rating_pred = torch.matmul(seq_out, test_item_emb.transpose(0, 1))
         return rating_pred
@@ -318,19 +327,24 @@ class UPTRecTrainer(Trainer):
                         sequence_output = self.model(input_ids,self.args)
                     if self.args.context == "item_embedding":
                         sequence_output = self.model.item_embeddings(input_ids)
+                        if self.args.description:
+                            sequence_output = self.model.transform_layer(sequence_output)
+
                     # average sum
                     if self.args.seq_representation_type == "mean":
                         sequence_output = torch.mean(sequence_output, dim=1, keepdim=False)
+                    
                     sequence_output = sequence_output.view(sequence_output.shape[0], -1).detach().cpu().numpy()
-
+                    
                     kmeans_training_data.append(sequence_output) #[len(cluster_dataloader) Batch hidden]
-                
                 kmeans_training_data = np.concatenate(kmeans_training_data, axis=0) #[* hidden]
+
                 # train multiple clusters
                 print("[Train] Training Clusters:")
                 for i, cluster in tqdm(enumerate(self.clusters), total=len(self.clusters)):
                     cluster.train(kmeans_training_data)
                     self.clusters[i] = cluster
+                    
                 # clean memory
                 del kmeans_training_data
                 import gc
@@ -367,21 +381,32 @@ class UPTRecTrainer(Trainer):
                         sequence_context = self.model(input_ids,self.args)
                     if self.args.context == "item_embedding":
                         sequence_context = self.model.item_embeddings(input_ids)
+                        if self.args.description:
+                            sequence_context = self.model.transform_layer(sequence_context)
                     if self.args.seq_representation_type == "mean":
                         sequence_context = torch.mean(sequence_context, dim=1, keepdim=False)
                     sequence_context = sequence_context.view(sequence_context.shape[0],-1).detach().cpu().numpy()
-                    
+
+                    if self.args.embedding == True and epoch % self.args.visualization_epoch == 0 and i in [0,10,20] and epoch > self.args.warm_up_epoches:
+                        self.embedding_plot(epoch, i, sequence_context, intent_ids[0])
+                        
+                    # sequence_context = sequence_context.detach().cpu().numpy()
                     # query on multiple clusters
+
                     for cluster in self.clusters:
                         seq2intents = []
                         intent_ids = []
+
                         try:
                             intent_id, seq2intent = cluster.query(sequence_context)
                         except:
-                            import IPython; IPython.embed(colors='Linux');exit(1);
+                            pass
+                            # print("Error in Model Training");import IPython; IPython.embed(colors='Linux');exit(1);
+                        
                         seq2intents.append(seq2intent)
                         intent_ids.append(intent_id)
                     nmi_assignment.append(intent_ids[0])
+                    # embedding visualization
 
 
 
@@ -393,9 +418,6 @@ class UPTRecTrainer(Trainer):
                     sequence_output = self.model(input_ids,self.args)
                 rec_loss = self.cross_entropy(sequence_output, target_pos, target_neg)
 
-                # embedding visualization
-                if self.args.embedding == True and epoch % self.args.visualization_epoch == 0 and i in [0,10,20] and epoch > self.args.warm_up_epoches:
-                    self.embedding_plot(epoch, i, sequence_context, intent_ids[0])
 
                 # attention map visualization
                 # if self.args.attention_map == True and epoch % self.args.visualization_epoch == 0 and i in [0,10,20]:
@@ -554,6 +576,8 @@ class UPTRecTrainer(Trainer):
                                 sequence_output = self.model(input_ids,self.args)
                             if self.args.context == "item_embedding":
                                 sequence_output = self.model.item_embeddings(input_ids)
+                                if self.args.description:
+                                    sequence_output = self.model.transform_layer(sequence_output)
                             # average sum
                             if self.args.seq_representation_type == "mean":
                                 sequence_output = torch.mean(sequence_output, dim=1, keepdim=False)
@@ -588,6 +612,8 @@ class UPTRecTrainer(Trainer):
                             sequence_context = self.model(input_ids,self.args)
                         if self.args.context == "item_embedding":
                             sequence_context = self.model.item_embeddings(input_ids)
+                            if self.args.description:
+                                sequence_context = self.model.transform_layer(sequence_context)
                         if self.args.seq_representation_type == "mean":
                             # [B x C]
                             sequence_context = torch.mean(sequence_context, dim=1, keepdim=False)

@@ -12,11 +12,12 @@ import random
 import torch
 import argparse
 import time
+import pandas as pd
+
 
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 
-from datasets import RecWithContrastiveLearningDataset, SASRecDataset
-
+from Datasets import RecWithContrastiveLearningDataset, SASRecDataset
 from trainers import UPTRecTrainer
 from models import UPTRec
 from utils import *
@@ -40,6 +41,7 @@ def main():
 
     #parser added
     parser.add_argument("--embedding", action="store_true")
+    parser.add_argument("--description", action="store_true")
     parser.add_argument("--attention_map", action="store_true")
     parser.add_argument("--vanilla_attention", action="store_true",help="whether to use two blocks for key")
     parser.add_argument("--alignment_loss", action="store_true", help="Alignment Loss from SimCLR.")
@@ -68,7 +70,7 @@ def main():
 
 
     # system args
-    parser.add_argument("--data_dir", default="data/", type=str)
+    parser.add_argument("--data_dir", default="data/2014/", type=str)
     parser.add_argument("--output_dir", default="output_custom/", type=str)
     parser.add_argument("--data_name", default="Beauty", type=str)
     parser.add_argument("--do_eval", action="store_true")
@@ -147,7 +149,7 @@ def main():
     parser.add_argument("--num_hidden_layers", type=int, default=2, help="number of layers")
     parser.add_argument("--num_attention_heads", default=2, type=int)
     parser.add_argument("--hidden_act", default="gelu", type=str)  # gelu relu
-    parser.add_argument("--attention_probs_dropout_prob", type=float, default=0.5, help="attention dropout p")
+    parser.add_argument("--attention_probs", type=float, default=0.5, help="attention dropout p")
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.5, help="hidden dropout p")
     parser.add_argument("--initializer_range", type=float, default=0.02)
     parser.add_argument("--max_seq_length", default=50, type=int)
@@ -179,7 +181,7 @@ def main():
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
     args.cuda_condition = torch.cuda.is_available() and not args.no_cuda
     print("Using Cuda:", torch.cuda.is_available())
-    args.data_file = args.data_dir + args.data_name + ".txt"
+    args.data_file = f'{args.data_dir}/{args.data_name}/{args.data_name}_seq.txt'
 
     user_seq, max_item, valid_rating_matrix, test_rating_matrix = get_user_seqs(args.data_file)
 
@@ -225,8 +227,15 @@ def main():
     test_sampler = SequentialSampler(test_dataset)
     test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.batch_size, drop_last=True)
 
-    model = UPTRec(args=args)
+    if args.description:
+        description_embeddings = pd.read_csv('/home/seongbeom/paper/preference_rec/data/2014/Beauty/Beauty_embeddings.csv')
+        description_embeddings = description_embeddings.sort_values(by='asin')
+        description_embeddings = torch.tensor(description_embeddings.drop(columns=['asin']).values, dtype=torch.float32)
     
+        model = UPTRec(args=args, description_embedding = description_embeddings)
+    else:
+        model =UPTRec(args=args)
+
     trainer = UPTRecTrainer(model, train_dataloader, cluster_dataloader, eval_dataloader, test_dataloader, args)
     
     if args.do_eval:

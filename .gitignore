@@ -10,6 +10,8 @@ data/*.txt
 
 data/preprocess.py
 data/preprocess.ipynb
+data/Beauty_meta.csv
+data/2014/*
 
 #result log
 result_log/
