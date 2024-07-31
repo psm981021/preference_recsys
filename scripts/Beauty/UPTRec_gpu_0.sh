@@ -1,136 +1,27 @@
 python main.py \
     --model_name UPTRec \
     --data_name Beauty  \
-    --output_dir renew_log/Beauty/UPTRec-V4\
+    --output_dir Description/Beauty/UPTRec-V3\
     --contrast_type Hybrid  \
     --context item_embedding \
-    --seq_representation_type concatenate \
+    --seq_representation_type mean \
     --attention_type Cluster \
-    --batch_size 256 \
+    --batch_size 512 \
     --epochs 2000 \
-    --patience 50 \
+    --patience 40 \
     --warm_up_epoches 0 \
-    --num_intent_clusters 16 \
-    --intent_cf_weight 0.1 \
-    --cf_weight 0.1 \
+    --num_intent_clusters 32 \
+    --intent_cf_weight 0.01 \
+    --cf_weight 0.5 \
     --num_hidden_layers 1 \
-    --cluster_train 10 \
-    --model_idx UPTRec-V4 \
+    --cluster_train 5 \
+    --model_idx V3 \
     --gpu_id 0 \
     --embedding \
+    --description \
     --temperature 1 \
-    --wandb
-
-python main.py \
-    --model_name UPTRec \
-    --data_name Beauty  \
-    --output_dir renew_log/Beauty/UPTRec-V5\
-    --contrast_type Hybrid  \
-    --context item_embedding \
-    --seq_representation_type concatenate \
-    --attention_type Cluster \
-    --batch_size 256 \
-    --epochs 2000 \
-    --patience 50 \
-    --warm_up_epoches 0 \
-    --num_intent_clusters 16 \
-    --intent_cf_weight 0.1 \
-    --cf_weight 0.1 \
-    --num_hidden_layers 2 \
-    --model_idx UPTRec-V5 \
-    --gpu_id 0 \
-    --embedding \
-    --temperature 1 \
-    --wandb
-
-python main.py \
-    --model_name UPTRec \
-    --data_name Beauty  \
-    --output_dir renew_log/Beauty/UPTRec-V6\
-    --contrast_type Hybrid  \
-    --context item_embedding \
-    --seq_representation_type concatenate \
-    --attention_type Cluster \
-    --batch_size 256 \
-    --epochs 2000 \
-    --patience 50 \
-    --warm_up_epoches 0 \
-    --num_intent_clusters 16 \
-    --intent_cf_weight 0.1 \
-    --cf_weight 0.1 \
-    --num_hidden_layers 1 \
-    --model_idx UPTRec-V6 \
-    --gpu_id 0 \
-    --embedding \
-    --temperature 1.5 \
-    --wandb
+    --hidden_size 384 \
+    --visualization_epoch 5
 
 
-python main.py \
-    --model_name UPTRec \
-    --data_name Beauty  \
-    --contrast_type Hybrid  \
-    --context item_embedding \
-    --seq_representation_type concatenate \
-    --attention_type Cluster \
-    --batch_size 256 \
-    --epochs 2000 \
-    --patience 50 \
-    --warm_up_epoches 100 \
-    --num_intent_clusters 16 \
-    --intent_cf_weight 0.1 \
-    --cf_weight 0.1 \
-    --num_hidden_layers 1 \
-    --gpu_id 0 \
-    --embedding \
-    --temperature 1.5 \
-    --model_idx UPTRec-V7 \
-    --output_dir renew_log/Beauty/UPTRec-V7\
-    --wandb
-
-python main.py \
-    --model_name UPTRec \
-    --data_name Beauty  \
-    --contrast_type Hybrid  \
-    --context item_embedding \
-    --seq_representation_type concatenate \
-    --attention_type Cluster \
-    --batch_size 256 \
-    --epochs 2000 \
-    --patience 50 \
-    --warm_up_epoches 100 \
-    --num_intent_clusters 16 \
-    --intent_cf_weight 0.1 \
-    --cf_weight 0.1 \
-    --num_hidden_layers 1 \
-    --gpu_id 0 \
-    --embedding \
-    --temperature 1.5 \
-    --augment_type Mask \
-    --model_idx UPTRec-V8 \
-    --output_dir renew_log/Beauty/UPTRec-V8\
-    --wandb
-
-python main.py \
-    --model_name UPTRec \
-    --data_name Beauty  \
-    --contrast_type Hybrid  \
-    --context item_embedding \
-    --seq_representation_type concatenate \
-    --attention_type Cluster \
-    --batch_size 256 \
-    --epochs 2000 \
-    --patience 50 \
-    --warm_up_epoches 0 \
-    --num_intent_clusters 16 \
-    --intent_cf_weight 0.1 \
-    --cf_weight 0.1 \
-    --num_hidden_layers 1 \
-    --gpu_id 0 \
-    --embedding \
-    --n_views 3 \
-    --temperature 1 \
-    --model_idx UPTRec-V9 \
-    --output_dir renew_log/Beauty/UPTRec-V9\
-    --wandb
 # scripts/Beauty/UPTRec_gpu_0.sh

@@ -173,7 +173,7 @@ class Trainer:
 
         x_min, x_max = np.min(embedding_2d[:, 0]), np.max(embedding_2d[:, 0])
         plt.xlim(x_min, x_max)
-        output_file = f'{self.args.output_dir}/Embedding/Embedding Visualization Batch:{i}, Epoch:{epoch}.png'
+        output_file = f'{self.args.output_dir}/embedding/Embedding Visualization Batch:{i}, Epoch:{epoch}.png'
         plt.savefig(output_file)
         plt.close()
 
@@ -327,6 +327,7 @@ class UPTRecTrainer(Trainer):
                         sequence_output = self.model(input_ids,self.args)
                     if self.args.context == "item_embedding":
                         sequence_output = self.model.item_embeddings(input_ids)
+                        import IPython; IPython.embed(colors='Linux');exit(1);
                         if self.args.description:
                             sequence_output = self.model.transform_layer(sequence_output)
 
@@ -387,8 +388,6 @@ class UPTRecTrainer(Trainer):
                         sequence_context = torch.mean(sequence_context, dim=1, keepdim=False)
                     sequence_context = sequence_context.view(sequence_context.shape[0],-1).detach().cpu().numpy()
 
-                    if self.args.embedding == True and epoch % self.args.visualization_epoch == 0 and i in [0,10,20] and epoch > self.args.warm_up_epoches:
-                        self.embedding_plot(epoch, i, sequence_context, intent_ids[0])
                         
                     # sequence_context = sequence_context.detach().cpu().numpy()
                     # query on multiple clusters
@@ -407,6 +406,10 @@ class UPTRecTrainer(Trainer):
                         intent_ids.append(intent_id)
                     nmi_assignment.append(intent_ids[0])
                     # embedding visualization
+                    if self.args.embedding == True and epoch % self.args.visualization_epoch == 0 and i in [0,10,20] and epoch > self.args.warm_up_epoches:
+                        
+                        self.embedding_plot(epoch, i, sequence_context, intent_ids[0])
+                   
 
 
 

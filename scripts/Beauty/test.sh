@@ -5,7 +5,7 @@ python main.py \
     --contrast_type Hybrid  \
     --context item_embedding \
     --seq_representation_type concatenate \
-    --attention_type Base \
+    --attention_type Cluster \
     --batch_size 512 \
     --epochs 2000 \
     --patience 40 \
@@ -18,7 +18,6 @@ python main.py \
     --model_idx V1 \
     --gpu_id 0 \
     --embedding \
-    --description \
     --visualization_epoch 2 \
     --temperature 1 \
 

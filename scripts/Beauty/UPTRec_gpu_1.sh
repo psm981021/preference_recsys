@@ -1,11 +1,11 @@
 python main.py \
     --model_name UPTRec \
     --data_name Beauty  \
-    --output_dir Description/Beauty/UPTRec-V1\
+    --output_dir Description/Beauty/UPTRec-V4\
     --contrast_type Hybrid  \
     --context item_embedding \
     --seq_representation_type concatenate \
-    --attention_type Base \
+    --attention_type Cluster \
     --batch_size 512 \
     --epochs 2000 \
     --patience 40 \
@@ -15,11 +15,12 @@ python main.py \
     --cf_weight 0.5 \
     --num_hidden_layers 1 \
     --cluster_train 1 \
-    --model_idx V1 \
-    --gpu_id 1 \
+    --model_idx V4 \
+    --gpu_id 0 \
     --embedding \
     --description \
     --temperature 1 \
+    --hidden_size 64
 
 
 # scripts/Beauty/UPTRec_gpu_1.sh

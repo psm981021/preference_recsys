@@ -180,6 +180,7 @@ class SASRecDataset(Dataset):
 
     def _data_sample_rec_task(self, user_id, items, input_ids, target_pos, answer):
         # make a deep copy to avoid original sequence be modified
+        
         copied_input_ids = copy.deepcopy(input_ids)
         target_neg = []
         seq_set = set(items)
