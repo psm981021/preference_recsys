@@ -28,7 +28,7 @@ from sklearn.decomposition import TruncatedSVD
 import wandb
 
 class Trainer:
-    def __init__(self, model, train_dataloader, cluster_dataloader, eval_dataloader, test_dataloader, args):
+    def __init__(self, model, train_dataloader, cluster_dataloader, eval_dataloader, test_dataloader,item_dataloader, args):
 
         self.args = args
         self.cuda_condition = torch.cuda.is_available() and not self.args.no_cuda
@@ -37,8 +37,31 @@ class Trainer:
         self.model = model
 
         self.num_intent_clusters = [int(i) for i in self.args.num_intent_clusters.split(",")]
-        self.clusters = []
 
+        self.item_clusters =[]
+        for num_intent_cluster in self.num_intent_clusters:
+            # initialize Kmeans
+            if self.args.seq_representation_type == "mean":
+                cluster = KMeans(
+                    num_cluster=num_intent_cluster,
+                    seed=self.args.seed,
+                    hidden_size=1,
+                    gpu_id=self.args.gpu_id,
+                    device=self.device,
+                )
+                self.clusters.append(cluster)
+            else:
+                cluster = KMeans(
+                    num_cluster=num_intent_cluster,
+                    seed=self.args.seed,
+                    hidden_size=self.args.hidden_size,
+                    gpu_id=self.args.gpu_id,
+                    device=self.device,
+                )
+                self.item_clusters.append(cluster)
+
+
+        self.clusters = []
         for num_intent_cluster in self.num_intent_clusters:
             # initialize Kmeans
             if self.args.seq_representation_type == "mean":
@@ -79,6 +102,7 @@ class Trainer:
         self.cluster_dataloader = cluster_dataloader
         self.eval_dataloader = eval_dataloader
         self.test_dataloader = test_dataloader
+        self.item_dataloader = item_dataloader
 
         # self.data_name = self.args.data_name
         betas = (self.args.adam_beta1, self.args.adam_beta2)
@@ -94,13 +118,13 @@ class Trainer:
         self.align_criterion = AlignmentLossWithSinkhorn().to(self.device)
 
     def train(self, epoch):
-        self.iteration(epoch, self.train_dataloader, self.cluster_dataloader)
+        self.iteration(epoch, self.train_dataloader, self.cluster_dataloader, self.item_dataloader)
 
     def valid(self, epoch, full_sort=False):
-        return self.iteration(epoch, self.eval_dataloader,self.cluster_dataloader, full_sort=full_sort, train=False, test=False)
+        return self.iteration(epoch, self.eval_dataloader,self.cluster_dataloader,self.item_dataloader, full_sort=full_sort, train=False, test=False)
 
     def test(self, epoch, full_sort=False):
-        return self.iteration(epoch, self.test_dataloader,self.cluster_dataloader, full_sort=full_sort, train=False, test=True)
+        return self.iteration(epoch, self.test_dataloader,self.cluster_dataloader,self.item_dataloader, full_sort=full_sort, train=False, test=True)
 
     def iteration(self, epoch, dataloader, full_sort=False, train=True):
         raise NotImplementedError
@@ -243,9 +267,9 @@ class Trainer:
 
 
 class UPTRecTrainer(Trainer):
-    def __init__(self, model, train_dataloader, cluster_dataloader, eval_dataloader, test_dataloader, args):
+    def __init__(self, model, train_dataloader, cluster_dataloader, eval_dataloader, test_dataloader,item_dataloader, args):
         super(UPTRecTrainer, self).__init__(
-            model, train_dataloader, cluster_dataloader, eval_dataloader, test_dataloader, args
+            model, train_dataloader, cluster_dataloader, eval_dataloader, test_dataloader,item_dataloader, args
         )
 
     def _instance_cl_one_pair_contrastive_learning(self, inputs, intent_ids=None):
@@ -305,13 +329,41 @@ class UPTRecTrainer(Trainer):
             cl_loss = self.pcl_criterion(cl_output_slice[0], cl_output_slice[1], intents=intents, intent_ids=None)
         return cl_loss
 
-    def iteration(self, epoch, dataloader, cluster_dataloader=None, full_sort=True, train=True, test=False):
+    def iteration(self, epoch, dataloader, cluster_dataloader=None, item_dataloader=None, full_sort=True, train=True, test=False):
 
         str_code = "train" if train else "test"
 
         # Setting the tqdm progress bar
-
         if train:
+            # ------------ item clustering ------------ #
+            if self.args.contrast_type in ["IntentCL", "Hybrid", "None"] and epoch >= self.args.warm_up_epoches:
+                print("[Train] Prepare Item Clustering")
+                self.model.eval()
+                kmeans_training_data = []
+                
+                item_iter = tqdm(enumerate(item_dataloader), total=len(item_dataloader))
+                for i, id in item_iter:
+                    id_ = torch.stack([t.to(self.device) for t in id], dim=0)
+                    
+                    sequence_output = self.model.item_embeddings(id_)
+                    
+                    if self.args.seq_representation_type == "mean":
+                        sequence_output = torch.mean(sequence_output, dim=1, keepdim=False)
+                    sequence_output = sequence_output.view(sequence_output.shape[0], -1).detach().cpu().numpy()
+                    kmeans_training_data.append(sequence_output)
+
+                kmeans_training_data = np.concatenate(kmeans_training_data, axis=0) #[* hidden]
+
+                # train multiple clusters
+                print("[Train] Training Item Clusters:")
+                for i, cluster in tqdm(enumerate(self.item_clusters), total=len(self.item_clusters)):
+                    cluster.train(kmeans_training_data)
+                    self.item_clusters[i] = cluster
+                    
+                # clean memory
+                del kmeans_training_data
+                import gc
+
             # ------ intentions clustering ----- #
             if self.args.contrast_type in ["IntentCL", "Hybrid", "None"] and epoch >= self.args.warm_up_epoches:
                 print("[Train] Preparing Clustering:")
@@ -327,7 +379,7 @@ class UPTRecTrainer(Trainer):
                         sequence_output = self.model(input_ids,self.args)
                     if self.args.context == "item_embedding":
                         sequence_output = self.model.item_embeddings(input_ids)
-                        import IPython; IPython.embed(colors='Linux');exit(1);
+                        
                         if self.args.description:
                             sequence_output = self.model.transform_layer(sequence_output)
 
@@ -386,32 +438,27 @@ class UPTRecTrainer(Trainer):
                             sequence_context = self.model.transform_layer(sequence_context)
                     if self.args.seq_representation_type == "mean":
                         sequence_context = torch.mean(sequence_context, dim=1, keepdim=False)
-                    sequence_context = sequence_context.view(sequence_context.shape[0],-1).detach().cpu().numpy()
-
+                    
+                    # sequence_context = sequence_context.view(sequence_context.shape[0],-1).detach().cpu().numpy()
+                    sequence_context = sequence_context.view(self.args.batch_size*self.args.max_seq_length,-1).detach().cpu().numpy()
                         
                     # sequence_context = sequence_context.detach().cpu().numpy()
                     # query on multiple clusters
-
-                    for cluster in self.clusters:
+                    
+                    for cluster in self.item_clusters:
                         seq2intents = []
                         intent_ids = []
 
-                        try:
-                            intent_id, seq2intent = cluster.query(sequence_context)
-                        except:
-                            pass
-                            # print("Error in Model Training");import IPython; IPython.embed(colors='Linux');exit(1);
-                        
+                        intent_id, seq2intent = cluster.query(sequence_context)
+
                         seq2intents.append(seq2intent)
                         intent_ids.append(intent_id)
-                    nmi_assignment.append(intent_ids[0])
+                    # nmi_assignment.append(intent_ids[0])
+                    
                     # embedding visualization
                     if self.args.embedding == True and epoch % self.args.visualization_epoch == 0 and i in [0,10,20] and epoch > self.args.warm_up_epoches:
                         
                         self.embedding_plot(epoch, i, sequence_context, intent_ids[0])
-                   
-
-
 
                 # ---------- recommendation task ---------------#
 

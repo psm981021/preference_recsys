@@ -257,3 +257,17 @@ class SASRecDataset(Dataset):
 
     def __len__(self):
         return len(self.user_seq)
+    
+
+class ItemembeddingDataset(Dataset):
+    def __init__(self, item_ids):
+        self.item_ids = item_ids
+    
+    def __getitem__(self, index):
+        item_id = self.item_ids[index]
+        return torch.tensor(item_id, dtype = torch.long)
+
+
+    def __len__(self):
+        return len(self.item_ids)
+    

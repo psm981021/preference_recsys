@@ -284,8 +284,32 @@ class Clustered_Attention_Chunking(nn.Module):
         N,C,E = seq.shape
         chunk_size = N // int(self.args.num_intent_clusters)
         N = chunk_size * int(self.args.num_intent_clusters)
+        item_id = cluster_id[0].reshape(N,C)
 
+
+        for i in range(N):
+            cluster_dict = {}
+            for j in range(C):
+                cluster = item_id[i,j].item()
+                if cluster not in cluster_dict:
+                    cluster_dict[cluster] = []
+                cluster_dict[cluster].append(j)
+
+            attention_outputs = []
+            attention_probs =[]
+
+            for cluster, indices in cluster_dict.items():
+                cluster_seq = seq[i, indices, :]
+                cluster_attention_mask = attention_mask[i,indices, :]
+                
+                attention_output = self.attention(cluster_seq,cluster_attention_mask)
+                
+
+        
+        sorted_indices = torch.argsort(item_id)
+        
         seq_sort = seq.view(N, -1)
+
         if isinstance(cluster_id, list):
             if N == len(cluster_id[0]):
                 sorted_indices = torch.argsort(cluster_id[0]) #cluster_id input as list
@@ -301,8 +325,7 @@ class Clustered_Attention_Chunking(nn.Module):
         except:
             print("\nClustered Attention Debugging");import IPython; IPython.embed(colors='Linux');exit(1);
         
-        attention_outputs = []
-        attention_probs =[]
+
         for i in range(int(self.args.num_intent_clusters)):
             #use chunking
             start_idx = i * chunk_size
@@ -337,18 +360,6 @@ class Clustered_Attention_Chunking(nn.Module):
         
         # sorted_attention_map = attention_prob[reverse_indices]
         return output
-class Clustered_Attention(nn.Module):
-    def __init__(self, args):
-        super(Clustered_Attention, self).__init__()
-        self.args = args
-        self.attention = SelfAttention(args)
-
-    def forward(self, seq, attention_mask, cluster_id= None):
-        N,C,E = seq.shape
-        cluster_id = cluster_id[0]
-
-        
-        pass
 
         
 class SelfAttention(nn.Module):
@@ -379,6 +390,7 @@ class SelfAttention(nn.Module):
         return x.permute(0, 2, 1, 3)
 
     def forward(self, input_tensor, attention_mask):
+        import IPython; IPython.embed(colors='Linux');exit(1);
         mixed_query_layer = self.query(input_tensor)
         mixed_key_layer = self.key(input_tensor)
         mixed_value_layer = self.value(input_tensor)
@@ -453,7 +465,6 @@ class Layer(nn.Module):
         super(Layer, self).__init__()
 
         self.base_attention = SelfAttention(args)
-        self.cluster_attention = Clustered_Attention(args)
         self.cluster_attention_chunking = Clustered_Attention_Chunking(args)
         self.feedforward = Intermediate(args)
 

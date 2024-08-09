@@ -86,19 +86,15 @@ class UPTRec(nn.Module):
     def __init__(self, args, description_embedding = None):
         super(UPTRec, self).__init__()
 
-        if description_embedding is not None:
-            self.item_embeddings = nn.Embedding.from_pretrained(description_embedding, padding_idx = 0)
-            self.transform_layer = nn.Linear(description_embedding.size(1), args.hidden_size)
-
-        else:
-            self.item_embeddings.append(nn.Embedding.from_pretrained(description_embedding, padding_idx = 0))
-            self.transform_layer = None
+        self.itemnum=args.item_size
+        self.args = args    
+        self.item_embeddings = nn.Embedding(self.itemnum, args.hidden_size)
             
         self.position_embeddings = nn.Embedding(args.max_seq_length, args.hidden_size)
         self.item_encoder = Encoder(args)
         self.LayerNorm = LayerNorm(args.hidden_size, eps=1e-12)
         self.dropout = nn.Dropout(args.hidden_dropout_prob)
-        self.args = args
+
 
         self.criterion = nn.BCELoss(reduction="none")
         self.apply(self.init_weights)
@@ -121,7 +117,7 @@ class UPTRec(nn.Module):
 
     # model same as SASRec
     def forward(self, input_ids, args, cluster_id =None):
-
+        
         attention_mask = (input_ids > 0).long()
         extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)  # torch.int64
         max_len = attention_mask.size(-1)

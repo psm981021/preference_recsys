@@ -17,7 +17,7 @@ import pandas as pd
 
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 
-from Datasets import RecWithContrastiveLearningDataset, SASRecDataset
+from Datasets import RecWithContrastiveLearningDataset, SASRecDataset, ItemembeddingDataset
 from trainers import UPTRecTrainer
 from models import UPTRec
 from utils import *
@@ -188,12 +188,12 @@ def main():
     args.item_size = max_item + 2
     args.mask_id = max_item + 1
 
+    item_ids = torch.arange(0, args.item_size, dtype=torch.long)
+
     # save model args
     args_str = f"{args.model_name}-{args.data_name}-{args.model_idx}-{args.num_intent_clusters}-{args.batch_size}"
     args.log_file = os.path.join(args.output_dir, args_str + ".txt")
-
     show_args_info(args,args.log_file)
-
 
     # set item score in train set to `0` in validation
     args.train_matrix = valid_rating_matrix
@@ -227,6 +227,11 @@ def main():
     test_sampler = SequentialSampler(test_dataset)
     test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.batch_size, drop_last=True)
 
+    item_dataset = ItemembeddingDataset(item_ids)
+    item_sampler = SequentialSampler(item_dataset)
+    item_dataloader = DataLoader(item_dataset, sampler=item_sampler, batch_size=args.batch_size)
+
+    
     if args.description:
         description_embeddings = pd.read_csv('/home/seongbeom/paper/preference_rec/data/2014/Beauty/Beauty_embeddings.csv')
         description_embeddings = description_embeddings.sort_values(by='asin')
@@ -236,7 +241,7 @@ def main():
     else:
         model =UPTRec(args=args)
 
-    trainer = UPTRecTrainer(model, train_dataloader, cluster_dataloader, eval_dataloader, test_dataloader, args)
+    trainer = UPTRecTrainer(model, train_dataloader, cluster_dataloader, eval_dataloader, test_dataloader,item_dataloader, args)
     
     if args.do_eval:
         trainer.args.train_matrix = test_rating_matrix

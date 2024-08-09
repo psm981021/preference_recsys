@@ -1,3 +1,4 @@
+
 python main.py \
     --model_name UPTRec \
     --data_name Beauty  \
@@ -22,6 +23,5 @@ python main.py \
     --temperature 1 \
     --hidden_size 384 \
     --visualization_epoch 5
-
 
 # scripts/Beauty/UPTRec_gpu_0.sh
