@@ -48,6 +48,9 @@ def main():
     parser.add_argument("--wandb", action="store_true", help="activate wandb.")
     parser.add_argument("--valid_attention", action="store_true", help="valid,test on self-attention if activated.")
     parser.add_argument("--cluster_valid", action="store_true", help="do not perform Cluster Attention in valid,test if activated.")
+    parser.add_argument("--softmax", action="store_true", help="softmax after cluster attention.")
+    parser.add_argument("--cluster_joint", action="store_true", help="use cluster attention as a auxilary information.")
+    
     parser.add_argument(
         "--attention_type",
         default ="Base",
@@ -182,13 +185,13 @@ def main():
     args.cuda_condition = torch.cuda.is_available() and not args.no_cuda
     print("Using Cuda:", torch.cuda.is_available())
     args.data_file = f'{args.data_dir}/{args.data_name}/{args.data_name}_seq.txt'
-
+    
     user_seq, max_item, valid_rating_matrix, test_rating_matrix = get_user_seqs(args.data_file)
 
     args.item_size = max_item + 2
     args.mask_id = max_item + 1
 
-    item_ids = torch.arange(0, args.item_size, dtype=torch.long)
+    item_ids = torch.arange(0, args.item_size-1, dtype=torch.long).to(torch.device("cuda" if args.cuda_condition else "cpu"))
 
     # save model args
     args_str = f"{args.model_name}-{args.data_name}-{args.model_idx}-{args.num_intent_clusters}-{args.batch_size}"
@@ -273,6 +276,7 @@ def main():
             scores, _ = trainer.valid(epoch, full_sort=True)
             
             early_stopping(np.array(scores[-1:]), trainer.model)
+            
             if early_stopping.early_stop:
                 save_epoch = epoch
                 print("Early stopping")

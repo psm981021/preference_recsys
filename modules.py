@@ -143,35 +143,52 @@ class PCLoss(nn.Module):
     """ Reference: https://github.com/salesforce/PCL/blob/018a929c53fcb93fd07041b1725185e1237d2c0e/pcl/builder.py#L168
     """
 
-    def __init__(self, temperature, device, contrast_mode="all"):
+    def __init__(self, args, temperature, device, contrast_mode="all"):
         super(PCLoss, self).__init__()
         self.contrast_mode = contrast_mode
-        self.criterion = NCELoss(temperature, device)
+        self.args = args
+        self.criterion = NCELoss(args,temperature, device)
+       
 
-    def forward(self, batch_sample_one, batch_sample_two, intents, intent_ids):
+    def forward(self,level,batch_sample_one, batch_sample_two, intents, intent_ids):
         """
         features: 
         intents: num_clusters x batch_size x hidden_dims
         """
         # instance contrast with prototypes
         mean_pcl_loss = 0
-        # do de-noise
-        if intent_ids is not None:
-            for intent, intent_id in zip(intents, intent_ids):
-                pos_one_compare_loss = self.criterion(batch_sample_one, intent, intent_id)
-                pos_two_compare_loss = self.criterion(batch_sample_two, intent, intent_id)
-                mean_pcl_loss += pos_one_compare_loss
-                mean_pcl_loss += pos_two_compare_loss
+
+
+        if self.args.contrast_type in ['Item-level', 'Item-User'] and level =='item':
+            
+            pos_one_compare_loss = self.criterion(level,batch_sample_one, intents, intent_ids=intent_ids)
+            pos_two_compare_loss = self.criterion(level,batch_sample_two, intents, intent_ids=intent_ids)
+            mean_pcl_loss += pos_one_compare_loss
+            mean_pcl_loss += pos_two_compare_loss
+
             mean_pcl_loss /= 2 * len(intents)
-        # don't do de-noise
+
         else:
-            for intent in intents:
-                
-                pos_one_compare_loss = self.criterion(batch_sample_one, intent, intent_ids=None)
-                pos_two_compare_loss = self.criterion(batch_sample_two, intent, intent_ids=None)
-                mean_pcl_loss += pos_one_compare_loss
-                mean_pcl_loss += pos_two_compare_loss
-            mean_pcl_loss /= 2 * len(intents)
+            # do de-noise
+            if intent_ids is not None:
+                for intent, intent_id in zip(intents, intent_ids):
+                    # intent 512 x 3200
+                    # intent_id 512
+                    
+                    pos_one_compare_loss = self.criterion(level, batch_sample_one, intent, intent_id)
+                    pos_two_compare_loss = self.criterion(level, batch_sample_two, intent, intent_id)
+                    mean_pcl_loss += pos_one_compare_loss
+                    mean_pcl_loss += pos_two_compare_loss
+                mean_pcl_loss /= 2 * len(intents)
+            # don't do de-noise
+            else:
+                for intent in intents:
+                    
+                    pos_one_compare_loss = self.criterion(batch_sample_one, intent, intent_ids=None)
+                    pos_two_compare_loss = self.criterion(batch_sample_two, intent, intent_ids=None)
+                    mean_pcl_loss += pos_one_compare_loss
+                    mean_pcl_loss += pos_two_compare_loss
+                mean_pcl_loss /= 2 * len(intents)
         return mean_pcl_loss
 
 class NCELoss(nn.Module):
@@ -179,15 +196,16 @@ class NCELoss(nn.Module):
     Eq. (12): L_{NCE}
     """
 
-    def __init__(self, temperature, device):
+    def __init__(self, args, temperature, device):
         super(NCELoss, self).__init__()
         self.device = device
+        self.args = args
         self.criterion = nn.CrossEntropyLoss().to(self.device)
         self.temperature = temperature
         self.cossim = nn.CosineSimilarity(dim=-1).to(self.device)
 
     # #modified based on impl: https://github.com/ae-foster/pytorch-simclr/blob/dc9ac57a35aec5c7d7d5fe6dc070a975f493c1a5/critic.py#L5
-    def forward(self, batch_sample_one, batch_sample_two, intent_ids=None):
+    def forward(self, level, batch_sample_one, batch_sample_two, intent_ids=None):
         # sim11 = self.cossim(batch_sample_one.unsqueeze(-2), batch_sample_one.unsqueeze(-3)) / self.temperature
         # sim22 = self.cossim(batch_sample_two.unsqueeze(-2), batch_sample_two.unsqueeze(-3)) / self.temperature
         # sim12 = self.cossim(batch_sample_one.unsqueeze(-2), batch_sample_two.unsqueeze(-3)) / self.temperature
@@ -196,38 +214,87 @@ class NCELoss(nn.Module):
         # batch_sample_one = F.normalize(batch_sample_one, p=2, dim=1)
         # batch_sample_two = F.normalize(batch_sample_two, p=2, dim=1)
 
-        sim11 = torch.matmul(batch_sample_one, batch_sample_one.T) / self.temperature
-        sim22 = torch.matmul(batch_sample_two, batch_sample_two.T) / self.temperature
-        sim12 = torch.matmul(batch_sample_one, batch_sample_two.T) / self.temperature
-        d = sim12.shape[-1]
-        # avoid contrast against positive intents
-        if intent_ids is not None:
-            #intent_ids should be list
+        
+        if self.args.contrast_type in ['Item-User','Item-level' ] and level == 'item':
+            
+            sim11 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_one) / self.temperature
+            sim22 = torch.einsum('bij,bkj->bik', batch_sample_two, batch_sample_two) / self.temperature
+            sim12 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_two) / self.temperature
 
-            intent_ids = intent_ids.contiguous().view(-1, 1)
-            mask_11_22 = torch.eq(intent_ids, intent_ids.T).long().to(self.device)
-            sim11[mask_11_22 == 1] = float("-inf")
-            sim22[mask_11_22 == 1] = float("-inf")
-            eye_metrix = torch.eye(d, dtype=torch.long).to(self.device)
-            mask_11_22[eye_metrix == 1] = 0
-            sim12[mask_11_22 == 1] = float("-inf")
+            batch_size, max_seq, _ = sim11.shape
+
+            # Mask out self-contrast (diagonal elements) and same-intent pairs if intent_ids is provided
+            if intent_ids is not None:
+                intent = intent_ids.unsqueeze(-1)
+                mask = torch.eq(intent,intent.transpose(1,2)).long().to(self.device)
+                
+                # mask = torch.eq(intent_ids, intent_ids.T).long().to(self.device)
+                
+                sim11[mask == 1] = float('-inf')
+                sim22[mask == 1] = float('-inf')
+                eye_metrix = torch.eye(max_seq, dtype=torch.long).repeat(batch_size,1,1).to(self.device)
+
+                mask[eye_metrix == 1] = 0
+                sim12[mask == 1] = float("-inf")
+
+                raw_scores1 = torch.cat([sim12, sim11], dim=-1) # positive
+                raw_scores2 = torch.cat([sim22,sim12],dim=-1) # negative
+
+                logits = torch.cat([raw_scores1, raw_scores2], dim=-2)
+
+                # logits = torch.cat([sim12, sim11, sim22], dim=-1)
+
+                labels = torch.arange(2 * max_seq, dtype=torch.long, device=logits.device)
+                labels = labels.unsqueeze(0).repeat(batch_size, 1) 
+
+                
+
+                nce_loss = self.criterion(logits, labels)
+
+            else:
+                mask = torch.eye(max_seq).to(self.device)
+                sim11.masked_fill_(mask.bool(), float('-inf'))
+                sim22.masked_fill_(mask.bool(), float('-inf'))
+                sim11[mask == 1] = float("-inf")
 
         else:
-            mask = torch.eye(d, dtype=torch.long).to(self.device)
-            sim11[mask == 1] = float("-inf")
-            # if sim22.shape != torch.Size([1]):
-            #     sim22[mask == 1] = float("-inf")
-            # sim22 = sim22.masked_fill_(mask, -np.inf)
-            # sim11[..., range(d), range(d)] = float('-inf')
-            # sim22[..., range(d), range(d)] = float('-inf')
+            try:
+                sim11 = torch.matmul(batch_sample_one, batch_sample_one.T) / self.temperature
+                sim22 = torch.matmul(batch_sample_two, batch_sample_two.T) / self.temperature
+                sim12 = torch.matmul(batch_sample_one, batch_sample_two.T) / self.temperature
+            except:
+                import IPython; IPython.embed(colors='Linux');exit(1);
 
-        raw_scores1 = torch.cat([sim12, sim11], dim=-1) # positive
-        raw_scores2 = torch.cat([sim22, sim12.transpose(-1, -2)], dim=-1) # negative
-        logits = torch.cat([raw_scores1, raw_scores2], dim=-2)
-        labels = torch.arange(2 * d, dtype=torch.long, device=logits.device)
+            d = sim12.shape[-1]
+            # avoid contrast against positive intents
+            if intent_ids is not None:
+                #intent_ids should be list
+                
+                intent_ids = intent_ids.contiguous().view(-1, 1)
+                mask_11_22 = torch.eq(intent_ids, intent_ids.T).long().to(self.device)
+                
+                sim11[mask_11_22 == 1] = float("-inf")
+                sim22[mask_11_22 == 1] = float("-inf")
+                eye_metrix = torch.eye(d, dtype=torch.long).to(self.device)
+                mask_11_22[eye_metrix == 1] = 0
+                sim12[mask_11_22 == 1] = float("-inf")
+
+            else:
+                mask = torch.eye(d, dtype=torch.long).to(self.device)
+                sim11[mask == 1] = float("-inf")
+                # if sim22.shape != torch.Size([1]):
+                #     sim22[mask == 1] = float("-inf")
+                # sim22 = sim22.masked_fill_(mask, -np.inf)
+                # sim11[..., range(d), range(d)] = float('-inf')
+                # sim22[..., range(d), range(d)] = float('-inf')
+
+            raw_scores1 = torch.cat([sim12, sim11], dim=-1) # positive
+            raw_scores2 = torch.cat([sim22, sim12.transpose(-1, -2)], dim=-1) # negative
+            logits = torch.cat([raw_scores1, raw_scores2], dim=-2)
+            labels = torch.arange(2 * d, dtype=torch.long, device=logits.device)
         
 
-        nce_loss = self.criterion(logits, labels)
+            nce_loss = self.criterion(logits, labels)
         return nce_loss
     
 class AlignmentLossWithSinkhorn(nn.Module):
@@ -277,56 +344,36 @@ class Clustered_Attention_Chunking(nn.Module):
         super(Clustered_Attention_Chunking, self).__init__()
         self.args =args
         self.attention = SelfAttention(args)
+        self.LayerNorm = LayerNorm(args.hidden_size, eps=1e-12)
         pass
 
     def forward(self, seq, attention_mask, cluster_id = None):
         #chunking
         N,C,E = seq.shape
-        chunk_size = N // int(self.args.num_intent_clusters)
-        N = chunk_size * int(self.args.num_intent_clusters)
-        item_id = cluster_id[0].reshape(N,C)
-
-
-        for i in range(N):
-            cluster_dict = {}
-            for j in range(C):
-                cluster = item_id[i,j].item()
-                if cluster not in cluster_dict:
-                    cluster_dict[cluster] = []
-                cluster_dict[cluster].append(j)
-
-            attention_outputs = []
-            attention_probs =[]
-
-            for cluster, indices in cluster_dict.items():
-                cluster_seq = seq[i, indices, :]
-                cluster_attention_mask = attention_mask[i,indices, :]
-                
-                attention_output = self.attention(cluster_seq,cluster_attention_mask)
-                
-
-        
-        sorted_indices = torch.argsort(item_id)
-        
-        seq_sort = seq.view(N, -1)
-
-        if isinstance(cluster_id, list):
-            if N == len(cluster_id[0]):
-                sorted_indices = torch.argsort(cluster_id[0]) #cluster_id input as list
-            else:
-                cluster_id = torch.cat((cluster_id[0], cluster_id[0]), dim=0)
-                sorted_indices = torch.argsort(cluster_id)
-        else:
-            cluster_id = torch.cat((cluster_id,cluster_id),dim=0)
-            sorted_indices = torch.argsort(cluster_id)
-
-        try:    
-            seq_sorted = seq_sort[sorted_indices].view(N,C,E)
+        chunk_size = C // int(self.args.num_intent_clusters)
+        try:
+            item_id = cluster_id[0].reshape(N,C)
         except:
-            print("\nClustered Attention Debugging");import IPython; IPython.embed(colors='Linux');exit(1);
+            import IPython; IPython.embed(colors='Linux');exit(1);
+            item_id = cluster_id.reshape(self.args.batch_size,C)
         
+        if self.args.cluster_joint:
+            self_attention_output = self.attention(seq,attention_mask)
 
+        #### cluster attention on item cluster ####
+        sorted_indices = torch.argsort(item_id, dim=1)
+
+        sorted_indices_seq = sorted_indices.unsqueeze(-1).expand(-1, -1, seq.size(-1))
+        seq_sorted = torch.gather(seq, dim=1, index=sorted_indices_seq)
+
+        sorted_indices_attn = sorted_indices.unsqueeze(1).unsqueeze(-1).expand(-1, 1, -1, attention_mask.size(-1))
+        sorted_attention_mask = torch.gather(attention_mask, dim=2, index=sorted_indices_attn)
+        sorted_attention_mask = torch.gather(sorted_attention_mask, dim=3, index=sorted_indices_attn)
+
+        attention_outputs = []
+        attention_probs =[] 
         for i in range(int(self.args.num_intent_clusters)):
+
             #use chunking
             start_idx = i * chunk_size
             end_idx = min((i + 1) * chunk_size, N)
@@ -334,37 +381,52 @@ class Clustered_Attention_Chunking(nn.Module):
             key_start_idx = max((i - 1) * chunk_size, 0)
             key_end_idx = min(((i + 1) * chunk_size if i > 1 else 2*chunk_size), N)
         
-            query_chunk_seq = seq_sorted[start_idx:end_idx, :, :]
-            key_chunk_seq = seq_sorted[key_start_idx:key_end_idx, :, :]
+            query_chunk_seq = seq_sorted[:,start_idx:end_idx, :]
+            key_chunk_seq = seq_sorted[:,key_start_idx:key_end_idx, :]
 
-            chunk_seq = seq_sorted[start_idx:end_idx,:, :]
-            chunk_attention_mask_ = attention_mask[start_idx:end_idx,: , :, :]
+            chunk_seq = seq_sorted[:,start_idx:end_idx, :]
+            
+            chunk_attention_mask_ = attention_mask[:,:,start_idx:end_idx,start_idx:end_idx]
 
             
             if self.args.vanilla_attention == True:
-                attention_output = self.attention(query_chunk_seq,chunk_attention_mask_,key_chunk_seq)
+                
+                attention_output  = self.attention(query_chunk_seq, chunk_attention_mask_, key_chunk_seq)
             else:
                 attention_output = self.attention(chunk_seq,chunk_attention_mask_)
             
             attention_outputs.append(attention_output)
             # attention_probs.append(attention_prob)
 
-        outputs = torch.cat(attention_outputs, dim=0)
-        # attention_prob = torch.cat(attention_probs, dim=0)
-        
-
+        outputs = torch.cat(attention_outputs, dim=1)
+        # attention_prob_ = torch.cat(attention_probs, dim=1)
+    
         # concat after attention
-        reverse_indices = torch.argsort(sorted_indices)
-        seq_sort = outputs.view(N,-1)
-        output = seq_sort[reverse_indices].view(N,C,E)
+        reverse_indices = torch.argsort(sorted_indices, dim=1)
+        reverse_indices_expanded = reverse_indices.unsqueeze(-1).expand(-1, -1, outputs.size(-1))
         
+        output = torch.gather(outputs, dim=1, index=reverse_indices_expanded)
+        if self.args.softmax:
+            
+            output = nn.Softmax(dim=1)(output)
+
+        if self.args.cluster_joint:
+            # output = nn.Softmax(dim=1)(output)
+            # output = self.LayerNorm(output + seq)
+            output = self_attention_output * 0.7 + output * 0.3
+            # output = self.LayerNorm(output + seq)
+            # output = nn.Softmax(dim=1)(output)
+
+
         # sorted_attention_map = attention_prob[reverse_indices]
+        
         return output
 
         
 class SelfAttention(nn.Module):
     def __init__(self, args):
         super(SelfAttention, self).__init__()
+        self.args = args
         if args.hidden_size % args.num_attention_heads != 0:
             raise ValueError(
                 "The hidden size (%d) is not a multiple of the number of attention "
@@ -389,24 +451,42 @@ class SelfAttention(nn.Module):
         x = x.view(*new_x_shape)
         return x.permute(0, 2, 1, 3)
 
-    def forward(self, input_tensor, attention_mask):
-        import IPython; IPython.embed(colors='Linux');exit(1);
-        mixed_query_layer = self.query(input_tensor)
-        mixed_key_layer = self.key(input_tensor)
-        mixed_value_layer = self.value(input_tensor)
+    def forward(self, input_tensor, attention_mask, key_chunk =None):
+        
+        if key_chunk is not None:
+            mix_query = self.query(input_tensor)
+            mix_key = self.key(key_chunk)
+            mix_value = self.value(key_chunk)
 
-        query_layer = self.transpose_for_scores(mixed_query_layer)
-        key_layer = self.transpose_for_scores(mixed_key_layer)
-        value_layer = self.transpose_for_scores(mixed_value_layer)
+            query_layer = self.transpose_for_scores(mix_query)
+            key_layer = self.transpose_for_scores(mix_key)
+            value_layer = self.transpose_for_scores(mix_value)
+            
+            attention_score = torch.matmul(query_layer,key_layer.transpose(-1,-2)) / math.sqrt(self.attention_head_size)
+            B,D,N,C = attention_mask.shape
+            zero_tensor = torch.zeros(B, D, N, C, device=attention_mask.device )
+            expanded_attention_mask = torch.cat([attention_mask, zero_tensor], dim=-1)
 
-        # Take the dot product between "query" and "key" to get the raw attention scores.
-        attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
+            attention_scores = attention_score + expanded_attention_mask
+            
+        else:
+            mixed_query_layer = self.query(input_tensor)
+            mixed_key_layer = self.key(input_tensor)
+            mixed_value_layer = self.value(input_tensor)
+            
+            query_layer = self.transpose_for_scores(mixed_query_layer)
+            key_layer = self.transpose_for_scores(mixed_key_layer)
+            value_layer = self.transpose_for_scores(mixed_value_layer)
 
-        attention_scores = attention_scores / math.sqrt(self.attention_head_size)
-        # Apply the attention mask is (precomputed for all layers in BertModel forward() function)
-        # [batch_size heads seq_len seq_len] scores
-        # [batch_size 1 1 seq_len]
-        attention_scores = attention_scores + attention_mask
+            # Take the dot product between "query" and "key" to get the raw attention scores.
+            attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
+
+            attention_scores = attention_scores / math.sqrt(self.attention_head_size)
+            # Apply the attention mask is (precomputed for all layers in BertModel forward() function)
+            # [batch_size heads seq_len seq_len] scores
+            # [batch_size 1 1 seq_len]
+            
+            attention_scores = attention_scores + attention_mask
 
         # Normalize the attention scores to probabilities.
         attention_probs = nn.Softmax(dim=-1)(attention_scores)
@@ -420,8 +500,11 @@ class SelfAttention(nn.Module):
         context_layer = context_layer.view(*new_context_layer_shape)
         hidden_states = self.dense(context_layer)
         hidden_states = self.out_dropout(hidden_states)
+        
         hidden_states = self.LayerNorm(hidden_states + input_tensor)
-
+            
+        attention_map = torch.mean(attention_probs, dim=1) 
+        
         return hidden_states
 
 class Intermediate(nn.Module):
@@ -436,7 +519,7 @@ class Intermediate(nn.Module):
         self.dropout = nn.Dropout(args.hidden_dropout_prob)
 
     def forward(self,seq):
-        
+
         hidden_state = self.inner_layer(seq)
         hidden_state = self.activation(hidden_state)
         hidden_state = self.outer_layer(hidden_state)

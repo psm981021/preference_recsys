@@ -265,8 +265,13 @@ class ItemembeddingDataset(Dataset):
     
     def __getitem__(self, index):
         item_id = self.item_ids[index]
-        return torch.tensor(item_id, dtype = torch.long)
 
+        # If item_id is already a tensor, clone and detach it
+        if isinstance(item_id, torch.Tensor):
+            return item_id.clone().detach().long()
+        else:
+            # Otherwise, create a new tensor
+            return torch.tensor(item_id, dtype=torch.long)
 
     def __len__(self):
         return len(self.item_ids)

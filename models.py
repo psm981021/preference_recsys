@@ -28,7 +28,7 @@ class KMeans(object):
         self.centroids = [] 
 
     def __init_cluster(
-        self, hidden_size, verbose=False, niter=20, nredo=5, max_points_per_centroid=4096, min_points_per_centroid=0
+        self, hidden_size, verbose=False, niter=5, nredo=5, max_points_per_centroid=4096, min_points_per_centroid=0
     ):
         print(" cluster train iterations:", niter)
         clus = faiss.Clustering(hidden_size, self.num_cluster)
