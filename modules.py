@@ -237,33 +237,26 @@ class NCELoss(nn.Module):
                 mask[eye_metrix == 1] = 0
                 sim12[mask == 1] = float("-inf")
 
-                raw_scores1 = torch.cat([sim12, sim11], dim=-1) # positive
-                raw_scores2 = torch.cat([sim22,sim12],dim=-1) # negative
-
-                logits = torch.cat([raw_scores1, raw_scores2], dim=-2)
-
-                # logits = torch.cat([sim12, sim11, sim22], dim=-1)
-
-                labels = torch.arange(2 * max_seq, dtype=torch.long, device=logits.device)
-                labels = labels.unsqueeze(0).repeat(batch_size, 1) 
-
-                
-
-                nce_loss = self.criterion(logits, labels)
 
             else:
-                mask = torch.eye(max_seq).to(self.device)
-                sim11.masked_fill_(mask.bool(), float('-inf'))
-                sim22.masked_fill_(mask.bool(), float('-inf'))
+                mask = torch.eye(max_seq, dtype=torch.long).repeat(batch_size,1,1).to(self.device)
                 sim11[mask == 1] = float("-inf")
 
+            raw_scores1 = torch.cat([sim12, sim11], dim=-1) # positive
+            raw_scores2 = torch.cat([sim22,sim12],dim=-1) # negative
+
+            logits = torch.cat([raw_scores1, raw_scores2], dim=-2)
+
+            # logits = torch.cat([sim12, sim11, sim22], dim=-1)
+
+            labels = torch.arange(2 * max_seq, dtype=torch.long, device=logits.device)
+            labels = labels.unsqueeze(0).repeat(batch_size, 1) 
+
+
         else:
-            try:
-                sim11 = torch.matmul(batch_sample_one, batch_sample_one.T) / self.temperature
-                sim22 = torch.matmul(batch_sample_two, batch_sample_two.T) / self.temperature
-                sim12 = torch.matmul(batch_sample_one, batch_sample_two.T) / self.temperature
-            except:
-                import IPython; IPython.embed(colors='Linux');exit(1);
+            sim11 = torch.matmul(batch_sample_one, batch_sample_one.T) / self.temperature
+            sim22 = torch.matmul(batch_sample_two, batch_sample_two.T) / self.temperature
+            sim12 = torch.matmul(batch_sample_one, batch_sample_two.T) / self.temperature
 
             d = sim12.shape[-1]
             # avoid contrast against positive intents
@@ -294,7 +287,7 @@ class NCELoss(nn.Module):
             labels = torch.arange(2 * d, dtype=torch.long, device=logits.device)
         
 
-            nce_loss = self.criterion(logits, labels)
+        nce_loss = self.criterion(logits, labels)
         return nce_loss
     
 class AlignmentLossWithSinkhorn(nn.Module):

@@ -11,7 +11,7 @@ python main.py \
     --patience 40 \
     --warm_up_epoches 50 \
     --num_intent_clusters 50 \
-    --intent_cf_weight 1 \
+    --intent_cf_weight 2 \
     --cf_weight 0.1 \
     --num_hidden_layers 3 \
     --cluster_train 1 \

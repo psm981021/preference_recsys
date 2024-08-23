@@ -370,7 +370,7 @@ class UPTRecTrainer(Trainer):
             # for batch_1, batch_2, intent_id in zip(cl_sequence_drop_output_one,cl_sequence_drop_output_two, intent_ids):
             #     cl_loss += self.cf_criterion(batch_1, batch_2, intent_ids=intent_id)
         else:
-            cl_loss = self.cf_criterion(cl_sequence_drop_output_one, cl_sequence_drop_output_two, intent_ids=None)
+            cl_loss = self.cf_criterion('item', cl_sequence_drop_output_one, cl_sequence_drop_output_two, intent_ids=None)
         return cl_loss
     
 
@@ -640,26 +640,29 @@ class UPTRecTrainer(Trainer):
                             cl_losses.append(self.args.intent_cf_weight * cl_loss3)
 
                     elif self.args.contrast_type == "Item-level":
-                        #  check seq_class_label_batches
+                       
+                        sequence_output = self.model.item_embeddings(input_ids)
+                        if self.args.seq_representation_type == "mean":
+                            sequence_output = torch.mean(sequence_output, dim=-1, keepdim=False)
+                        
+                        sequence_output = sequence_output.view(sequence_output.shape[0]*self.args.max_seq_length, -1).detach().cpu().numpy()
+                        
+                        for cluster in self.item_clusters:
+                            seq2intents = []
+                            intent_ids = []
+                            intent_id, seq2intent = cluster.query(sequence_output)
+                            seq2intents.append(seq2intent)
+                            intent_ids.append(intent_id)
+
                         if epoch < self.args.warm_up_epoches:
                             
                             cl_loss1 = self._instance_cl_item_level_one_pair_contrastive_learning(
-                                    input_ids, intent_ids=input_ids
+                                    input_ids
                                 )
                             cl_losses.append(self.args.cf_weight * cl_loss1)
                         else:
-                            sequence_output = self.model.item_embeddings(input_ids) # fix to cl_batch
-                            if self.args.seq_representation_type == "mean":
-                                sequence_output = torch.mean(sequence_output, dim=-1, keepdim=False)
-                            
-                            sequence_output = sequence_output.view(sequence_output.shape[0]*self.args.max_seq_length, -1).detach().cpu().numpy()
-                            
-                            for cluster in self.item_clusters:
-                                seq2intents = []
-                                intent_ids = []
-                                intent_id, seq2intent = cluster.query(sequence_output)
-                                seq2intents.append(seq2intent)
-                                intent_ids.append(intent_id)
+                            sequence_output = self.model.item_embeddings(input_ids)
+
                             
 
                             cl_loss3 = self.pcl_item_pair_contrastive_learning(
