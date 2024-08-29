@@ -79,6 +79,7 @@ class Trainer:
                     num_cluster=num_intent_cluster,
                     seed=self.args.seed,
                     hidden_size=self.args.hidden_size * self.args.max_seq_length,
+                    # hidden_size=self.args.hidden_size,
                     gpu_id=self.args.gpu_id,
                     device=self.device,
                 )
@@ -434,40 +435,41 @@ class UPTRecTrainer(Trainer):
         if train:
             # ------------ item clustering ------------ #
             
-            print("[Train] Prepare Item Clustering")
-            self.model.eval()
-            kmeans_training_data = []
+            # print("[Train] Prepare Item Clustering")
+            # self.model.eval()
+            # kmeans_training_data = []
             
-            item_iter = tqdm(enumerate(item_dataloader), total=len(item_dataloader))
-            for i, id in item_iter:
-                id_ = torch.stack([t.to(self.device) for t in id], dim=0)
+            # item_iter = tqdm(enumerate(item_dataloader), total=len(item_dataloader))
+            # for i, id in item_iter:
+            #     id_ = torch.stack([t.to(self.device) for t in id], dim=0)
                 
-                sequence_output = self.model.item_embeddings(id_)
-                
-                if self.args.seq_representation_type == "mean":
-                    sequence_output = torch.mean(sequence_output, dim=-1, keepdim=False)
+            #     sequence_output = self.model.item_embeddings(id_)
+            #     if self.args.seq_representation_type == "mean":
+            #         sequence_output = torch.mean(sequence_output, dim=-1, keepdim=False)
 
-                sequence_output = sequence_output.view(sequence_output.shape[0], -1).detach().cpu().numpy()# B hidden
+            #     sequence_output = sequence_output.view(sequence_output.shape[0], -1).detach().cpu().numpy()# B hidden
         
-                kmeans_training_data.append(sequence_output)
+            #     kmeans_training_data.append(sequence_output)
 
-            kmeans_training_data = np.concatenate(kmeans_training_data, axis=0) #[* hidden]
+            # kmeans_training_data = np.concatenate(kmeans_training_data, axis=0) #[* hidden]
 
-            # train multiple clusters
-            print("[Train] Training Item Clusters:")
-            for i, cluster in tqdm(enumerate(self.item_clusters), total=len(self.item_clusters)):
-                cluster.train(kmeans_training_data)
-                self.item_clusters[i] = cluster
+            # # train multiple clusters
+            # print("[Train] Training Item Clusters:")
+            # if epoch % self.args.cluster_train ==0:
+            #     for i, cluster in tqdm(enumerate(self.item_clusters), total=len(self.item_clusters)):
+            #         cluster.train(kmeans_training_data)
+            #         self.item_clusters[i] = cluster
                 
-            # clean memory
-            del kmeans_training_data
-            import gc
+            # # clean memory
+            # del kmeans_training_data
+            # import gc
 
             # ------ intentions clustering ----- #
-            if self.args.contrast_type in ["IntentCL", "Hybrid","Item-User"]:
-                print("[Train] Preparing User Clustering:")
+            if self.args.contrast_type in ["IntentCL", "Hybrid","Item-User","Item-level"] and epoch % self.args.cluster_train ==0 :
+                print("[Train] Preparing User,Item Clustering:")
                 self.model.eval()
                 kmeans_training_data = []
+                kmeans_training_data_item = []
                 rec_cf_data_iter = tqdm(enumerate(cluster_dataloader), total=len(cluster_dataloader))
                 for i, (rec_batch, _, _) in rec_cf_data_iter:
                     
@@ -486,19 +488,31 @@ class UPTRecTrainer(Trainer):
                     if self.args.seq_representation_type == "mean":
                         sequence_output = torch.mean(sequence_output, dim=1, keepdim=False)
                     
-                    sequence_output = sequence_output.view(sequence_output.shape[0], -1).detach().cpu().numpy()
+                    sequence_context = sequence_output.view(self.args.batch_size*self.args.max_seq_length,-1).detach().cpu().numpy()
+                    sequence_output = sequence_output.view(self.args.batch_size,-1).detach().cpu().numpy()
                     
                     kmeans_training_data.append(sequence_output) #[len(cluster_dataloader) Batch hidden]
+                    kmeans_training_data_item.append(sequence_context) #[len(cluster_dataloader) Batch hidden]
+
                 kmeans_training_data = np.concatenate(kmeans_training_data, axis=0) #[* hidden]
+                kmeans_training_data_item = np.concatenate(kmeans_training_data_item, axis=0) #[* hidden]
 
                 # train multiple clusters
                 print("[Train] Training User Clusters:")
-                for i, cluster in tqdm(enumerate(self.clusters), total=len(self.clusters)):
-                    cluster.train(kmeans_training_data)
-                    self.clusters[i] = cluster
+                if epoch % self.args.cluster_train ==0:
+                    for i, cluster in tqdm(enumerate(self.clusters), total=len(self.clusters)):
+                        cluster.train(kmeans_training_data)
+                        self.clusters[i] = cluster
                     
                 # clean memory
                 del kmeans_training_data
+
+                print("[Train] Training Item Clusters:")
+                for i, cluster in tqdm(enumerate(self.item_clusters), total=len(self.item_clusters)):
+                    cluster.train(kmeans_training_data_item)
+                    self.item_clusters[i] = cluster
+
+                del kmeans_training_data_item
                 import gc
 
                 gc.collect()
@@ -545,8 +559,7 @@ class UPTRecTrainer(Trainer):
                     
                     # sequence_context = sequence_context.view(sequence_context.shape[0],-1).detach().cpu().numpy()
                     sequence_context = sequence_context.view(self.args.batch_size*self.args.max_seq_length,-1).detach().cpu().numpy()
-                        
-                    # sequence_context = sequence_context.detach().cpu().numpy()
+
                     # query on multiple clusters
                     
                     for cluster in self.item_clusters:
@@ -641,13 +654,14 @@ class UPTRecTrainer(Trainer):
 
                     elif self.args.contrast_type == "Item-level":
                        
-                        sequence_output = self.model.item_embeddings(input_ids)
+                        # sequence_output = self.model.item_embeddings(input_ids)
+                        sequence_output = recommendation_output
                         if self.args.seq_representation_type == "mean":
                             sequence_output = torch.mean(sequence_output, dim=-1, keepdim=False)
                         
                         sequence_output = sequence_output.view(sequence_output.shape[0]*self.args.max_seq_length, -1).detach().cpu().numpy()
                         
-                        for cluster in self.item_clusters:
+                        for cluster in self.clusters:
                             seq2intents = []
                             intent_ids = []
                             intent_id, seq2intent = cluster.query(sequence_output)
@@ -703,7 +717,7 @@ class UPTRecTrainer(Trainer):
 
 
                             #### Item level ####
-                            sequence_output = self.model.item_embeddings(input_ids) # fix to cl_batch
+                            # sequence_output = self.model.item_embeddings(input_ids) # fix to cl_batch
                             if self.args.seq_representation_type == "mean":
                                 sequence_output = torch.mean(sequence_output, dim=-1, keepdim=False)
                             
