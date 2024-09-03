@@ -159,7 +159,7 @@ class PCLoss(nn.Module):
         mean_pcl_loss = 0
 
 
-        if self.args.contrast_type in ['Item-level', 'Item-User'] and level =='item':
+        if self.args.contrast_type in ['Item-level', 'Item-User','Item-description'] and level =='item':
             
             pos_one_compare_loss = self.criterion(level,batch_sample_one, intents, intent_ids=intent_ids)
             pos_two_compare_loss = self.criterion(level,batch_sample_two, intents, intent_ids=intent_ids)
@@ -215,7 +215,7 @@ class NCELoss(nn.Module):
         # batch_sample_two = F.normalize(batch_sample_two, p=2, dim=1)
 
         
-        if self.args.contrast_type in ['Item-User','Item-level' ] and level == 'item':
+        if self.args.contrast_type in ['Item-User','Item-level', 'Item-description'] and level == 'item':
             
             sim11 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_one) / self.temperature
             sim22 = torch.einsum('bij,bkj->bik', batch_sample_two, batch_sample_two) / self.temperature
@@ -347,8 +347,7 @@ class Clustered_Attention_Chunking(nn.Module):
         try:
             item_id = cluster_id[0].reshape(N,C)
         except:
-            import IPython; IPython.embed(colors='Linux');exit(1);
-            item_id = cluster_id.reshape(self.args.batch_size,C)
+            item_id = cluster_id[0].reshape(self.args.batch_size,C)
         
         if self.args.cluster_joint:
             self_attention_output = self.attention(seq,attention_mask)
@@ -406,10 +405,10 @@ class Clustered_Attention_Chunking(nn.Module):
         if self.args.cluster_joint:
             # output = nn.Softmax(dim=1)(output)
             # output = self.LayerNorm(output + seq)
-            output = self_attention_output * 0.7 + output * 0.3
+            # output = self_attention_output * 0.7 + output * 0.3
             # output = self.LayerNorm(output + seq)
             # output = nn.Softmax(dim=1)(output)
-
+            output = self.LayerNorm(self_attention_output * 0.7 + output * 0.3)
 
         # sorted_attention_map = attention_prob[reverse_indices]
         

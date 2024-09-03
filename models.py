@@ -11,7 +11,7 @@ from tqdm import tqdm
 import copy
 
 class KMeans(object):
-    def __init__(self, num_cluster, seed, hidden_size, gpu_id=0, device="cpu"):
+    def __init__(self, num_cluster, seed, hidden_size, niter, gpu_id=0, device="cpu"):
         """
         Args:
             k: number of clusters
@@ -24,13 +24,15 @@ class KMeans(object):
         self.device = device
         self.first_batch = True
         self.hidden_size = hidden_size
+        self.niter = niter
         self.clus, self.index = self.__init_cluster(self.hidden_size)
         self.centroids = [] 
+        
 
     def __init_cluster(
         self, hidden_size, verbose=False, niter=5, nredo=5, max_points_per_centroid=4096, min_points_per_centroid=0
     ):
-        print(" cluster train iterations:", niter)
+        print(" cluster train iterations:", self.niter)
         clus = faiss.Clustering(hidden_size, self.num_cluster)
         clus.verbose = verbose
         clus.niter = niter
@@ -89,7 +91,12 @@ class UPTRec(nn.Module):
         self.itemnum=args.item_size
         self.args = args    
         self.item_embeddings = nn.Embedding(self.itemnum, args.hidden_size)
-            
+        if description_embedding is not None:
+            # Create an embedding layer initialized with the description_embedding tensor
+            self.description_embeddings = nn.Embedding.from_pretrained(
+                description_embedding, freeze=False  
+            )
+        self.transform_layer =nn.Linear(384,self.args.hidden_size)
         self.position_embeddings = nn.Embedding(args.max_seq_length, args.hidden_size)
         self.item_encoder = Encoder(args)
         self.LayerNorm = LayerNorm(args.hidden_size, eps=1e-12)
@@ -100,14 +107,18 @@ class UPTRec(nn.Module):
         self.apply(self.init_weights)
 
     # Positional Embedding
-    def add_position_embedding(self, sequence):
+    def add_position_embedding(self, sequence,description=None):
 
         seq_length = sequence.size(1)
         position_ids = torch.arange(seq_length, dtype=torch.long, device=sequence.device)
         position_ids = position_ids.unsqueeze(0).expand_as(sequence)
-        item_embeddings = self.item_embeddings(sequence)
-        if self.args.description:
+        
+        if description is not None:
+            item_embeddings = self.description_embeddings(sequence)
             item_embeddings = self.transform_layer(item_embeddings)
+        else:
+            item_embeddings = self.item_embeddings(sequence)
+
         position_embeddings = self.position_embeddings(position_ids)
         sequence_emb = item_embeddings + position_embeddings
         sequence_emb = self.LayerNorm(sequence_emb)
@@ -116,7 +127,7 @@ class UPTRec(nn.Module):
         return sequence_emb
 
     # model same as SASRec
-    def forward(self, input_ids, args, cluster_id =None):
+    def forward(self, input_ids, args, cluster_id =None, description=None):
         
         attention_mask = (input_ids > 0).long()
         extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)  # torch.int64
@@ -133,7 +144,7 @@ class UPTRec(nn.Module):
         extended_attention_mask = extended_attention_mask.to(dtype=next(self.parameters()).dtype)  # fp16 compatibility
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
 
-        sequence_emb = self.add_position_embedding(input_ids)
+        sequence_emb = self.add_position_embedding(input_ids,description)
         
         item_encoded_layers = self.item_encoder(sequence_emb, extended_attention_mask,args,cluster_id, output_all_encoded_layers=True)
 
