@@ -150,7 +150,7 @@ class PCLoss(nn.Module):
         self.criterion = NCELoss(args,temperature, device)
        
 
-    def forward(self,level,batch_sample_one, batch_sample_two, intents, intent_ids):
+    def forward(self,level,batch_sample_one, batch_sample_two, intents, intent_ids,temperature):
         """
         features: 
         intents: num_clusters x batch_size x hidden_dims
@@ -161,19 +161,34 @@ class PCLoss(nn.Module):
 
         if self.args.contrast_type in ['Item-level', 'Item-User','Item-description'] and level =='item':
             
-            pos_one_compare_loss = self.criterion(level,batch_sample_one, intents, intent_ids=intent_ids)
-            pos_two_compare_loss = self.criterion(level,batch_sample_two, intents, intent_ids=intent_ids)
+            # for batch_one, batch_two, intent, intent_id,density in zip(batch_sample_one, batch_sample_two,intents, intent_ids,temperature):
+            #     # batch_one, batch_two [C x E]
+            #     # intent [C x E]
+            #     # intent_id [C]
+                
+            #     pos_one_item_compare_loss = self.criterion(level,batch_one, intent, intent_ids=intent_id,density=density)
+            #     pos_two_item_compare_loss = self.criterion(level,batch_two, intent, intent_ids=intent_id,density=density)
+
+            #     mean_pcl_loss += pos_one_item_compare_loss
+            #     mean_pcl_loss += pos_two_item_compare_loss
+
+            # mean_pcl_loss /= 2 * len(intent_ids)
+                                
+            pos_one_compare_loss = self.criterion(level,batch_sample_one, intents, intent_ids=intent_ids,density = temperature)
+            pos_two_compare_loss = self.criterion(level,batch_sample_two, intents, intent_ids=intent_ids,density = temperature)
             mean_pcl_loss += pos_one_compare_loss
             mean_pcl_loss += pos_two_compare_loss
-
-            mean_pcl_loss /= 2 * len(intents)
+            
+            # mean_pcl_loss /= 2 * len(intents)
+            mean_pcl_loss /= 2 * int(self.args.num_intent_clusters)
 
         else:
             # do de-noise
             if intent_ids is not None:
+        
                 for intent, intent_id in zip(intents, intent_ids):
-                    # intent 512 x 3200
-                    # intent_id 512
+                    # intent [B x C*E] - Centroid for Prototype
+                    # intent_id 512 [B] - Prototype for each User
                     
                     pos_one_compare_loss = self.criterion(level, batch_sample_one, intent, intent_id)
                     pos_two_compare_loss = self.criterion(level, batch_sample_two, intent, intent_id)
@@ -205,7 +220,7 @@ class NCELoss(nn.Module):
         self.cossim = nn.CosineSimilarity(dim=-1).to(self.device)
 
     # #modified based on impl: https://github.com/ae-foster/pytorch-simclr/blob/dc9ac57a35aec5c7d7d5fe6dc070a975f493c1a5/critic.py#L5
-    def forward(self, level, batch_sample_one, batch_sample_two, intent_ids=None):
+    def forward(self, level, batch_sample_one, batch_sample_two, intent_ids=None,density=None):
         # sim11 = self.cossim(batch_sample_one.unsqueeze(-2), batch_sample_one.unsqueeze(-3)) / self.temperature
         # sim22 = self.cossim(batch_sample_two.unsqueeze(-2), batch_sample_two.unsqueeze(-3)) / self.temperature
         # sim12 = self.cossim(batch_sample_one.unsqueeze(-2), batch_sample_two.unsqueeze(-3)) / self.temperature
@@ -217,43 +232,50 @@ class NCELoss(nn.Module):
         
         if self.args.contrast_type in ['Item-User','Item-level', 'Item-description'] and level == 'item':
             
-            sim11 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_one) / self.temperature
-            sim22 = torch.einsum('bij,bkj->bik', batch_sample_two, batch_sample_two) / self.temperature
-            sim12 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_two) / self.temperature
+            # sim11 = torch.matmul(batch_sample_one, batch_sample_one.T) / density.view(-1,1) # self.temperature
+            # sim22 = torch.matmul(batch_sample_two, batch_sample_two.T) / density.view(-1,1) # self.temperature
+            # sim12 = torch.matmul(batch_sample_one, batch_sample_two.T) / density.view(-1,1) # self.temperature
+
+            sim11 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_one) / density.unsqueeze(-1) #self.temperature
+            sim22 = torch.einsum('bij,bkj->bik', batch_sample_two, batch_sample_two) / density.unsqueeze(-1) #self.temperature
+            sim12 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_two) / density.unsqueeze(-1) #self.temperature
 
             batch_size, max_seq, _ = sim11.shape
-
+            # d = sim12.shape[-1]
             # Mask out self-contrast (diagonal elements) and same-intent pairs if intent_ids is provided
             if intent_ids is not None:
                 intent = intent_ids.unsqueeze(-1)
-                mask = torch.eq(intent,intent.transpose(1,2)).long().to(self.device)
-                
+                mask_11_22 = torch.eq(intent,intent.transpose(1,2)).long().to(self.device)
+                # mask_11_22 = torch.eq(intent,intent.T).long().to(self.device)
                 # mask = torch.eq(intent_ids, intent_ids.T).long().to(self.device)
                 
-                sim11[mask == 1] = float('-inf')
-                sim22[mask == 1] = float('-inf')
+                sim11[mask_11_22 == 1] = float('-inf')
+                sim22[mask_11_22 == 1] = float('-inf')
                 eye_metrix = torch.eye(max_seq, dtype=torch.long).repeat(batch_size,1,1).to(self.device)
+                # eye_metrix = torch.eye(d, dtype=torch.long).to(self.device)
 
-                mask[eye_metrix == 1] = 0
-                sim12[mask == 1] = float("-inf")
-
+                # mask[eye_metrix == 1] = 0
+                mask_11_22[eye_metrix == 1] = 0
+                sim12[mask_11_22 == 1] = float("-inf")
 
             else:
-                mask = torch.eye(max_seq, dtype=torch.long).repeat(batch_size,1,1).to(self.device)
+                mask = torch.eye(d, dtype=torch.long).to(self.device)
                 sim11[mask == 1] = float("-inf")
-
+            
             raw_scores1 = torch.cat([sim12, sim11], dim=-1) # positive
-            raw_scores2 = torch.cat([sim22,sim12],dim=-1) # negative
+            raw_scores2 = torch.cat([sim22, sim12.transpose(-1, -2)], dim=-1) # negative
+            # raw_scores2 = torch.cat([sim22,sim12],dim=-1) # negative
 
             logits = torch.cat([raw_scores1, raw_scores2], dim=-2)
 
-            # logits = torch.cat([sim12, sim11, sim22], dim=-1)
+            # logits = torch.cat([sim12, sim11, sim22], dim=-2)
 
             labels = torch.arange(2 * max_seq, dtype=torch.long, device=logits.device)
             labels = labels.unsqueeze(0).repeat(batch_size, 1) 
 
 
         else:
+            
             sim11 = torch.matmul(batch_sample_one, batch_sample_one.T) / self.temperature
             sim22 = torch.matmul(batch_sample_two, batch_sample_two.T) / self.temperature
             sim12 = torch.matmul(batch_sample_one, batch_sample_two.T) / self.temperature
@@ -408,7 +430,7 @@ class Clustered_Attention_Chunking(nn.Module):
             # output = self_attention_output * 0.7 + output * 0.3
             # output = self.LayerNorm(output + seq)
             # output = nn.Softmax(dim=1)(output)
-            output = self.LayerNorm(self_attention_output * 0.7 + output * 0.3)
+            output = self_attention_output * 0.7 + output * 0.3
 
         # sorted_attention_map = attention_prob[reverse_indices]
         

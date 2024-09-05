@@ -11,7 +11,7 @@ from tqdm import tqdm
 import copy
 
 class KMeans(object):
-    def __init__(self, num_cluster, seed, hidden_size, niter, gpu_id=0, device="cpu"):
+    def __init__(self, num_cluster, seed, hidden_size, niter,temperature, gpu_id=0, device="cpu"):
         """
         Args:
             k: number of clusters
@@ -24,6 +24,7 @@ class KMeans(object):
         self.device = device
         self.first_batch = True
         self.hidden_size = hidden_size
+        self.temperature = temperature
         self.niter = niter
         self.clus, self.index = self.__init_cluster(self.hidden_size)
         self.centroids = [] 
@@ -80,8 +81,30 @@ class KMeans(object):
         D, I = self.index.search(x, 1)  # for each sample, find cluster distance and assignments
         seq2cluster = [int(n[0]) for n in I]
         # print("cluster number:", self.num_cluster,"cluster in batch:", len(set(seq2cluster)))
+
+        ### code for Density ###
+        # https://github.com/salesforce/PCL/blob/master/main_pcl.py#L406
+        Dcluster = [[] for c in range(self.num_cluster)]
+        for im,i in enumerate(seq2cluster):
+            Dcluster[i].append(D[im][0])
+        
+        density = np.zeros(self.num_cluster)
+        for i,dist in enumerate(Dcluster):
+            if len(dist)>1:
+                d = (np.asarray(dist)**0.5).mean()/np.log(len(dist)+10)            
+                density[i] = d   
+        
+         #if cluster only has one point, use the max to estimate its concentration 
+        dmax = density.max()
+        for i,dist in enumerate(Dcluster):
+            if len(dist)<=1:
+                density[i] = dmax 
+        density = density.clip(np.percentile(density,10),np.percentile(density,90)) #clamp extreme values for stability
+        density = self.temperature*density/density.mean()  #scale the mean to temperature 
+        density = torch.Tensor(density).to(self.device)
+        
         seq2cluster = torch.LongTensor(seq2cluster).to(self.device)
-        return seq2cluster, self.centroids[seq2cluster]
+        return seq2cluster, self.centroids[seq2cluster],density[seq2cluster]
 
     
 class UPTRec(nn.Module):
