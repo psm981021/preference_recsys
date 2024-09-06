@@ -38,6 +38,7 @@ class Trainer:
         self.model = model
 
         self.num_intent_clusters = [int(i) for i in self.args.num_intent_clusters.split(",")]
+        self.num_user_intent_clusters = [int(i) for i in self.args.num_user_intent_clusters.split(",")]
 
         self.item_clusters =[]
         for num_intent_cluster in self.num_intent_clusters:
@@ -67,7 +68,7 @@ class Trainer:
 
 
         self.clusters = []
-        for num_intent_cluster in self.num_intent_clusters:
+        for num_intent_cluster in self.num_user_intent_clusters:
             # initialize Kmeans
             if self.args.seq_representation_type == "mean":
                 cluster = KMeans(
@@ -417,7 +418,7 @@ class UPTRecTrainer(Trainer):
         return cl_loss
 
 
-    def _pcl_one_pair_contrastive_learning(self, inputs, intents, intent_ids, temperature):
+    def _pcl_one_pair_contrastive_learning(self, inputs, intents, intent_ids, temperature=None):
         """
         contrastive learning given one pair sequences (batch)
         inputs: [batch1_augmented_data, batch2_augmentated_data]
@@ -427,7 +428,8 @@ class UPTRecTrainer(Trainer):
         n_views, (bsz, seq_len) = len(inputs), inputs[0].shape
         cl_batch = torch.cat(inputs, dim=0)
         cl_batch = cl_batch.to(self.device)
-        prototype_density = temperature[0].view(self.args.batch_size, -1)
+        if temperature is not None:
+            prototype_density = temperature[0].view(self.args.batch_size, -1)
 
         cl_sequence_output = self.model(cl_batch,self.args)
        
@@ -440,7 +442,10 @@ class UPTRecTrainer(Trainer):
         
         #PCLoss
         if self.args.de_noise:
-            cl_loss = self.pcl_criterion('user',cl_output_slice[0], cl_output_slice[1], intents=intents, intent_ids=intent_ids, temperature = prototype_density)
+            if temperature is not None:
+                cl_loss = self.pcl_criterion('user',cl_output_slice[0], cl_output_slice[1], intents=intents, intent_ids=intent_ids, temperature = prototype_density)
+            else:
+                cl_loss = self.pcl_criterion('user',cl_output_slice[0], cl_output_slice[1], intents=intents, intent_ids=intent_ids)
             
         else:
             cl_loss = self.pcl_criterion('user', cl_output_slice[0], cl_output_slice[1], intents=intents, intent_ids=None)
@@ -452,39 +457,8 @@ class UPTRecTrainer(Trainer):
 
         # Setting the tqdm progress bar
         if train:
-            # ------------ item clustering ------------ #
-            
-            # print("[Train] Prepare Item Clustering")
-            # self.model.eval()
-            # kmeans_training_data = []
-            
-            # item_iter = tqdm(enumerate(item_dataloader), total=len(item_dataloader))
-            # for i, id in item_iter:
-            #     id_ = torch.stack([t.to(self.device) for t in id], dim=0)
-                
-            #     sequence_output = self.model.item_embeddings(id_)
-            #     if self.args.seq_representation_type == "mean":
-            #         sequence_output = torch.mean(sequence_output, dim=-1, keepdim=False)
-
-            #     sequence_output = sequence_output.view(sequence_output.shape[0], -1).detach().cpu().numpy()# B hidden
-        
-            #     kmeans_training_data.append(sequence_output)
-
-            # kmeans_training_data = np.concatenate(kmeans_training_data, axis=0) #[* hidden]
-
-            # # train multiple clusters
-            # print("[Train] Training Item Clusters:")
-            # if epoch % self.args.cluster_train ==0:
-            #     for i, cluster in tqdm(enumerate(self.item_clusters), total=len(self.item_clusters)):
-            #         cluster.train(kmeans_training_data)
-            #         self.item_clusters[i] = cluster
-                
-            # # clean memory
-            # del kmeans_training_data
-            # import gc
-
             # ------ intentions clustering ----- #
-            if self.args.contrast_type in ["IntentCL", "Hybrid","Item-User","Item-level","Item-description","None"] and epoch % self.args.cluster_train ==0 :
+            if self.args.contrast_type in ["IntentCL", "Hybrid","Item-User","Item-level","Item-description","User","None"] and epoch % self.args.cluster_train ==0 :
                 print("[Train] Preparing User,Item Clustering:")
                 self.model.eval()
                 kmeans_training_data = []
@@ -502,7 +476,7 @@ class UPTRecTrainer(Trainer):
 
                     # average sum
                     if self.args.seq_representation_type == "mean":
-                        sequence_output = torch.mean(sequence_output, dim=1, keepdim=False)
+                        sequence_output = torch.mean(sequence_output, dim=-1)
                     
                     sequence_context = sequence_output.view(self.args.batch_size*self.args.max_seq_length,-1).detach().cpu().numpy()
                     sequence_output = sequence_output.view(self.args.batch_size,-1).detach().cpu().numpy()
@@ -675,10 +649,10 @@ class UPTRecTrainer(Trainer):
 
                         if epoch > self.args.warm_up_epoches:
                             
-                            # cl_loss1 = self._instance_cl_one_pair_contrastive_learning(
-                            #         cl_batch, intent_ids=seq_class_label_batches
-                            #     )
-                            # cl_losses.append(self.args.cf_weight * cl_loss1)
+                            cl_loss1 = self._instance_cl_one_pair_contrastive_learning(
+                                    cl_batch, intent_ids=seq_class_label_batches
+                                )
+                            cl_losses.append(self.args.cf_weight * cl_loss1)
 
                             sequence_output = recommendation_output.view(recommendation_output.shape[0]*self.args.max_seq_length, -1).detach().cpu().numpy()
                             for cluster in self.item_clusters:
@@ -696,29 +670,15 @@ class UPTRecTrainer(Trainer):
                             
                             cl_losses.append(self.args.intent_cf_weight * cl_loss3)
 
-                    elif self.args.contrast_type == "Item-User":
 
-                        
-                        if self.args.seq_representation_type == "mean":
-                            sequence_output = torch.mean(recommendation_output, dim=-1, keepdim=False)
-                        
-                        # sequence_output = recommendation_output.view(recommendation_output.shape[0]*self.args.max_seq_length, -1).detach().cpu().numpy()
-                        
-                        # for cluster in self.item_clusters:
-                        #     seq2intents = []
-                        #     intent_ids = []
-                        #     intent_id, seq2intent,density = cluster.query(sequence_output)
-                        #     seq2intents.append(seq2intent)
-                        #     intent_ids.append(intent_id)
+                    elif self.args.contrast_type == "User":
+                        cl_loss1 = self._instance_cl_one_pair_contrastive_learning(
+                                cl_batch, intent_ids=seq_class_label_batches
+                            )
+                        cl_losses.append(self.args.cf_weight * cl_loss1)
 
-                        # cl_loss4 = self.pcl_item_pair_contrastive_learning(
-                        #         cl_batch, intents=seq2intents, intent_ids=intent_ids,temperature = densitys
-                        # )
-                        # cl_losses.append(self.args.intent_cf_weight * cl_loss4)
+                        sequence_output = recommendation_output.view(recommendation_output.shape[0], -1).detach().cpu().numpy()
 
-                        # sequence_output = recommendation_output.view(recommendation_output.shape[0], -1).detach().cpu().numpy()
-
-                        # query on multiple clusters
                         for cluster in self.clusters:
                             seq2intents = []
                             intent_ids = []
@@ -730,10 +690,56 @@ class UPTRecTrainer(Trainer):
                             densitys.append(density)
 
                         cl_loss3 = self._pcl_one_pair_contrastive_learning(
-                            cl_batch, intents=seq2intents, intent_ids=intent_ids
+                            cl_batch, intents=seq2intents, intent_ids=intent_ids,temperature = densitys
                         )
-                        cl_losses.append(self.args.intent_cf_weight * cl_loss3 * 2)
+                        cl_losses.append(self.args.intent_cf_user_weight * cl_loss3)
 
+
+                    elif self.args.contrast_type == "Item-User":
+
+                        if self.args.seq_representation_type == "mean":
+                            sequence_output = torch.mean(recommendation_output, dim=-1, keepdim=False)
+
+                        cl_loss1 = self._instance_cl_one_pair_contrastive_learning(
+                                cl_batch, intent_ids=seq_class_label_batches
+                            )
+                        cl_losses.append(self.args.cf_weight * cl_loss1)
+
+                        sequence_output = recommendation_output.view(recommendation_output.shape[0], -1).detach().cpu().numpy()
+
+                        for cluster in self.clusters:
+                            seq2intents = []
+                            intent_ids = []
+                            densitys = []
+                            intent_id, seq2intent, density = cluster.query(sequence_output)
+
+                            seq2intents.append(seq2intent)
+                            intent_ids.append(intent_id)
+                            densitys.append(density)
+
+                        cl_loss3 = self._pcl_one_pair_contrastive_learning(
+                            cl_batch, intents=seq2intents, intent_ids=intent_ids, temperature = densitys
+                        )
+                        cl_losses.append(self.args.intent_cf_user_weight * cl_loss3)
+
+
+                        sequence_output = recommendation_output.view(recommendation_output.shape[0]*self.args.max_seq_length, -1).detach().cpu().numpy()
+
+                        for cluster in self.item_clusters:
+                            seq2intents = []
+                            intent_ids = []
+                            densitys = []
+                            intent_id, seq2intent, density = cluster.query(sequence_output)
+
+                            seq2intents.append(seq2intent)
+                            intent_ids.append(intent_id)
+                            densitys.append(density)
+
+                        cl_loss4 = self.pcl_item_pair_contrastive_learning(
+                            cl_batch, intents=seq2intents, intent_ids=intent_ids, temperature = densitys
+                        )
+                        cl_losses.append(self.args.intent_cf_weight * cl_loss4)
+                        
 
                     elif self.args.contrast_type == "Item-description":
                         if epoch > self.args.warm_up_epoches:
@@ -780,7 +786,7 @@ class UPTRecTrainer(Trainer):
 
 
                 joint_loss = self.args.rec_weight * rec_loss
-                if self.args.contrast_type in ["IntentCL", "Hybrid", "Item-level","Item-User","Item-description"]:
+                if self.args.contrast_type in ["IntentCL", "Hybrid", "Item-level","Item-User","Item-description","User"]:
                     for cl_loss in cl_losses:
                         joint_loss += cl_loss
 
@@ -790,7 +796,7 @@ class UPTRecTrainer(Trainer):
                 self.optim.step()
 
                 rec_avg_loss += rec_loss.item()
-                if self.args.contrast_type in ["IntentCL", "Hybrid", "Item-level","Item-User","Item-description"]:
+                if self.args.contrast_type in ["IntentCL", "Hybrid", "Item-level","Item-User","Item-description","User"]:
                     for i, cl_loss in enumerate(cl_losses):
                         cl_sum_avg_loss += cl_loss.item()
 
@@ -822,7 +828,7 @@ class UPTRecTrainer(Trainer):
                 if self.args.wandb == True:
                     wandb.log({'rec_avg_loss':rec_avg_loss / len(rec_cf_data_iter)}, step=epoch)
                 
-            elif self.args.contrast_type in ["Hybrid","IntentCL","Item-level","Item-User","Item-description"]:
+            elif self.args.contrast_type in ["Hybrid","IntentCL","Item-level","Item-User","Item-description","User"]:
 
                 post_fix = {
                     "epoch": epoch,
@@ -855,7 +861,7 @@ class UPTRecTrainer(Trainer):
             pred_list = None
             if full_sort:
                 if test:
-                    if self.args.contrast_type in ["IntentCL", "Hybrid","Item-User","Item-level"] and self.args.cluster_valid == False:
+                    if self.args.contrast_type in ["IntentCL", "Hybrid","Item-User","Item-level","User"] and self.args.cluster_valid == False:
                         print("[Test] Prepare Item,User Clustering")
 
                         kmeans_training_data = []

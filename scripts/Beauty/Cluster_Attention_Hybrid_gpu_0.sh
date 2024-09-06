@@ -2,28 +2,32 @@
 python main.py \
     --model_name UPTRec \
     --data_name Beauty  \
-    --output_dir renew_log/Beauty/Cluster-Attention-16-1-concatenate/\
-    --contrast_type Hybrid  \
     --context encoder \
     --seq_representation_type concatenate \
     --attention_type Cluster \
+    --cluster_joint \
+    --de_noise \
     --batch_size 512 \
     --epochs 2000 \
-    --patience 200 \
-    --warm_up_epoches 0 \
-    --num_intent_clusters 16 \
-    --intent_cf_weight 0.1 \
-    --cf_weight 0.1 \
-    --num_hidden_layers 1 \
-    --model_idx Cluster-Attention-0.1 \
     --gpu_id 0 \
-    --embedding \
     --visualization_epoch 10 \
-    --temperature=1 \
-    --cluster_valid \ 
-    --wandb
+    --patience 30 \
+    --embedding \
+    --output_dir output/Beauty/Item_level/tests\
+    --model_idx asdr \
+    --contrast_type Item-level \
+    --augment_type mask \
+    --n_views 3 \
+    --cluster_train 1 \
+    --warm_up_epoches 0\
+    --num_intent_clusters 10 \
+    --intent_cf_weight 0.01 \
+    --cf_weight 1 \
+    --num_hidden_layers 2 \
+    --gamma 0.3 \
+    --num_user_intent_clusters 256 \
+    --intent_cf_user_weight 0.9 \
+    --temperature 1 \
+    --de_noise
 
 # scripts/Beauty/Cluster_Attention_Hybrid_gpu_0.sh
-# --temperature=0.1 \
-# --num_hidden_layers 2 \
-# --cluster_train 1 

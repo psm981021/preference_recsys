@@ -150,7 +150,7 @@ class PCLoss(nn.Module):
         self.criterion = NCELoss(args,temperature, device)
        
 
-    def forward(self,level,batch_sample_one, batch_sample_two, intents, intent_ids,temperature):
+    def forward(self,level,batch_sample_one, batch_sample_two, intents, intent_ids,temperature=None):
         """
         features: 
         intents: num_clusters x batch_size x hidden_dims
@@ -195,15 +195,18 @@ class PCLoss(nn.Module):
                     mean_pcl_loss += pos_one_compare_loss
                     mean_pcl_loss += pos_two_compare_loss
                 mean_pcl_loss /= 2 * len(intents)
+                
+
             # don't do de-noise
             else:
                 for intent in intents:
                     
-                    pos_one_compare_loss = self.criterion(batch_sample_one, intent, intent_ids=None)
-                    pos_two_compare_loss = self.criterion(batch_sample_two, intent, intent_ids=None)
+                    pos_one_compare_loss = self.criterion(level,batch_sample_one, intent, intent_ids=None)
+                    pos_two_compare_loss = self.criterion(level,batch_sample_two, intent, intent_ids=None)
                     mean_pcl_loss += pos_one_compare_loss
                     mean_pcl_loss += pos_two_compare_loss
                 mean_pcl_loss /= 2 * len(intents)
+            
         return mean_pcl_loss
 
 class NCELoss(nn.Module):
@@ -308,7 +311,6 @@ class NCELoss(nn.Module):
             logits = torch.cat([raw_scores1, raw_scores2], dim=-2)
             labels = torch.arange(2 * d, dtype=torch.long, device=logits.device)
         
-
         nce_loss = self.criterion(logits, labels)
         return nce_loss
     
@@ -372,65 +374,66 @@ class Clustered_Attention_Chunking(nn.Module):
             item_id = cluster_id[0].reshape(self.args.batch_size,C)
         
         if self.args.cluster_joint:
-            self_attention_output = self.attention(seq,attention_mask)
+            self_attention_output,cluster_attention_output = self.attention(seq,attention_mask,item_id)
+            output = self_attention_output * (1-self.args.cluster_value) + cluster_attention_output * self.args.cluster_value
 
-        #### cluster attention on item cluster ####
-        sorted_indices = torch.argsort(item_id, dim=1)
+        # #### cluster attention on item cluster ####
+        # sorted_indices = torch.argsort(item_id, dim=1)
 
-        sorted_indices_seq = sorted_indices.unsqueeze(-1).expand(-1, -1, seq.size(-1))
-        seq_sorted = torch.gather(seq, dim=1, index=sorted_indices_seq)
+        # sorted_indices_seq = sorted_indices.unsqueeze(-1).expand(-1, -1, seq.size(-1))
+        # seq_sorted = torch.gather(seq, dim=1, index=sorted_indices_seq)
 
-        sorted_indices_attn = sorted_indices.unsqueeze(1).unsqueeze(-1).expand(-1, 1, -1, attention_mask.size(-1))
-        sorted_attention_mask = torch.gather(attention_mask, dim=2, index=sorted_indices_attn)
-        sorted_attention_mask = torch.gather(sorted_attention_mask, dim=3, index=sorted_indices_attn)
+        # sorted_indices_attn = sorted_indices.unsqueeze(1).unsqueeze(-1).expand(-1, 1, -1, attention_mask.size(-1))
+        # sorted_attention_mask = torch.gather(attention_mask, dim=2, index=sorted_indices_attn)
+        # sorted_attention_mask = torch.gather(sorted_attention_mask, dim=3, index=sorted_indices_attn)
 
-        attention_outputs = []
-        attention_probs =[] 
-        for i in range(int(self.args.num_intent_clusters)):
+        # attention_outputs = []
+        # attention_probs =[] 
+        # for i in range(int(self.args.num_intent_clusters)):
 
-            #use chunking
-            start_idx = i * chunk_size
-            end_idx = min((i + 1) * chunk_size, N)
+        #     #use chunking
+        #     start_idx = i * chunk_size
+        #     end_idx = min((i + 1) * chunk_size, N)
 
-            key_start_idx = max((i - 1) * chunk_size, 0)
-            key_end_idx = min(((i + 1) * chunk_size if i > 1 else 2*chunk_size), N)
+        #     key_start_idx = max((i - 1) * chunk_size, 0)
+        #     key_end_idx = min(((i + 1) * chunk_size if i > 1 else 2*chunk_size), N)
         
-            query_chunk_seq = seq_sorted[:,start_idx:end_idx, :]
-            key_chunk_seq = seq_sorted[:,key_start_idx:key_end_idx, :]
+        #     query_chunk_seq = seq_sorted[:,start_idx:end_idx, :]
+        #     key_chunk_seq = seq_sorted[:,key_start_idx:key_end_idx, :]
 
-            chunk_seq = seq_sorted[:,start_idx:end_idx, :]
+        #     chunk_seq = seq_sorted[:,start_idx:end_idx, :]
             
-            chunk_attention_mask_ = attention_mask[:,:,start_idx:end_idx,start_idx:end_idx]
+        #     chunk_attention_mask_ = attention_mask[:,:,start_idx:end_idx,start_idx:end_idx]
 
             
-            if self.args.vanilla_attention == True:
+        #     if self.args.vanilla_attention == True:
                 
-                attention_output  = self.attention(query_chunk_seq, chunk_attention_mask_, key_chunk_seq)
-            else:
-                attention_output = self.attention(chunk_seq,chunk_attention_mask_)
+        #         attention_output  = self.attention(query_chunk_seq, chunk_attention_mask_, key_chunk_seq)
+        #     else:
+        #         attention_output = self.attention(chunk_seq,chunk_attention_mask_)
             
-            attention_outputs.append(attention_output)
-            # attention_probs.append(attention_prob)
+        #     attention_outputs.append(attention_output)
+        #     # attention_probs.append(attention_prob)
 
-        outputs = torch.cat(attention_outputs, dim=1)
-        # attention_prob_ = torch.cat(attention_probs, dim=1)
+        # outputs = torch.cat(attention_outputs, dim=1)
+        # # attention_prob_ = torch.cat(attention_probs, dim=1)
     
-        # concat after attention
-        reverse_indices = torch.argsort(sorted_indices, dim=1)
-        reverse_indices_expanded = reverse_indices.unsqueeze(-1).expand(-1, -1, outputs.size(-1))
+        # # concat after attention
+        # reverse_indices = torch.argsort(sorted_indices, dim=1)
+        # reverse_indices_expanded = reverse_indices.unsqueeze(-1).expand(-1, -1, outputs.size(-1))
         
-        output = torch.gather(outputs, dim=1, index=reverse_indices_expanded)
-        if self.args.softmax:
+        # output = torch.gather(outputs, dim=1, index=reverse_indices_expanded)
+        # if self.args.softmax:
             
-            output = nn.Softmax(dim=1)(output)
+        #     output = nn.Softmax(dim=1)(output)
 
-        if self.args.cluster_joint:
-            # output = nn.Softmax(dim=1)(output)
-            # output = self.LayerNorm(output + seq)
-            # output = self_attention_output * 0.7 + output * 0.3
-            # output = self.LayerNorm(output + seq)
-            # output = nn.Softmax(dim=1)(output)
-            output = self_attention_output * 0.7 + output * 0.3
+        # if self.args.cluster_joint:
+        #     # output = nn.Softmax(dim=1)(output)
+        #     # output = self.LayerNorm(output + seq)
+        #     # output = self_attention_output * 0.7 + output * 0.3
+        #     # output = self.LayerNorm(output + seq)
+        #     # output = nn.Softmax(dim=1)(output)
+        #     output = self_attention_output * 0.7 + output * 0.3
 
         # sorted_attention_map = attention_prob[reverse_indices]
         
@@ -465,7 +468,7 @@ class SelfAttention(nn.Module):
         x = x.view(*new_x_shape)
         return x.permute(0, 2, 1, 3)
 
-    def forward(self, input_tensor, attention_mask, key_chunk =None):
+    def forward(self, input_tensor, attention_mask, intent_id = None, key_chunk =None):
         
         if key_chunk is not None:
             mix_query = self.query(input_tensor)
@@ -482,6 +485,7 @@ class SelfAttention(nn.Module):
             expanded_attention_mask = torch.cat([attention_mask, zero_tensor], dim=-1)
 
             attention_scores = attention_score + expanded_attention_mask
+            
             
         else:
             mixed_query_layer = self.query(input_tensor)
@@ -501,6 +505,28 @@ class SelfAttention(nn.Module):
             # [batch_size 1 1 seq_len]
             
             attention_scores = attention_scores + attention_mask
+            
+            if intent_id is not None:
+                
+                intent_id = intent_id.unsqueeze(-1)
+                mask = torch.eq(intent_id,intent_id.transpose(1,2)).long().unsqueeze(1)#.to(self.device)
+                mask = mask.repeat(1, attention_scores.shape[1], 1, 1) 
+                cluster_attention_output = attention_scores.masked_fill(mask == 0, float('-inf'))
+
+                # Normalize the attention scores to probabilities.
+                attention_probs = nn.Softmax(dim=-1)(cluster_attention_output)
+                # This is actually dropping out entire tokens to attend to, which might
+                # seem a bit unusual, but is taken from the original Transformer paper.
+                # Fixme
+                attention_probs = self.attn_dropout(attention_probs)
+                context_layer = torch.matmul(attention_probs, value_layer)
+                context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
+                new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
+                context_layer = context_layer.view(*new_context_layer_shape)
+                hidden_states = self.dense(context_layer)
+                hidden_states = self.out_dropout(hidden_states)
+                
+                hidden_states_cluster = self.LayerNorm(hidden_states + input_tensor)
 
         # Normalize the attention scores to probabilities.
         attention_probs = nn.Softmax(dim=-1)(attention_scores)
@@ -519,7 +545,10 @@ class SelfAttention(nn.Module):
             
         attention_map = torch.mean(attention_probs, dim=1) 
         
-        return hidden_states
+        if intent_id is not None:
+            return hidden_states, hidden_states_cluster
+        else:
+            return hidden_states
 
 class Intermediate(nn.Module):
     def __init__(self, args):

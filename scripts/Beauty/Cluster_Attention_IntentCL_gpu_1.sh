@@ -1,34 +1,33 @@
-for augment_type in mask
-do
-    for gamma in 0.7
-    do
-        python main.py \
-            --model_name="UPTRec" \
-            --data_name="Beauty"  \
-            --output_dir="output_custom/Beauty/Cluster_Attention_IntentCL/K(16)-R(200)" \
-            --contrast_type="IntentCL" \
-            --context="item_embedding" \
-            --seq_representation_type="concatenate" \
-            --attention_type="Cluster" \
-            --augment_type=$augment_type \
-            --gamma=$gamma \
-            --batch_size=512 \
-            --gpu_id=1 \
-            --n_views=3 \
-            --rec_weight=1.5 \
-            --epochs=4000 \
-            --intent_cf_weight=0.5 \
-            --temperature=0.1 \
-            --patience=500 \
-            --embedding \
-            --attention_map \
-            --warm_up_epoches=200 \
-            --num_intent_clusters=16 \
-            --visualization_epoch=100 \
-            --cluster_train=200 \
-            --user_list=[] \
-            --wandb \
-            --model_idx="UPTRec_Clustered_Attention_IntentCL_${augment_type}_${gamma}_K(16)_R(200)"
 
-    done
-done
+python main.py \
+    --model_name UPTRec \
+    --data_name Beauty  \
+    --context encoder \
+    --seq_representation_type concatenate \
+    --attention_type Cluster \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 512 \
+    --epochs 2000 \
+    --gpu_id 0 \
+    --visualization_epoch 10 \
+    --patience 40 \
+    --embedding \
+    --output_dir output/Beauty/Item_level/V_CL_46\
+    --model_idx V_CL_45 \
+    --contrast_type User \
+    --augment_type mask \
+    --n_views 3 \
+    --cluster_train 1 \
+    --warm_up_epoches 0\
+    --num_intent_clusters 10 \
+    --intent_cf_weight 0.1 \
+    --cf_weight 0.1 \
+    --num_hidden_layers 2 \
+    --gamma 0.3 \
+    --num_user_intent_clusters 256 \
+    --intent_cf_user_weight 0.1 \
+    --temperature 1 \
+    --de_noise
+
+# scripts/Beauty/Cluster_Attention_IntentCL_gpu_1.sh

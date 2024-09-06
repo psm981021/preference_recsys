@@ -130,6 +130,13 @@ def main():
                         IntentCL or Hybrid types.",
     )
     parser.add_argument(
+        "--num_user_intent_clusters",
+        default="256",
+        type=str,
+        help="Number of cluster of intents. Activated only when using \
+                        IntentCL or Hybrid types.",
+    )
+    parser.add_argument(
         "--seq_representation_type",
         default="mean",
         type=str,
@@ -168,7 +175,9 @@ def main():
     parser.add_argument("--cf_weight", type=float, default=0.1, help="weight of contrastive learning task")
     parser.add_argument("--rec_weight", type=float, default=1.0, help="weight of contrastive learning task")
     parser.add_argument("--intent_cf_weight", type=float, default=0.1, help="weight of contrastive learning task")
-    parser.add_argument("--align_weight", type=float, default=0.01, help="weight of contrastive learning task")
+    parser.add_argument("--intent_cf_user_weight", type=float, default=0.1, help="weight of user-level contrastive learning task")
+    parser.add_argument("--align_weight", type=float, default=0.001, help="weight of contrastive learning task")
+    parser.add_argument("--cluster_value", type=float, default=0.1, help="value for cluster-attention joint learning")
 
     # learning related
     parser.add_argument("--weight_decay", type=float, default=0.0, help="weight_decay of adam")
