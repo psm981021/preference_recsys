@@ -9,19 +9,19 @@ python main.py \
     --de_noise \
     --batch_size 512 \
     --epochs 2000 \
-    --gpu_id 0 \
+    --gpu_id 1 \
     --visualization_epoch 20 \
     --patience 30 \
     --embedding \
-    --output_dir output/Beauty/Item_level/V_CL_48\
-    --model_idx V_CL_48\
+    --output_dir output/Beauty/Cluster_Attention/V2_CL_01\
+    --model_idx V2_CL_01\
     --contrast_type None \
-    --description \
-    --align_weight 0.0001 \
     --augment_type mask \
     --n_views 3 \
     --cluster_train 1 \
     --warm_up_epoches 0\
+    --cluster_attention_type 0 \
+    --cluster_value 0.7 \
     --num_intent_clusters 200 \
     --intent_cf_weight 0.01 \
     --cf_weight 1 \

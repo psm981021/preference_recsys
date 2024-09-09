@@ -235,14 +235,14 @@ class NCELoss(nn.Module):
         
         if self.args.contrast_type in ['Item-User','Item-level', 'Item-description'] and level == 'item':
             
-            # sim11 = torch.matmul(batch_sample_one, batch_sample_one.T) / density.view(-1,1) # self.temperature
-            # sim22 = torch.matmul(batch_sample_two, batch_sample_two.T) / density.view(-1,1) # self.temperature
-            # sim12 = torch.matmul(batch_sample_one, batch_sample_two.T) / density.view(-1,1) # self.temperature
-
-            sim11 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_one) / density.unsqueeze(-1) #self.temperature
-            sim22 = torch.einsum('bij,bkj->bik', batch_sample_two, batch_sample_two) / density.unsqueeze(-1) #self.temperature
-            sim12 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_two) / density.unsqueeze(-1) #self.temperature
-
+            if density is not None:
+                sim11 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_one) / density.unsqueeze(-1) #self.temperature
+                sim22 = torch.einsum('bij,bkj->bik', batch_sample_two, batch_sample_two) / density.unsqueeze(-1) #self.temperature
+                sim12 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_two) / density.unsqueeze(-1) #self.temperature
+            else:
+                sim11 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_one) /  self.temperature
+                sim22 = torch.einsum('bij,bkj->bik', batch_sample_two, batch_sample_two) /  self.temperature
+                sim12 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_two) /  self.temperature
             batch_size, max_seq, _ = sim11.shape
             # d = sim12.shape[-1]
             # Mask out self-contrast (diagonal elements) and same-intent pairs if intent_ids is provided
@@ -365,77 +365,77 @@ class Clustered_Attention_Chunking(nn.Module):
         pass
 
     def forward(self, seq, attention_mask, cluster_id = None):
+
+        """
+        Supports 0 as Block-wise, concatenated Cluster attention C // K 
+        Supports 1 as using Mask for Cluster attention, for different Cluster-ID assign -inf'
+        
+        """
+        
         #chunking
         N,C,E = seq.shape
-        chunk_size = C // int(self.args.num_intent_clusters)
+        if int(self.args.num_intent_clusters) <= C:
+            chunk_size = C // int(self.args.num_intent_clusters)
+        else:
+            chunk_size = int(self.args.num_intent_clusters) // C
         try:
             item_id = cluster_id[0].reshape(N,C)
         except:
             item_id = cluster_id[0].reshape(self.args.batch_size,C)
-        
-        if self.args.cluster_joint:
-            self_attention_output,cluster_attention_output = self.attention(seq,attention_mask,item_id)
-            output = self_attention_output * (1-self.args.cluster_value) + cluster_attention_output * self.args.cluster_value
 
-        # #### cluster attention on item cluster ####
-        # sorted_indices = torch.argsort(item_id, dim=1)
 
-        # sorted_indices_seq = sorted_indices.unsqueeze(-1).expand(-1, -1, seq.size(-1))
-        # seq_sorted = torch.gather(seq, dim=1, index=sorted_indices_seq)
+        self_attention_output,cluster_attention_output = self.attention(seq,attention_mask,item_id)
 
-        # sorted_indices_attn = sorted_indices.unsqueeze(1).unsqueeze(-1).expand(-1, 1, -1, attention_mask.size(-1))
-        # sorted_attention_mask = torch.gather(attention_mask, dim=2, index=sorted_indices_attn)
-        # sorted_attention_mask = torch.gather(sorted_attention_mask, dim=3, index=sorted_indices_attn)
+        if self.args.cluster_attention_type == 0:
+            sorted_indices = torch.argsort(item_id, dim=1)
+            sorted_indices_seq = sorted_indices.unsqueeze(-1).expand(-1, -1, seq.size(-1))
+            seq_sorted = torch.gather(seq, dim=1, index=sorted_indices_seq)
 
-        # attention_outputs = []
-        # attention_probs =[] 
-        # for i in range(int(self.args.num_intent_clusters)):
+            sorted_indices_attn = sorted_indices.unsqueeze(1).unsqueeze(-1).expand(-1, 1, -1, attention_mask.size(-1))
+            sorted_attention_mask = torch.gather(attention_mask, dim=2, index=sorted_indices_attn)
+            sorted_attention_mask = torch.gather(sorted_attention_mask, dim=3, index=sorted_indices_attn)
 
-        #     #use chunking
-        #     start_idx = i * chunk_size
-        #     end_idx = min((i + 1) * chunk_size, N)
+            attention_outputs = []
+            attention_probs =[] 
+            for i in range(int(self.args.num_intent_clusters)):
 
-        #     key_start_idx = max((i - 1) * chunk_size, 0)
-        #     key_end_idx = min(((i + 1) * chunk_size if i > 1 else 2*chunk_size), N)
-        
-        #     query_chunk_seq = seq_sorted[:,start_idx:end_idx, :]
-        #     key_chunk_seq = seq_sorted[:,key_start_idx:key_end_idx, :]
+                #use chunking
+                start_idx = i * chunk_size
+                end_idx = min((i + 1) * chunk_size, N)
 
-        #     chunk_seq = seq_sorted[:,start_idx:end_idx, :]
+                key_start_idx = max((i - 1) * chunk_size, 0)
+                key_end_idx = min(((i + 1) * chunk_size if i > 1 else 2*chunk_size), N)
             
-        #     chunk_attention_mask_ = attention_mask[:,:,start_idx:end_idx,start_idx:end_idx]
+                query_chunk_seq = seq_sorted[:,start_idx:end_idx, :]
+                key_chunk_seq = seq_sorted[:,key_start_idx:key_end_idx, :]
 
-            
-        #     if self.args.vanilla_attention == True:
+                chunk_seq = seq_sorted[:,start_idx:end_idx, :]
                 
-        #         attention_output  = self.attention(query_chunk_seq, chunk_attention_mask_, key_chunk_seq)
-        #     else:
-        #         attention_output = self.attention(chunk_seq,chunk_attention_mask_)
-            
-        #     attention_outputs.append(attention_output)
-        #     # attention_probs.append(attention_prob)
+                chunk_attention_mask_ = attention_mask[:,:,start_idx:end_idx,start_idx:end_idx]
 
-        # outputs = torch.cat(attention_outputs, dim=1)
-        # # attention_prob_ = torch.cat(attention_probs, dim=1)
-    
-        # # concat after attention
-        # reverse_indices = torch.argsort(sorted_indices, dim=1)
-        # reverse_indices_expanded = reverse_indices.unsqueeze(-1).expand(-1, -1, outputs.size(-1))
+                
+                if self.args.vanilla_attention == True:
+                    self_attention_output_ = self.attention(query_chunk_seq, chunk_attention_mask_, key_chunk_seq)
+                else:
+                    self_attention_output_ = self.attention(chunk_seq,chunk_attention_mask_)
+                
+                attention_outputs.append(self_attention_output_)
+                # attention_probs.append(attention_prob)
+
+            outputs = torch.cat(attention_outputs, dim=1)
+            # attention_prob_ = torch.cat(attention_probs, dim=1)
         
-        # output = torch.gather(outputs, dim=1, index=reverse_indices_expanded)
-        # if self.args.softmax:
+            # concat after attention
+            reverse_indices = torch.argsort(sorted_indices, dim=1)
+            reverse_indices_expanded = reverse_indices.unsqueeze(-1).expand(-1, -1, outputs.size(-1))
             
-        #     output = nn.Softmax(dim=1)(output)
+            output = torch.gather(outputs, dim=1, index=reverse_indices_expanded)
+            # output = nn.Softmax(dim=1)(output)
+            # sorted_attention_map = attention_prob[reverse_indices]
+            output = self_attention_output *  self.args.cluster_value + output *  (1-self.args.cluster_value)
 
-        # if self.args.cluster_joint:
-        #     # output = nn.Softmax(dim=1)(output)
-        #     # output = self.LayerNorm(output + seq)
-        #     # output = self_attention_output * 0.7 + output * 0.3
-        #     # output = self.LayerNorm(output + seq)
-        #     # output = nn.Softmax(dim=1)(output)
-        #     output = self_attention_output * 0.7 + output * 0.3
-
-        # sorted_attention_map = attention_prob[reverse_indices]
+        else:
+            output = self_attention_output * (1-self.args.cluster_value) + cluster_attention_output * self.args.cluster_value
         
         return output
 

@@ -50,7 +50,9 @@ def main():
     parser.add_argument("--cluster_valid", action="store_true", help="do not perform Cluster Attention in valid,test if activated.")
     parser.add_argument("--softmax", action="store_true", help="softmax after cluster attention.")
     parser.add_argument("--cluster_joint", action="store_true", help="use cluster attention as a auxilary information.")
-    
+    parser.add_argument("--cluster_prediction", action="store_true", help="use cluster prediction loss.")
+
+
     parser.add_argument(
         "--attention_type",
         default ="Base",
@@ -68,6 +70,10 @@ def main():
     )
 
     parser.add_argument("--cluster_train", default=1, type=int)
+    parser.add_argument("--cluster_attention_type", default=0, type=int, help='Type of Cluster-Attention \
+                        Supports 0 as Block-wise, concatenated Cluster attention C // K \
+                        Supports 1 as Block-wise concatenated Cluster attention for only same Cluster-ID \
+                        Supports 2 as using Mask for Cluster attention, for different Cluster-ID assign -inf')
     parser.add_argument("--visualization_epoch", default=50, type=int)
     parser.add_argument('--user_list', nargs='+', default=[], help='List to store user data')
 
