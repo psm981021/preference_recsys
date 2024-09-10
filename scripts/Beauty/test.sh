@@ -14,8 +14,8 @@ python main.py \
     --patience 30 \
     --embedding \
     --output_dir output/Beauty/Item_level/test\
-    --model_idx a1212sse\
-    --contrast_type User\
+    --model_idx a1212sseasd\
+    --contrast_type Item-level \
     --augment_type random \
     --n_views 3 \
     --cluster_train 1 \

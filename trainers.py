@@ -327,8 +327,6 @@ class UPTRecTrainer(Trainer):
         cl_batch = cl_batch.to(self.device)
     
         cl_sequence_output = self.model(cl_batch,self.args)
-        # cl_sequence_output = self.projection(cl_sequence_output.view(self.args.batch_size*2,-1)).reshape(self.args.batch_size*2,self.args.max_seq_length,self.args.hidden_size)
-        #cf_sequence_output = cl_sequence_output[:, -1, :]
 
         if self.args.seq_representation_instancecl_type == "mean":
             cl_sequence_output = torch.mean(cl_sequence_output, dim=1, keepdim=False)
@@ -671,12 +669,10 @@ class UPTRecTrainer(Trainer):
                                 densitys.append(density)
                             
                             cl_loss3 = self.pcl_item_pair_contrastive_learning(
-                                    cl_batch, intents=seq2intents, intent_ids=intent_ids #, temperature=densitys
+                                    cl_batch, intents=seq2intents, intent_ids=intent_ids, temperature=densitys
                             )
                             
-                            cl_losses.append(self.args.cf_weight * cl_loss3)
-                            
-
+                            cl_losses.append(self.args.intent_cf_weight * cl_loss3)
 
                     elif self.args.contrast_type == "User":
                         cl_loss1 = self._instance_cl_one_pair_contrastive_learning(
