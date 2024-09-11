@@ -51,6 +51,7 @@ def main():
     parser.add_argument("--softmax", action="store_true", help="softmax after cluster attention.")
     parser.add_argument("--cluster_joint", action="store_true", help="use cluster attention as a auxilary information.")
     parser.add_argument("--cluster_prediction", action="store_true", help="use cluster prediction loss.")
+    parser.add_argument("--cluster_temperature", action="store_true", help="use density as cluster temperature")
 
 
     parser.add_argument(
@@ -341,6 +342,4 @@ def main():
             np.savetxt(csv_file_name, user_array, delimiter=",", fmt='%d')
 
 main()
-
-# import IPython; IPython.embed(colors='Linux'); exit(1);
 

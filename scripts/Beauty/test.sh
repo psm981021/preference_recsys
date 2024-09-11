@@ -1,4 +1,3 @@
-
 python main.py \
     --model_name UPTRec \
     --data_name Beauty  \
@@ -9,28 +8,16 @@ python main.py \
     --de_noise \
     --batch_size 512 \
     --epochs 2000 \
-    --gpu_id 0 \
+    --gpu_id 1 \
     --visualization_epoch 20 \
     --patience 30 \
     --embedding \
-    --output_dir output/Beauty/Item_level/test\
-    --model_idx a1212sseasd\
-    --contrast_type Item-level \
-    --augment_type random \
-    --n_views 3 \
+    --output_dir output/Beauty/Cluster_Attention/V2_CL_17\
+    --model_idx V2_CL_17\
+    --contrast_type None \
     --cluster_train 1 \
     --warm_up_epoches 0\
-    --num_intent_clusters 200 \
-    --intent_cf_weight 0.01 \
-    --description \
-    --cf_weight 1 \
-    --align_weight 0.001 \
-    --cluster_attention_type 1 \
-    --num_hidden_layers 2 \
-    --gamma 0.3 \
-    --cluster_prediction \
-    --num_user_intent_clusters 256 \
-    --intent_cf_user_weight 0.01 \
-    --temperature 1 \
+    --num_intent_clusters 10 \
+    --cluster_value 0.3 \
 
 # scripts/Beauty/test.sh

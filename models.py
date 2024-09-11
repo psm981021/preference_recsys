@@ -141,7 +141,7 @@ class UPTRec(nn.Module):
             item_embeddings = self.transform_layer(item_embeddings)
         else:
             item_embeddings = self.item_embeddings(sequence)
-
+        
         position_embeddings = self.position_embeddings(position_ids)
         sequence_emb = item_embeddings + position_embeddings
         sequence_emb = self.LayerNorm(sequence_emb)
