@@ -1,31 +1,77 @@
+
+
 python main.py \
     --model_name UPTRec \
-    --data_name Beauty  \
+    --data_name Sports_and_Outdoors  \
+    --data_dir data/ \
     --context encoder \
     --seq_representation_type concatenate \
-    --attention_type Cluster \
-    --cluster_joint \
+    --attention_type None \
+    --de_noise \
     --batch_size 512 \
     --epochs 2000 \
-    --gpu_id 0 \
+    --gpu_id 1 \
     --visualization_epoch 20 \
     --patience 30 \
     --embedding \
-    --output_dir output/Beauty/Contrastive_Learning/User_level/V2_CL_05 \
-    --model_idx V2_CL_05\
-    --contrast_type User \
-    --n_views 2 \
-    --num_intent_clusters 10 \
-    --cluster_train 1 \
-    --warm_up_epoches 0\
-    --intent_cf_weight 0.01 \
-    --cf_weight 1 \
-    --cluster_value 0.3 \
-    --intent_cf_user_weight 0.1 \
-    --num_hidden_layers 1 \
-    --cluster_temperature \
-    --cluster_prediction \
-    --temperature 1 \
+    --output_dir Main_Table/Sports_and_Outdoors/SASRec \
+    --model_idx SASRec\
+    --contrast_type None \
+
+
+python main.py \
+    --model_name UPTRec \
+    --data_name Toys_and_Games  \
+    --data_dir data/ \
+    --context encoder \
+    --seq_representation_type concatenate \
+    --attention_type None \
     --de_noise \
+    --batch_size 512 \
+    --epochs 2000 \
+    --gpu_id 1 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Main_Table/Toys_and_Games/SASRec \
+    --model_idx SASRec\
+    --contrast_type None \
+
+python main.py \
+    --model_name UPTRec \
+    --data_name Yelp  \
+    --data_dir data/ \
+    --context encoder \
+    --seq_representation_type concatenate \
+    --attention_type None \
+    --de_noise \
+    --batch_size 512 \
+    --epochs 2000 \
+    --gpu_id 1 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Main_Table/Yelp/SASRec \
+    --model_idx SASRec\
+    --contrast_type None \
+
+python main.py \
+    --model_name UPTRec \
+    --data_name ml-1m  \
+    --data_dir data/ \
+    --context encoder \
+    --seq_representation_type concatenate \
+    --attention_type None \
+    --de_noise \
+    --batch_size 512 \
+    --epochs 2000 \
+    --gpu_id 1 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --max_seq_length 200 \
+    --output_dir Main_Table/ml-1m/SASRec \
+    --model_idx SASRec\
+    --contrast_type None \
 
 # scripts/Beauty/Contrastive_Learning_ablation.sh

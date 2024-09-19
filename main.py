@@ -202,7 +202,7 @@ def main():
     args.cuda_condition = torch.cuda.is_available() and not args.no_cuda
     print("Using Cuda:", torch.cuda.is_available())
     args.data_file = f'{args.data_dir}/{args.data_name}/{args.data_name}_seq.txt'
-    
+    # args.data_file = f'{args.data_dir}/{args.data_name}.txt'
     user_seq, max_item, valid_rating_matrix, test_rating_matrix = get_user_seqs(args.data_file)
 
     args.item_size = max_item + 2

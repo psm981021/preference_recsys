@@ -96,16 +96,25 @@ class Trainer:
 
         self.total_augmentaion_pairs = nCr(self.args.n_views, 2)
 
-        self.projection = nn.Sequential(
+        self.projection_user = nn.Sequential(
             nn.Linear(self.args.hidden_size*self.args.max_seq_length , self.args.batch_size, bias=False),
             nn.BatchNorm1d(self.args.batch_size),
             nn.ReLU(inplace=True),
             nn.Linear(self.args.batch_size, self.args.hidden_size*self.args.max_seq_length, bias=True),
         )
 
+        self.projection_item = nn.Sequential(
+            nn.Linear(self.args.hidden_size, self.args.batch_size, bias=False),
+            nn.BatchNorm1d(self.args.batch_size),
+            nn.ReLU(inplace=True),
+            nn.Linear(self.args.batch_size, self.args.hidden_size, bias=True),
+        )
+
         if self.cuda_condition:
             self.model.cuda()
-            self.projection.cuda()
+            self.projection_user.cuda()
+            self.projection_item.cuda()
+
 
         # Setting the train and test data loader
         self.train_dataloader = train_dataloader
@@ -360,22 +369,21 @@ class UPTRecTrainer(Trainer):
         inputs[1] =inputs[1].to(self.device).to(self.device)
 
         if self.args.description:
-            cl_sequence_output_view_1 = self.model(inputs[0],self.args,description='description').view(self.args.batch_size,-1)
-            cl_sequence_output_view_2 = self.model(inputs[1],self.args,description='description').view(self.args.batch_size,-1)
+            cl_sequence_output_view_1 = self.model(inputs[0],self.args,description='description')#.view(self.args.batch_size,-1)
+            cl_sequence_output_view_2 = self.model(inputs[1],self.args,description='description')#.view(self.args.batch_size,-1)
         else:
-            cl_sequence_output_view_1 = self.model(inputs[0],self.args,intent_ids).view(self.args.batch_size,-1)
-            cl_sequence_output_view_2 = self.model(inputs[1],self.args,intent_ids).view(self.args.batch_size,-1)
+            cl_sequence_output_view_1 = self.model(inputs[0],self.args,intent_ids)#.view(self.args.batch_size,-1)
+            cl_sequence_output_view_2 = self.model(inputs[1],self.args,intent_ids)#.view(self.args.batch_size,-1)
 
         if self.args.seq_representation_type == "mean":
             cl_sequence_output = torch.mean(cl_sequence_output, dim=-1, keepdim=True)
             
             # cl_sequence_output.view(cl_sequence_output.shape[0],-1)
 
-        augmentation = self.projection
+        augmentation = self.projection_item
         
-        cl_sequence_drop_output_one = augmentation(cl_sequence_output_view_1).view(self.args.batch_size, self.args.max_seq_length, -1)
-        cl_sequence_drop_output_two = augmentation(cl_sequence_output_view_2).view(self.args.batch_size, self.args.max_seq_length, -1)
-
+        cl_sequence_drop_output_one = augmentation(cl_sequence_output_view_1.view(self.args.batch_size*self.args.max_seq_length, -1)).view(self.args.batch_size, self.args.max_seq_length, -1)
+        cl_sequence_drop_output_two = augmentation(cl_sequence_output_view_2.view(self.args.batch_size*self.args.max_seq_length, -1)).view(self.args.batch_size, self.args.max_seq_length, -1)
        
         #PCLoss
         if self.args.de_noise:
@@ -446,11 +454,17 @@ class UPTRecTrainer(Trainer):
                     if self.args.seq_representation_type == "mean":
                         sequence_output = torch.mean(sequence_output, dim=-1)
                     
-                    sequence_context = sequence_output.view(self.args.batch_size*self.args.max_seq_length,-1).detach().cpu().numpy()
-                    sequence_output = sequence_output.view(self.args.batch_size,-1).detach().cpu().numpy()
+                    sequence_context_item = sequence_output.view(self.args.batch_size*self.args.max_seq_length,-1)
+                    sequence_context_user = sequence_output.view(self.args.batch_size,-1)
+
+                    sequence_context_item = self.projection_item(sequence_context_item).detach().cpu().numpy()
+                    sequence_context_user = self.projection_user(sequence_context_user).detach().cpu().numpy()
+
+                    # sequence_context = sequence_output.view(self.args.batch_size*self.args.max_seq_length,-1).detach().cpu().numpy()
+                    # sequence_output = sequence_output.view(self.args.batch_size,-1).detach().cpu().numpy()
                     
-                    kmeans_training_data.append(sequence_output) #[len(cluster_dataloader) Batch hidden]
-                    kmeans_training_data_item.append(sequence_context) #[len(cluster_dataloader) Batch hidden]
+                    kmeans_training_data.append(sequence_context_user)
+                    kmeans_training_data_item.append(sequence_context_item) 
 
                 kmeans_training_data = np.concatenate(kmeans_training_data, axis=0) #[* hidden]
                 kmeans_training_data_item = np.concatenate(kmeans_training_data_item, axis=0) #[* hidden]
@@ -620,9 +634,12 @@ class UPTRecTrainer(Trainer):
                             cl_loss1 = self._instance_cl_one_pair_contrastive_learning(
                                     cl_batch, intent_ids=seq_class_label_batches
                                 )
-                            cl_losses.append(self.args.intent_cf_weight * cl_loss1)
+                            cl_losses.append(self.args.cf_weight * cl_loss1)
 
-                            sequence_output = recommendation_output.view(recommendation_output.shape[0]*self.args.max_seq_length, -1).detach().cpu().numpy()
+
+                            sequence_output = self.projection_item(recommendation_output.view(recommendation_output.shape[0]*self.args.max_seq_length, -1)).detach().cpu().numpy()
+                            # sequence_output = recommendation_output.view(recommendation_output.shape[0]*self.args.max_seq_length, -1).detach().cpu().numpy()
+                            
                             for cluster in self.item_clusters:
                                 seq2intents = []
                                 intent_ids = []
@@ -641,7 +658,7 @@ class UPTRecTrainer(Trainer):
                                     cl_batch, intents=seq2intents, intent_ids=intent_ids
                                 )
                             
-                            cl_losses.append(self.args.cf_weight * cl_loss3)
+                            cl_losses.append(self.args.intent_cf_weight * cl_loss3)
                             
                             if self.args.cluster_prediction:
                                 input_1 = cl_batch[0].to(self.device)
@@ -674,17 +691,15 @@ class UPTRecTrainer(Trainer):
 
                                 # cl_losses.append(ce_loss)
                                 cl_losses.append(ce_loss * self.args.intent_cf_weight)
-                                
-
 
                     elif self.args.contrast_type == "User":
                         cl_loss1 = self._instance_cl_one_pair_contrastive_learning(
                                 cl_batch, intent_ids=seq_class_label_batches
                             )
-                        cl_losses.append(self.args.intent_cf_weight * cl_loss1)
+                        cl_losses.append(self.args.cf_weight * cl_loss1)
 
-                        sequence_output = recommendation_output.view(recommendation_output.shape[0], -1).detach().cpu().numpy()
-
+                        # sequence_output = recommendation_output.view(recommendation_output.shape[0], -1).detach().cpu().numpy()
+                        sequence_output = self.projection_user(recommendation_output.view(recommendation_output.shape[0], -1)).detach().cpu().numpy()
                         for cluster in self.clusters:
                             seq2intents = []
                             intent_ids = []
@@ -694,6 +709,7 @@ class UPTRecTrainer(Trainer):
                             seq2intents.append(seq2intent)
                             intent_ids.append(intent_id)
                             densitys.append(density)
+                            
                         if self.args.cluster_temperature:
                             cl_loss3 = self._pcl_one_pair_contrastive_learning(
                                 cl_batch, intents=seq2intents, intent_ids=intent_ids,temperature = densitys
@@ -702,7 +718,7 @@ class UPTRecTrainer(Trainer):
                             cl_loss3 = self._pcl_one_pair_contrastive_learning(
                                 cl_batch, intents=seq2intents, intent_ids=intent_ids
                             )
-                        cl_losses.append(self.args.intent_cf_user_weight * cl_loss3)
+                        cl_losses.append(self.args.intent_cf_weight * cl_loss3)
                         
                         if self.args.cluster_prediction:
                             cl_1 =cl_batch[0].to(self.device)
@@ -732,8 +748,6 @@ class UPTRecTrainer(Trainer):
                             ce_loss = cross_entropy_loss_fn(intent_1_logits, intent_2_labels) * 0.00001
                             cl_losses.append(ce_loss * self.args.intent_cf_weight)
 
-
-
                     elif self.args.contrast_type == "Item-User":
                         if epoch >= self.args.warm_up_epoches:
                             if self.args.seq_representation_type == "mean":
@@ -742,7 +756,7 @@ class UPTRecTrainer(Trainer):
                             cl_loss1 = self._instance_cl_one_pair_contrastive_learning(
                                     cl_batch, intent_ids=seq_class_label_batches
                                 )
-                            cl_losses.append(self.args.intent_cf_weight * cl_loss1)
+                            cl_losses.append(self.args.cf_weight * cl_loss1)
 
                             sequence_output = recommendation_output.view(recommendation_output.shape[0], -1).detach().cpu().numpy()
 
@@ -763,7 +777,7 @@ class UPTRecTrainer(Trainer):
                                 cl_loss3 = self._pcl_one_pair_contrastive_learning(
                                     cl_batch, intents=seq2intents, intent_ids=intent_ids
                                 )
-                            cl_losses.append(self.args.intent_cf_user_weight * cl_loss3)
+                            cl_losses.append(self.args.intent_cf_weight * cl_loss3)
 
                             sequence_output = recommendation_output.view(recommendation_output.shape[0]*self.args.max_seq_length, -1).detach().cpu().numpy()
 
@@ -784,7 +798,7 @@ class UPTRecTrainer(Trainer):
                                 cl_loss4 = self.pcl_item_pair_contrastive_learning(
                                     cl_batch, intents=seq2intents, intent_ids=intent_ids
                                 )                             
-                            cl_losses.append(self.args.cf_weight * cl_loss4)
+                            cl_losses.append(self.args.intent_cf_weight * cl_loss4)
 
                     elif self.args.contrast_type == "Item-description":
                         if epoch >= self.args.warm_up_epoches:
@@ -914,14 +928,21 @@ class UPTRecTrainer(Trainer):
                             if self.args.seq_representation_type == "mean":
                                 sequence_output = torch.mean(sequence_output, dim=1, keepdim=False)
                             
-                            # Item-level Clustering
-                            sequence_context = sequence_output.view(self.args.batch_size*self.args.max_seq_length,-1).detach().cpu().numpy()
-                            
-                            # User-level Clustering
-                            sequence_output = sequence_output.view(sequence_output.shape[0], -1).detach().cpu().numpy()# B hidden
 
-                            kmeans_training_data.append(sequence_output)
-                            kmeans_training_data_item.append(sequence_context)
+
+                            sequence_context_item = sequence_output.view(self.args.batch_size*self.args.max_seq_length,-1)
+                            sequence_context_user = sequence_output.view(self.args.batch_size,-1)
+
+                            sequence_context_item = self.projection_item(sequence_context_item).detach().cpu().numpy()
+                            sequence_context_user = self.projection_user(sequence_context_user).detach().cpu().numpy()
+                            # # Item-level Clustering
+                            # sequence_context = sequence_output.view(self.args.batch_size*self.args.max_seq_length,-1).detach().cpu().numpy()
+                            
+                            # # User-level Clustering
+                            # sequence_output = sequence_output.view(sequence_output.shape[0], -1).detach().cpu().numpy()# B hidden
+
+                            kmeans_training_data.append(sequence_context_user)
+                            kmeans_training_data_item.append(sequence_context_item)
 
                         kmeans_training_data = np.concatenate(kmeans_training_data, axis=0) #[* hidden]
                         kmeans_training_data_item = np.concatenate(kmeans_training_data_item, axis=0) #[* hidden]

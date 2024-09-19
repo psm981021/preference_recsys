@@ -12,12 +12,16 @@ python main.py \
     --visualization_epoch 20 \
     --patience 30 \
     --embedding \
-    --output_dir output/Beauty/Cluster_Attention/V2_CL_17\
-    --model_idx V2_CL_17\
-    --contrast_type None \
-    --cluster_train 1 \
+    --output_dir output/Beauty/Contrastive_Learning/Item_level/V2_CL_10 \
+    --model_idx V2_CL_10\
+    --contrast_type Item-level \
+    --cluster_train 10 \
     --warm_up_epoches 0\
-    --num_intent_clusters 10 \
-    --cluster_value 0.3 \
+    --rec_weight 1 \
+    --temperature 0.1 \
+    --num_intent_clusters 10\
+    --intent_cf_weight  2\
+    --cf_weight 0.1 \
+    --cluster_value 0.7 \
 
 # scripts/Beauty/test.sh

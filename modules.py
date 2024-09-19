@@ -157,40 +157,39 @@ class PCLoss(nn.Module):
         """
         # instance contrast with prototypes
         mean_pcl_loss = 0
-
-
-        if self.args.contrast_type in ['Item-level', 'Item-User','Item-description'] and level =='item':
-            # if temperature is not None:
-            #     for batch_one, batch_two, intent, intent_id,density in zip(batch_sample_one, batch_sample_two,intents, intent_ids,temperature):
-            #         # batch_one, batch_two [C x E]
-            #         # intent [C x E]
-            #         # intent_id [C]
-            #         # density [C]
-                    
-            #         pos_one_item_compare_loss = self.criterion(level,batch_one, intent, intent_ids=intent_id,density=density)
-            #         pos_two_item_compare_loss = self.criterion(level,batch_two, intent, intent_ids=intent_id,density=density)
-
-            #         mean_pcl_loss += pos_one_item_compare_loss
-            #         mean_pcl_loss += pos_two_item_compare_loss
-            # else:
-            #     for batch_one, batch_two, intent, intent_id in zip(batch_sample_one, batch_sample_two,intents, intent_ids):
-            #         # batch_one, batch_two [C x E]
-            #         # intent [C x E]
-            #         # intent_id [C]
-            #         pos_one_item_compare_loss = self.criterion(level,batch_one, intent, intent_ids=intent_id,density=density)
-            #         pos_two_item_compare_loss = self.criterion(level,batch_two, intent, intent_ids=intent_id,density=density)
-
-            #         mean_pcl_loss += pos_one_item_compare_loss
-            #         mean_pcl_loss += pos_two_item_compare_loss
-
-            #     mean_pcl_loss /= 2 * len(batch_sample_one.shape[0])
-
-            pos_one_compare_loss = self.criterion(level,batch_sample_one, intents, intent_ids=intent_ids,density = temperature)
-            pos_two_compare_loss = self.criterion(level,batch_sample_two, intents, intent_ids=intent_ids,density = temperature)
-            mean_pcl_loss += pos_one_compare_loss
-            mean_pcl_loss += pos_two_compare_loss
             
-            mean_pcl_loss /= 2 * int(self.args.max_seq_length)
+        if self.args.contrast_type in ['Item-level', 'Item-User','Item-description'] and level =='item':
+            if temperature is not None:
+                for batch_one, batch_two, intent, intent_id,density in zip(batch_sample_one, batch_sample_two,intents, intent_ids,temperature):
+                    # batch_one, batch_two [C x E]
+                    # intent [C x E]
+                    # intent_id [C]
+                    # density [C]
+                    
+                    pos_one_item_compare_loss = self.criterion(level,batch_one, intent, intent_ids=intent_id,density=density)
+                    pos_two_item_compare_loss = self.criterion(level,batch_two, intent, intent_ids=intent_id,density=density)
+
+                    mean_pcl_loss += pos_one_item_compare_loss
+                    mean_pcl_loss += pos_two_item_compare_loss
+            else:
+                for batch_one, batch_two, intent, intent_id in zip(batch_sample_one, batch_sample_two,intents, intent_ids):
+                    # batch_one, batch_two [C x E]
+                    # intent [C x E]
+                    # intent_id [C]
+                    
+                    pos_one_item_compare_loss = self.criterion(level,batch_one, intent, intent_ids=intent_id,density=temperature)
+                    pos_two_item_compare_loss = self.criterion(level,batch_two, intent, intent_ids=intent_id,density=temperature)
+
+                    mean_pcl_loss += pos_one_item_compare_loss
+                    mean_pcl_loss += pos_two_item_compare_loss
+                mean_pcl_loss /= 2 * int(batch_sample_one.shape[0])
+
+            # pos_one_compare_loss = self.criterion(level,batch_sample_one, intents, intent_ids=intent_ids,density = temperature)
+            # pos_two_compare_loss = self.criterion(level,batch_sample_two, intents, intent_ids=intent_ids,density = temperature)
+            # mean_pcl_loss += pos_one_compare_loss
+            # mean_pcl_loss += pos_two_compare_loss
+            
+            # mean_pcl_loss /= 2 * int(self.args.max_seq_length)
             # mean_pcl_loss /= 2 * batch_sample_one.shape[0]
             # mean_pcl_loss /= 2 # * int(self.args.num_intent_clusters)
 
@@ -206,8 +205,8 @@ class PCLoss(nn.Module):
                     pos_two_compare_loss = self.criterion(level, batch_sample_two, intent, intent_id)
                     mean_pcl_loss += pos_one_compare_loss
                     mean_pcl_loss += pos_two_compare_loss
-                mean_pcl_loss /= 2 * len(intents)
-                
+                    
+                mean_pcl_loss /= 2 * int(batch_sample_one.shape[0])
 
             # don't do de-noise
             else:
@@ -257,46 +256,73 @@ class NCELoss(nn.Module):
                 sim12 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_two) / density.unsqueeze(-1) #self.temperature
             else:
                 
+
+                sim11 = torch.matmul(batch_sample_one, batch_sample_one.T) / self.temperature
+                sim22 = torch.matmul(batch_sample_two, batch_sample_two.T) / self.temperature
+                sim12 = torch.matmul(batch_sample_one, batch_sample_two.T) / self.temperature
                 # sim11 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_one) /  self.temperature
                 # sim22 = torch.einsum('ij,kj->ik', batch_sample_two, batch_sample_two) /  self.temperature
                 # sim12 = torch.einsum('bij,kj->bik', batch_sample_one, batch_sample_two) /  self.temperature
-                sim11 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_one) /  self.temperature
-                sim22 = torch.einsum('bij,bkj->bik', batch_sample_two, batch_sample_two) /  self.temperature
-                sim12 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_two) /  self.temperature
-            batch_size, max_seq, _ = sim11.shape
-            # max_seq, _ = sim11.shape
+
+                # sim11 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_one) /  self.temperature
+                # sim22 = torch.einsum('bij,bkj->bik', batch_sample_two, batch_sample_two) /  self.temperature
+                # sim12 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_two) /  self.temperature
+            # batch_size, max_seq, _ = sim11.shape
+            max_seq, _ = sim11.shape
             # d = sim12.shape[-1]
             # Mask out self-contrast (diagonal elements) and same-intent pairs if intent_ids is provided
             if intent_ids is not None:
                 intent = intent_ids.unsqueeze(-1)
-                mask_11_22 = torch.eq(intent,intent.transpose(1,2)).long().to(self.device)
-
-                # mask_11_22 = torch.eq(intent,intent.T).long().to(self.device)
+                # mask_11_22 = torch.eq(intent,intent.transpose(1,2)).long().to(self.device)
+                
+                mask_11_22 = torch.eq(intent,intent.T).long().to(self.device)
                 # mask = torch.eq(intent_ids, intent_ids.T).long().to(self.device)
                 
-                sim11[mask_11_22 == 1] = float('-inf')
-                sim22[mask_11_22 == 1] = float('-inf')
-                eye_metrix = torch.eye(max_seq, dtype=torch.long).repeat(batch_size,1,1).to(self.device)
+
+                positive_mask = (mask_11_22 == 1).float()
+                negative_mask = (mask_11_22 == 0).float()
+
+                sim11_positive = sim11 * positive_mask  # Positive pair에 대해 sim11 값만 남기기
+                sim22_positive = sim22 * positive_mask  # Positive pair에 대해 sim22 값만 남기기
+                sim12_positive = sim12 * positive_mask  # Positive pair에 대해 sim12 값만 남기기
+
+                sim11_negative = sim11 * negative_mask  # Negative pair에 대해 sim11 값만 남기기
+                sim22_negative = sim22 * negative_mask  # Negative pair에 대해 sim22 값만 남기기
+                sim12_negative = sim12 * negative_mask  # Negative pair에 대해 sim12 값만 남기기
+
+
+
+                # ## original code
+                # sim11[mask_11_22 == 1] = float('-inf')
+                # sim22[mask_11_22 == 1] = float('-inf')
+                # # eye_metrix = torch.eye(max_seq, dtype=torch.long).repeat(batch_size,1,1).to(self.device)
                 # eye_metrix = torch.eye(max_seq, dtype=torch.long).to(self.device)
 
-                # mask[eye_metrix == 1] = 0
-                mask_11_22[eye_metrix == 1] = 0
-                sim12[mask_11_22 == 1] = float("-inf")
+                # # mask[eye_metrix == 1] = 0
+                # mask_11_22[eye_metrix == 1] = 0
+                # sim12[mask_11_22 == 1] = float("-inf")
 
             else:
                 mask = torch.eye(d, dtype=torch.long).to(self.device)
                 sim11[mask == 1] = float("-inf")
             
-            raw_scores1 = torch.cat([sim12, sim11], dim=-1) # positive
-            raw_scores2 = torch.cat([sim22, sim12.transpose(-1, -2)], dim=-1) # negative
-            # raw_scores2 = torch.cat([sim22,sim12],dim=-1) # negative
+            # Positive와 Negative 유사도 값을 각각 합쳐서 최종 logits 생성
+            raw_scores_positive = torch.cat([sim12_positive, sim11_positive], dim=-1)
+            raw_scores_negative = torch.cat([sim22_negative, sim12_negative.transpose(-1, -2)], dim=-1)
+            logits = torch.cat([raw_scores_positive, raw_scores_negative], dim=-2)
 
-            logits = torch.cat([raw_scores1, raw_scores2], dim=-2)
 
-            # logits = torch.cat([sim12, sim11, sim22], dim=-2)
+            # ### original code
+            # raw_scores1 = torch.cat([sim12, sim11], dim=-1) # positive
+            # raw_scores2 = torch.cat([sim22, sim12.transpose(-1, -2)], dim=-1) # negative
+            # # raw_scores2 = torch.cat([sim22,sim12],dim=-1) # negative
+
+            # logits = torch.cat([raw_scores1, raw_scores2], dim=-2)
+
+            # # logits = torch.cat([sim12, sim11, sim22], dim=-2)
 
             labels = torch.arange(2 * max_seq, dtype=torch.long, device=logits.device)
-            labels = labels.unsqueeze(0).repeat(batch_size, 1) 
+            # labels = labels.unsqueeze(0).repeat(batch_size, 1) 
 
 
         else:
@@ -406,60 +432,56 @@ class Clustered_Attention_Chunking(nn.Module):
         except:
             item_id = cluster_id[0].reshape(self.args.batch_size,C)
 
+        self_attention_output = self.attention(seq,attention_mask)
 
-        self_attention_output,cluster_attention_output = self.attention(seq,attention_mask,item_id)
-
-        if self.args.cluster_attention_type == 0:
-            sorted_indices = torch.argsort(item_id, dim=1)
-            sorted_indices_seq = sorted_indices.unsqueeze(-1).expand(-1, -1, seq.size(-1))
-            seq_sorted = torch.gather(seq, dim=1, index=sorted_indices_seq)
-
-            sorted_indices_attn = sorted_indices.unsqueeze(1).unsqueeze(-1).expand(-1, 1, -1, attention_mask.size(-1))
-            sorted_attention_mask = torch.gather(attention_mask, dim=2, index=sorted_indices_attn)
-            sorted_attention_mask = torch.gather(sorted_attention_mask, dim=3, index=sorted_indices_attn)
-
-            attention_outputs = []
-            attention_probs =[] 
-            for i in range(int(self.args.num_intent_clusters)):
-
-                #use chunking
-                start_idx = i * chunk_size
-                end_idx = min((i + 1) * chunk_size, N)
-
-                key_start_idx = max((i - 1) * chunk_size, 0)
-                key_end_idx = min(((i + 1) * chunk_size if i > 1 else 2*chunk_size), N)
-            
-                query_chunk_seq = seq_sorted[:,start_idx:end_idx, :]
-                key_chunk_seq = seq_sorted[:,key_start_idx:key_end_idx, :]
-
-                chunk_seq = seq_sorted[:,start_idx:end_idx, :]
-                
-                chunk_attention_mask_ = attention_mask[:,:,start_idx:end_idx,start_idx:end_idx]
-
-                
-                if self.args.vanilla_attention == True:
-                    self_attention_output_ = self.attention(query_chunk_seq, chunk_attention_mask_, key_chunk_seq)
-                else:
-                    self_attention_output_ = self.attention(chunk_seq,chunk_attention_mask_)
-                
-                attention_outputs.append(self_attention_output_)
-                # attention_probs.append(attention_prob)
-
-            outputs = torch.cat(attention_outputs, dim=1)
-            # attention_prob_ = torch.cat(attention_probs, dim=1)
         
-            # concat after attention
-            reverse_indices = torch.argsort(sorted_indices, dim=1)
-            reverse_indices_expanded = reverse_indices.unsqueeze(-1).expand(-1, -1, outputs.size(-1))
-            
-            output = torch.gather(outputs, dim=1, index=reverse_indices_expanded)
-            # output = nn.Softmax(dim=-1)(output)
-            # sorted_attention_map = attention_prob[reverse_indices]
-            output = self_attention_output *  (1-self.args.cluster_value)+ output * self.args.cluster_value
+        sorted_indices = torch.argsort(item_id, dim=1)
+        sorted_indices_seq = sorted_indices.unsqueeze(-1).expand(-1, -1, seq.size(-1))
+        seq_sorted = torch.gather(seq, dim=1, index=sorted_indices_seq)
 
-        else:
-            output = self_attention_output * (1-self.args.cluster_value) + cluster_attention_output * self.args.cluster_value
+        sorted_indices_attn = sorted_indices.unsqueeze(1).unsqueeze(-1).expand(-1, 1, -1, attention_mask.size(-1))
+        sorted_attention_mask = torch.gather(attention_mask, dim=2, index=sorted_indices_attn)
+        sorted_attention_mask = torch.gather(sorted_attention_mask, dim=3, index=sorted_indices_attn)
+
+        attention_outputs = []
+        attention_probs =[] 
+        for i in range(int(self.args.num_intent_clusters)):
+
+            #use chunking
+            start_idx = i * chunk_size
+            end_idx = min((i + 1) * chunk_size, N)
+
+            key_start_idx = max((i - 1) * chunk_size, 0)
+            key_end_idx = min(((i + 1) * chunk_size if i > 1 else 2*chunk_size), N)
         
+            query_chunk_seq = seq_sorted[:,start_idx:end_idx, :]
+            key_chunk_seq = seq_sorted[:,key_start_idx:key_end_idx, :]
+
+            chunk_seq = seq_sorted[:,start_idx:end_idx, :]
+            
+            chunk_attention_mask_ = attention_mask[:,:,start_idx:end_idx,start_idx:end_idx]
+
+            
+            if self.args.vanilla_attention == True:
+                self_attention_output_ = self.attention(query_chunk_seq, chunk_attention_mask_, key_chunk_seq)
+            else:
+                self_attention_output_ = self.attention(chunk_seq,chunk_attention_mask_)
+            
+            attention_outputs.append(self_attention_output_)
+            # attention_probs.append(attention_prob)
+
+        outputs = torch.cat(attention_outputs, dim=1)
+        # attention_prob_ = torch.cat(attention_probs, dim=1)
+    
+        # concat after attention
+        reverse_indices = torch.argsort(sorted_indices, dim=1)
+        reverse_indices_expanded = reverse_indices.unsqueeze(-1).expand(-1, -1, outputs.size(-1))
+        
+        output = torch.gather(outputs, dim=1, index=reverse_indices_expanded)
+        # output = nn.Softmax(dim=-1)(output)
+        # sorted_attention_map = attention_prob[reverse_indices]
+        output = self_attention_output *  (1-self.args.cluster_value)+ output * self.args.cluster_value
+
         return output
 
         
