@@ -26,6 +26,7 @@ renew_log/
 Description/Beauty/*
 output/
 Main_Table/
+Ablation/
 
 #recbole results
 log/

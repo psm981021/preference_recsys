@@ -11,7 +11,7 @@ from tqdm import tqdm
 import copy
 
 class KMeans(object):
-    def __init__(self, num_cluster, seed, hidden_size, niter,temperature, gpu_id=0, device="cpu"):
+    def __init__(self, num_cluster, seed, hidden_size,temperature, gpu_id=0, device="cpu"):
         """
         Args:
             k: number of clusters
@@ -25,15 +25,14 @@ class KMeans(object):
         self.first_batch = True
         self.hidden_size = hidden_size
         self.temperature = temperature
-        self.niter = niter
         self.clus, self.index = self.__init_cluster(self.hidden_size)
         self.centroids = [] 
         
 
     def __init_cluster(
-        self, hidden_size, verbose=False, niter=5, nredo=5, max_points_per_centroid=4096, min_points_per_centroid=0
+        self, hidden_size, verbose=False, niter=20, nredo=5, max_points_per_centroid=4096, min_points_per_centroid=0
     ):
-        print(" cluster train iterations:", self.niter)
+        print(" cluster train iterations:", niter)
         clus = faiss.Clustering(hidden_size, self.num_cluster)
         clus.verbose = verbose
         clus.niter = niter
@@ -79,6 +78,7 @@ class KMeans(object):
     def query(self, x):
         # self.index.add(x)
         D, I = self.index.search(x, 1)  # for each sample, find cluster distance and assignments
+        
         seq2cluster = [int(n[0]) for n in I]
         # print("cluster number:", self.num_cluster,"cluster in batch:", len(set(seq2cluster)))
 
@@ -105,6 +105,7 @@ class KMeans(object):
         
         seq2cluster = torch.LongTensor(seq2cluster).to(self.device)
         return seq2cluster, self.centroids[seq2cluster],density[seq2cluster]
+
 
     
 class UPTRec(nn.Module):

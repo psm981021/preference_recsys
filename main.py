@@ -52,7 +52,8 @@ def main():
     parser.add_argument("--cluster_joint", action="store_true", help="use cluster attention as a auxilary information.")
     parser.add_argument("--cluster_prediction", action="store_true", help="use cluster prediction loss.")
     parser.add_argument("--cluster_temperature", action="store_true", help="use density as cluster temperature")
-
+    parser.add_argument("--mlp", action="store_true", help="adapt mlp for cluster head")    
+    parser.add_argument("--ncl", action="store_true", help="non negative vector for similarity")   
 
     parser.add_argument(
         "--attention_type",
@@ -201,9 +202,14 @@ def main():
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
     args.cuda_condition = torch.cuda.is_available() and not args.no_cuda
     print("Using Cuda:", torch.cuda.is_available())
-    args.data_file = f'{args.data_dir}/{args.data_name}/{args.data_name}_seq.txt'
-    # args.data_file = f'{args.data_dir}/{args.data_name}.txt'
-    user_seq, max_item, valid_rating_matrix, test_rating_matrix = get_user_seqs(args.data_file)
+    try:
+        args.data_file = f'{args.data_dir}/{args.data_name}/{args.data_name}_seq.txt'
+        user_seq, max_item, valid_rating_matrix, test_rating_matrix = get_user_seqs(args.data_file)
+    except: 
+        args.data_file = f'{args.data_dir}/{args.data_name}.txt'
+        user_seq, max_item, valid_rating_matrix, test_rating_matrix = get_user_seqs(args.data_file)
+        
+    # user_seq, max_item, valid_rating_matrix, test_rating_matrix = get_user_seqs(args.data_file)
 
     args.item_size = max_item + 2
     args.mask_id = max_item + 1
