@@ -9,7 +9,6 @@
 import numpy as np
 from tqdm import tqdm
 import random
-
 import torch
 import torch.nn as nn
 from torch.optim import Adam
@@ -17,14 +16,13 @@ from torch.utils.data import DataLoader, RandomSampler
 from torchmetrics.clustering import NormalizedMutualInfoScore
 
 from models import KMeans
-from modules import NCELoss, NTXent, SupConLoss, PCLoss, AlignmentLossWithSinkhorn
+from modules import NCELoss, NTXent, SupConLoss, PCLoss, AlignmentLossWithSinkhorn, SimCLR
 from utils import *
 
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from sklearn.decomposition import TruncatedSVD
-
 import wandb
 
 class Trainer:
@@ -34,7 +32,6 @@ class Trainer:
         self.cuda_condition = torch.cuda.is_available() and not self.args.no_cuda
         self.device = torch.device("cuda" if self.cuda_condition else "cpu")
         self.args.device = self.device
-
         self.model = model
 
         self.num_intent_clusters = [int(i) for i in self.args.num_intent_clusters.split(",")]
@@ -119,13 +116,10 @@ class Trainer:
                 nn.ReLU(inplace=True),
                 nn.Linear(self.args.batch_size, self.args.hidden_size, bias=True),
             )
-
-
         if self.cuda_condition:
             self.model.cuda()
             self.projection_user.cuda()
             self.projection_item.cuda()
-
 
         # Setting the train and test data loader
         self.train_dataloader = train_dataloader
@@ -142,6 +136,7 @@ class Trainer:
 
         self.cf_criterion = NCELoss(self.args,self.args.temperature, self.device)
         self.pcl_criterion = PCLoss(self.args,self.args.temperature, self.device)
+        self.simclr_criterion = SimCLR(self.args,self.args.temperature, self.device)
 
         self.criterion = torch.nn.CrossEntropyLoss().to(self.device)
         self.nmi = NormalizedMutualInfoScore().to(self.device)
@@ -296,6 +291,7 @@ class Trainer:
 
     def cross_entropy(self, seq_out, pos_ids, neg_ids):
         # [batch seq_len hidden_size]
+       
         pos_emb = self.model.item_embeddings(pos_ids)
         neg_emb = self.model.item_embeddings(neg_ids)
 
@@ -366,15 +362,16 @@ class UPTRecTrainer(Trainer):
                 import IPython;IPython.embed(colors='Linux');exit(1);
         
         if self.args.de_noise:
-            cl_loss = self.cf_criterion('user',cl_output_slice_0, cl_output_slice_1, intent_ids=intent_ids)
+            if self.args.simclr:
+                cl_loss = self.simclr_criterion('user', cl_output_slice_0, cl_output_slice_1, intent_ids = intent_ids)
+            else:
+                cl_loss = self.cf_criterion('user',cl_output_slice_0, cl_output_slice_1, intent_ids=intent_ids)
         else:
             cl_loss = self.cf_criterion('user',cl_output_slice_0, cl_output_slice_1, intent_ids=None)
         return cl_loss
 
 
     def pcl_item_pair_contrastive_learning(self, inputs, intents, intent_ids,temperature=None):
-
-        n_views, (bsz, seq_len) = len(inputs), inputs[0].shape
 
         cl_intents = intents[0].view(self.args.batch_size,self.args.max_seq_length,-1) # B x C x E
         cl_intent_ids = intent_ids[0].view(self.args.batch_size, -1) # B x C
@@ -384,8 +381,8 @@ class UPTRecTrainer(Trainer):
         elif temperature is None:
             prototype_density = None
 
-        inputs[0] =inputs[0].to(self.device).to(self.device)
-        inputs[1] =inputs[1].to(self.device).to(self.device)
+        inputs[0] =inputs[0].to(self.device)
+        inputs[1] =inputs[1].to(self.device)
 
         if self.args.description:
             cl_sequence_output_view_1 = self.model(inputs[0],self.args,description='description')
@@ -404,7 +401,7 @@ class UPTRecTrainer(Trainer):
         
         #PCLoss
         if self.args.de_noise:
-                cl_loss = self.pcl_criterion('item',cl_sequence_output_view_1, cl_sequence_output_view_2, intents=cl_intents, intent_ids=cl_intent_ids,temperature=prototype_density)
+            cl_loss = self.pcl_criterion('item',cl_sequence_output_view_1, cl_sequence_output_view_2, intents=cl_intents, intent_ids=cl_intent_ids,temperature=prototype_density)
         else:
             cl_loss = self.pcl_criterion(cl_sequence_output_view_1, cl_sequence_output_view_2, intents=cl_intents, intent_ids=None)
         return cl_loss
@@ -545,6 +542,7 @@ class UPTRecTrainer(Trainer):
                     list of n_views x batch_size x feature_dim tensors
                 """
                 # 0. batch_data will be sent into the device(GPU or CPU)
+                
                 rec_batch = tuple(t.to(self.device) for t in rec_batch)
                 _, input_ids, target_pos, target_neg, _ = rec_batch
 
@@ -731,7 +729,8 @@ class UPTRecTrainer(Trainer):
                                 ce_loss = (ce_loss_1 + ce_loss_2 ) /2
 
                                 # cl_losses.append(ce_loss)
-                                cl_losses.append(ce_loss * 0.1)
+                                cl_losses.append(ce_loss * self.args.intent_cf_weight * 0.1)
+                            
                             
                     elif self.args.contrast_type == "User":
                         cl_loss1 = self._instance_wsie_one_pair_contrastive_learning(
@@ -960,7 +959,7 @@ class UPTRecTrainer(Trainer):
             pred_list = None
             if full_sort:
                 if test:
-                    if self.args.contrast_type in ["IntentCL", "Hybrid","Item-User","Item-Level","User"] and epoch >= self.args.warm_up_epoches:
+                    if self.args.contrast_type in ["IntentCL", "Hybrid","Item-User","Item-Level","User","None"] and epoch >= self.args.warm_up_epoches:
                         print("[Test] Prepare Item,User Clustering")
 
                         kmeans_training_data = []
@@ -1034,6 +1033,7 @@ class UPTRecTrainer(Trainer):
                         
                         # sequence_context = sequence_context.view(sequence_context.shape[0], -1).detach().cpu().numpy()
                         # sequence_context = sequence_context.view(self.args.batch_size*self.args.max_seq_length,-1).detach().cpu().numpy()
+                        
                         for cluster in self.item_clusters:
                             seq2intents = []
                             intent_ids = []

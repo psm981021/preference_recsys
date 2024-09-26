@@ -12,15 +12,15 @@ python main.py \
     --visualization_epoch 20 \
     --patience 30 \
     --embedding \
-    --output_dir Ablation/Beauty/Item-User/1/Mean \
+    --output_dir Ablation/Beauty/Item-User/2/Mean \
     --model_idx Mean\
     --contrast_type Item-User \
     --warm_up_epoches 0\
     --rec_weight 1 \
     --temperature 1 \
     --num_intent_clusters 10\
-    --intent_cf_weight  0.1\
-    --intent_cf_user_weight 0.1 \
+    --intent_cf_weight  1\
+    --intent_cf_user_weight 1 \
     --cf_weight 0 \
     --cluster_value 0.3 \
 
@@ -38,15 +38,15 @@ python main.py \
     --visualization_epoch 20 \
     --patience 30 \
     --embedding \
-    --output_dir Ablation/Beauty/Item-User/1/Mean_NCL \
+    --output_dir Ablation/Beauty/Item-User/2/Mean_NCL \
     --model_idx Mean_NCL\
     --contrast_type Item-User \
     --warm_up_epoches 0\
     --rec_weight 1 \
     --temperature 1 \
     --num_intent_clusters 10\
-    --intent_cf_weight  0.1\
-    --intent_cf_user_weight 0.1 \
+    --intent_cf_weight  1\
+    --intent_cf_user_weight 1 \
     --cf_weight 0 \
     --cluster_value 0.3 \
     --ncl \
@@ -65,18 +65,18 @@ python main.py \
     --visualization_epoch 20 \
     --patience 30 \
     --embedding \
-    --output_dir Ablation/Beauty/Item-User/1/Mean_temperature_density \
+    --output_dir Ablation/Beauty/Item-User/2/Mean_temperature_density \
     --model_idx Mean_temperature_density\
     --contrast_type Item-User \
     --warm_up_epoches 0\
     --rec_weight 1 \
     --temperature 1 \
     --num_intent_clusters 10\
-    --intent_cf_weight  0.1\
-    --intent_cf_user_weight 0.1 \
+    --intent_cf_weight  1\
+    --intent_cf_user_weight 1 \
     --cf_weight 0 \
     --cluster_value 0.3 \
-    --cluster_temperature
+    --cluster_temperature \
 
 python main.py \
     --model_name UPTRec \
@@ -92,16 +92,17 @@ python main.py \
     --visualization_epoch 20 \
     --patience 30 \
     --embedding \
-    --output_dir Ablation/Beauty/Item-User/1/Mean_MLP \
+    --output_dir Ablation/Beauty/Item-User/2/Mean_MLP \
     --model_idx Mean_MLP\
     --contrast_type Item-User \
     --warm_up_epoches 0\
     --rec_weight 1 \
     --temperature 1 \
     --num_intent_clusters 10\
-    --intent_cf_weight  0.1\
-    --intent_cf_user_weight 0.1 \
+    --intent_cf_weight  1\
+    --intent_cf_user_weight 1 \
     --cf_weight 0 \
     --cluster_value 0.3 \
     --mlp \
+
 # scripts/Beauty/UPTRec_gpu_1.sh

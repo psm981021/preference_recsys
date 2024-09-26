@@ -125,14 +125,12 @@ class UPTRec(nn.Module):
         self.item_encoder = Encoder(args)
         self.LayerNorm = LayerNorm(args.hidden_size, eps=1e-12)
         self.dropout = nn.Dropout(args.hidden_dropout_prob)
-
-
         self.criterion = nn.BCELoss(reduction="none")
         self.apply(self.init_weights)
 
     # Positional Embedding
     def add_position_embedding(self, sequence,description=None):
-
+        
         seq_length = sequence.size(1)
         position_ids = torch.arange(seq_length, dtype=torch.long, device=sequence.device)
         position_ids = position_ids.unsqueeze(0).expand_as(sequence)
@@ -142,7 +140,6 @@ class UPTRec(nn.Module):
             item_embeddings = self.transform_layer(item_embeddings)
         else:
             item_embeddings = self.item_embeddings(sequence)
-        
         position_embeddings = self.position_embeddings(position_ids)
         sequence_emb = item_embeddings + position_embeddings
         sequence_emb = self.LayerNorm(sequence_emb)
@@ -152,7 +149,6 @@ class UPTRec(nn.Module):
 
     # model same as SASRec
     def forward(self, input_ids, args, cluster_id =None, description=None):
-        
         attention_mask = (input_ids > 0).long()
         extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)  # torch.int64
         max_len = attention_mask.size(-1)
@@ -162,10 +158,11 @@ class UPTRec(nn.Module):
         subsequent_mask = subsequent_mask.long()
 
         if self.args.cuda_condition:
-            subsequent_mask = subsequent_mask.cuda()
-        
+            device = input_ids.device
+
+        subsequent_mask = subsequent_mask.to(device)
         extended_attention_mask = extended_attention_mask * subsequent_mask
-        extended_attention_mask = extended_attention_mask.to(dtype=next(self.parameters()).dtype)  # fp16 compatibility
+        extended_attention_mask = extended_attention_mask.to(device)#to(dtype=next(self.parameters()).dtype)# fp16 compatibility          
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
 
         sequence_emb = self.add_position_embedding(input_ids,description)

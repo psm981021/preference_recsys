@@ -16,6 +16,7 @@ import pandas as pd
 
 
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
+import torch.nn as nn
 
 from Datasets import RecWithContrastiveLearningDataset, SASRecDataset, ItemembeddingDataset
 from trainers import UPTRecTrainer
@@ -27,12 +28,23 @@ import wandb
 def show_args_info(args, log_file=None):
     print("Arguments:")
     for arg in vars(args):
+        value = getattr(args, arg)  # Get the value of the argument
+
+        # Convert torch.device objects to string
+        if isinstance(value, torch.device):
+            value = str(value)
+        if isinstance(value, (list, tuple, dict)):
+            value = str(value)
+        # Handle user_list argument
         if arg == "user_list":
-            value = getattr(args, arg)
             value_str = ', '.join(map(str, value)) if value else '[]'
             print(f"{arg:<30} : {value_str:>35}")
         else:
-            print(f"{arg:<30} : {getattr(args, arg):>35}")
+            # Use the value variable instead of calling getattr again
+            try:
+                print(f"{arg:<30} : {value:>35}")
+            except:
+                import IPython; IPython.embed(colors='Linux');exit(1);
 
 
 def main():
@@ -54,6 +66,7 @@ def main():
     parser.add_argument("--cluster_temperature", action="store_true", help="use density as cluster temperature")
     parser.add_argument("--mlp", action="store_true", help="adapt mlp for cluster head")    
     parser.add_argument("--ncl", action="store_true", help="non negative vector for similarity")   
+    parser.add_argument("--simclr", action="store_true", help="non negative vector for similarity")   
 
     parser.add_argument(
         "--attention_type",
@@ -62,7 +75,6 @@ def main():
         help="Ways of performing Attention Mechanism\
             Supports 'Base' for Self-Attention and 'Cluster' for Clustered Atteniton"
     )
-
     parser.add_argument(
         "--context",
         default ="item_embedding",
@@ -191,6 +203,10 @@ def main():
     parser.add_argument("--weight_decay", type=float, default=0.0, help="weight_decay of adam")
     parser.add_argument("--adam_beta1", type=float, default=0.9, help="adam first beta value")
     parser.add_argument("--adam_beta2", type=float, default=0.999, help="adam second beta value")
+
+    parser.add_argument('--use_multi_gpu', action='store_true', help='use multiple gpus', default=False)
+    parser.add_argument('--multi_devices', type=str, default='0,1', help='device ids of multile gpus')
+
     args = parser.parse_args()
 
     set_seed(args.seed)
@@ -199,20 +215,41 @@ def main():
         embedding_path = os.path.join(args.output_dir, "embedding")
         check_path(embedding_path)
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
-    args.cuda_condition = torch.cuda.is_available() and not args.no_cuda
-    print("Using Cuda:", torch.cuda.is_available())
     try:
         args.data_file = f'{args.data_dir}/{args.data_name}/{args.data_name}_seq.txt'
         user_seq, max_item, valid_rating_matrix, test_rating_matrix = get_user_seqs(args.data_file)
     except: 
         args.data_file = f'{args.data_dir}/{args.data_name}.txt'
         user_seq, max_item, valid_rating_matrix, test_rating_matrix = get_user_seqs(args.data_file)
-        
-    # user_seq, max_item, valid_rating_matrix, test_rating_matrix = get_user_seqs(args.data_file)
 
     args.item_size = max_item + 2
     args.mask_id = max_item + 1
+
+    # os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
+
+    if args.description:
+        description_embeddings = pd.read_csv('/home/seongbeom/paper/preference_rec/data/2014/Beauty/Beauty_embeddings.csv')
+        description_embeddings = description_embeddings.sort_values(by='asin')
+        description_embeddings = torch.tensor(description_embeddings.drop(columns=['asin']).values, dtype=torch.float32)
+    
+        model = UPTRec(args=args, description_embedding = description_embeddings)
+    else:
+        model =UPTRec(args=args)
+
+    # if args.use_multi_gpu and torch.cuda.device_count() > 1:
+    #     args.device_ids = list(map(int, args.multi_devices.split(',')))
+    #     args.device = torch.device(f"cuda:{args.device_ids[0]}")  # Use the first device for primary
+    #     model = nn.DataParallel(model, device_ids=args.device_ids)  # Wrap the model with DataParallel
+    #     print(f"Using {len(args.device_ids)} GPUs: {args.device_ids}")
+    # else:
+    
+    args.device = torch.device(f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu")
+    model = model.to(args.device)
+
+    args.cuda_condition = torch.cuda.is_available() and not args.no_cuda
+    print("Using Cuda:", torch.cuda.is_available())
+        
+    # user_seq, max_item, valid_rating_matrix, test_rating_matrix = get_user_seqs(args.data_file)
 
     item_ids = torch.arange(0, args.item_size-1, dtype=torch.long).to(torch.device("cuda" if args.cuda_condition else "cpu"))
 
@@ -256,16 +293,6 @@ def main():
     item_dataset = ItemembeddingDataset(item_ids)
     item_sampler = SequentialSampler(item_dataset)
     item_dataloader = DataLoader(item_dataset, sampler=item_sampler, batch_size=args.batch_size)
-
-    
-    if args.description:
-        description_embeddings = pd.read_csv('/home/seongbeom/paper/preference_rec/data/2014/Beauty/Beauty_embeddings.csv')
-        description_embeddings = description_embeddings.sort_values(by='asin')
-        description_embeddings = torch.tensor(description_embeddings.drop(columns=['asin']).values, dtype=torch.float32)
-    
-        model = UPTRec(args=args, description_embedding = description_embeddings)
-    else:
-        model =UPTRec(args=args)
 
     trainer = UPTRecTrainer(model, train_dataloader, cluster_dataloader, eval_dataloader, test_dataloader,item_dataloader, args)
     
