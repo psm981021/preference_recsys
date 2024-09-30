@@ -16,9 +16,9 @@ class RecWithContrastiveLearningDataset(Dataset):
         # currently apply one transform, will extend to multiples
         self.augmentations = {
             "crop": Crop(tao=args.tao),
-            "mask": Mask(gamma=args.gamma),
+            "mask": Mask(self.args, gamma=args.gamma),
             "reorder": Reorder(beta=args.beta),
-            "random": Random(tao=args.tao, gamma=args.gamma, beta=args.beta),
+            "random": Random(self.args, tao=args.tao, gamma=args.gamma, beta=args.beta),
         }
         if self.args.augment_type not in self.augmentations:
             raise ValueError(f"augmentation type: '{self.args.augment_type}' is invalided")
@@ -36,7 +36,6 @@ class RecWithContrastiveLearningDataset(Dataset):
             augmented_input_ids = self.base_transform(input_ids)
             pad_len = self.max_len - len(augmented_input_ids)
             augmented_input_ids = [0] * pad_len + augmented_input_ids
-
             augmented_input_ids = augmented_input_ids[-self.max_len :]
 
             assert len(augmented_input_ids) == self.max_len
@@ -152,15 +151,27 @@ class RecWithContrastiveLearningDataset(Dataset):
 
         elif self.data_type == "valid":
             cur_rec_tensors = self._data_sample_rec_task(user_id, items, input_ids, target_pos, answer)
+            cf_tensors_list = []
+            # if n_views == 2, then it's downgraded to pair-wise contrastive learning
+            total_augmentaion_pairs = nCr(self.n_views, 2)
+            for i in range(total_augmentaion_pairs):
+                cf_tensors_list.append(self._one_pair_data_augmentation(input_ids))
+
 
             # cur_rec_tensors returns user_id, input_id, target_pos, target_neg, answer
 
-            return cur_rec_tensors
+            return (cur_rec_tensors,cf_tensors_list)
         else:
             cur_rec_tensors = self._data_sample_rec_task(user_id, items_with_noise, input_ids, target_pos, answer)
 
+            cf_tensors_list = []
+            # if n_views == 2, then it's downgraded to pair-wise contrastive learning
+            total_augmentaion_pairs = nCr(self.n_views, 2)
+            for i in range(total_augmentaion_pairs):
+                cf_tensors_list.append(self._one_pair_data_augmentation(input_ids))
+
             # cur_rec_tensors returns user_id, input_id, target_pos, target_neg, answer
-            return cur_rec_tensors
+            return (cur_rec_tensors,cf_tensors_list)
 
     def __len__(self):
         """

@@ -166,6 +166,7 @@ class PCLoss(nn.Module):
                 pos_one_item_compare_loss = self.simclr_criterion(level,batch_sample_one, intents, intent_ids=intent_ids, density=temperature)
                 pos_two_item_compare_loss = self.simclr_criterion(level,batch_sample_two, intents, intent_ids=intent_ids, density=temperature)
             else:
+                
                 pos_one_item_compare_loss = self.criterion(level,batch_sample_one, intents, intent_ids=intent_ids, density=temperature)
                 pos_two_item_compare_loss = self.criterion(level,batch_sample_two, intents, intent_ids=intent_ids, density=temperature)
 
@@ -294,14 +295,17 @@ class NCELoss(nn.Module):
         # batch_sample_one = F.normalize(batch_sample_one, p=2, dim=1)
         # batch_sample_two = F.normalize(batch_sample_two, p=2, dim=1)
         
+        
         if self.args.contrast_type in ['Item-User','Item-Level', 'Item-description'] and level == 'item':
-            
+            B,C,E = batch_sample_one.shape
+
             if density is not None:
                 if self.args.ncl:
                     sim11 = F.relu(torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_one)) / density.unsqueeze(-1) 
                     sim22 = F.relu(torch.einsum('bij,bkj->bik', batch_sample_two, batch_sample_two)) / density.unsqueeze(-1) 
                     sim12 = F.relu(torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_two)) / density.unsqueeze(-1) 
                 else:
+                    
                     sim11 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_one) / density.unsqueeze(-1) 
                     sim22 = torch.einsum('bij,bkj->bik', batch_sample_two, batch_sample_two) / density.unsqueeze(-1) 
                     sim12 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_two) / density.unsqueeze(-1) 
@@ -312,25 +316,38 @@ class NCELoss(nn.Module):
                     sim22 = F.relu(torch.einsum('bij,bkj->bik', batch_sample_two, batch_sample_two)) /  self.temperature
                     sim12 = F.relu(torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_two)) /  self.temperature
                 else:
-                    sim11 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_one) / self.temperature
-                    sim22 = torch.einsum('bij,bkj->bik', batch_sample_two, batch_sample_two) / self.temperature
-                    sim12 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_two) / self.temperature
+                    
+                    batch_sample_one = batch_sample_one.reshape(-1,E)
+                    batch_sample_two = batch_sample_two.reshape(-1,E)
 
-            batch_size, max_seq, _ = sim11.shape
+                    sim11 = torch.matmul(batch_sample_one,batch_sample_one.T) / self.temperature
+                    sim22 = torch.matmul(batch_sample_two,batch_sample_two.T) / self.temperature
+                    sim12 = torch.matmul(batch_sample_one,batch_sample_two.T) / self.temperature
+                    
+                    # sim11 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_one) / self.temperature
+                    # sim22 = torch.einsum('bij,bkj->bik', batch_sample_two, batch_sample_two) / self.temperature
+                    # sim12 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_two) / self.temperature
+
+            # batch_size, max_seq, _ = sim11.shape
             # max_seq, _ = sim11.shape
 
             # d = sim12.shape[-1]
             # Mask out self-contrast (diagonal elements) and same-intent pairs if intent_ids is provided
             if intent_ids is not None:
-                intent = intent_ids.unsqueeze(-1)
-                mask_11_22 = torch.eq(intent,intent.transpose(1,2)).long().to(self.device)
-                
+                # intent = intent_ids.unsqueeze(-1)
+                intent = intent_ids.reshape(-1)
+
+                # mask_11_22 = torch.eq(intent,intent.transpose(1,2)).long().to(self.device)
                 # mask_11_22 = torch.eq(intent,intent.T).long().to(self.device)
+                mask_11_22 = torch.eq(intent.unsqueeze(0), intent.unsqueeze(1)).long().to(self.device)
 
                 sim11[mask_11_22 == 1] = float('-inf')
                 sim22[mask_11_22 == 1] = float('-inf')
-                eye_metrix = torch.eye(max_seq, dtype=torch.long).repeat(batch_size,1,1).to(self.device)
+
+                # eye_metrix = torch.eye(max_seq, dtype=torch.long).repeat(batch_size,1,1).to(self.device)
                 # eye_metrix = torch.eye(max_seq, dtype=torch.long).to(self.device)
+                N = B * C
+                eye_metrix = torch.eye(N, dtype=torch.long).to(self.device)
 
                 # # mask[eye_metrix == 1] = 0
                 mask_11_22[eye_metrix == 1] = 0
@@ -343,12 +360,12 @@ class NCELoss(nn.Module):
             # Positive와 Negative 유사도 값을 각각 합쳐서 최종 logits 생성
             raw_scores1 = torch.cat([sim12, sim11], dim=-1) # positive
             raw_scores2 = torch.cat([sim22, sim12.transpose(-1, -2)], dim=-1) # negative
-            # # raw_scores2 = torch.cat([sim22,sim12],dim=-1) # negative
 
             logits = torch.cat([raw_scores1, raw_scores2], dim=-2)
 
-            labels = torch.arange(2 * max_seq, dtype=torch.long, device=logits.device)
-            labels = labels.unsqueeze(0).repeat(batch_size, 1) 
+            # labels = torch.arange(2 * B, dtype=torch.long, device=logits.device)
+            labels = torch.arange(2 * N, dtype=torch.long, device=logits.device)
+            # labels = labels.unsqueeze(0).repeat(batch_size, 1) 
 
 
         else:
@@ -543,8 +560,9 @@ class SelfAttention(nn.Module):
         # self.query = nn.Linear(args.hidden_size, self.all_head_size)
         self.query = lora.Linear(args.hidden_size, self.all_head_size, r=16)
 
-        self.key = nn.Linear(args.hidden_size, self.all_head_size)
-
+        # self.key = nn.Linear(args.hidden_size, self.all_head_size)
+        self.key = lora.Linear(args.hidden_size, self.all_head_size , r=16)
+        
         # self.value = nn.Linear(args.hidden_size, self.all_head_size)
         self.value = lora.Linear(args.hidden_size, self.all_head_size , r=16)
 

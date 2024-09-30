@@ -451,7 +451,6 @@ class EarlyStopping:
 
     def __call__(self, score, model):
         # score HIT@10 NDCG@10
-
         if self.best_score is None:
             self.best_score = score
             self.score_min = np.array([0] * len(score))
@@ -486,8 +485,9 @@ class EarlyStopping:
 class Random(object):
     """Randomly pick one data augmentation type every time call"""
 
-    def __init__(self, tao=0.2, gamma=0.7, beta=0.2):
-        self.data_augmentation_methods = [Crop(tao=tao), Mask(gamma=gamma), Reorder(beta=beta)]
+    def __init__(self,args, tao=0.2, gamma=0.7, beta=0.2):
+        self.args=args
+        self.data_augmentation_methods = [Crop(tao=tao), Mask(self.args,gamma=gamma), Reorder(beta=beta)]
         print("Total augmentation numbers: ", len(self.data_augmentation_methods))
 
     def __call__(self, sequence):
@@ -529,19 +529,61 @@ class Crop(object):
 class Mask(object):
     """Randomly mask k items given a sequence"""
 
-    def __init__(self, gamma=0.7):
+    def __init__(self, args,gamma=0.7):
+        self.args =args
         self.gamma = gamma
 
     def __call__(self, sequence):
         # make a deep copy to avoid original sequence be modified
         copied_sequence = copy.deepcopy(sequence)
+        
         mask_nums = int(self.gamma * len(copied_sequence))
-        mask = [0 for i in range(mask_nums)]
+        # mask = [ 0 for i in range(mask_nums)]
+        mask = [self.args.mask_id for i in range(mask_nums)]
+        
         mask_idx = random.sample([i for i in range(len(copied_sequence))], k=mask_nums)
         for idx, mask_value in zip(mask_idx, mask):
             copied_sequence[idx] = mask_value
         return copied_sequence
+    
+class Masking(object):
+    """Randomly mask tokens in a sequence for MLM."""
 
+    def __init__(self, args, gamma=0.15):
+        self.args = args
+        self.gamma = gamma  # Fraction of tokens to mask (15% is standard)
+
+    def __call__(self, sequence):
+        # Make a deep copy to avoid modifying the original sequence
+        copied_sequence = copy.deepcopy(sequence)
+        labels = copy.deepcopy(sequence)
+        sequence_length = len(copied_sequence)
+
+        # Calculate the number of tokens to mask
+        mask_num = max(1, int(self.gamma * sequence_length))
+
+        # Randomly select indices to mask
+        mask_indices = random.sample(range(sequence_length), k=mask_num)
+
+        for idx in range(sequence_length):
+            if idx in mask_indices:
+                rand = random.random()
+                if rand < 0.8:
+                    # 80% replace with mask token
+                    copied_sequence[idx] = self.args.mask_id
+                elif rand < 0.9:
+                    # 10% replace with a random token ID
+                    copied_sequence[idx] = random.randint(0, self.args.item_size - 1)
+                else:
+                    # 10% keep the original token
+                    pass
+                # Keep the original token as the label
+                labels[idx] = sequence[idx]
+            else:
+                # Do not compute loss on unmasked tokens
+                labels[idx] = -100  # Use -100 to ignore in loss computation
+
+        return copied_sequence, labels
 
 class Reorder(object):
     """Randomly shuffle a continuous sub-sequence"""

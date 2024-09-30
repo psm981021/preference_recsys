@@ -19,6 +19,7 @@ import loralib as lora
 
 from Datasets import RecWithContrastiveLearningDataset, SASRecDataset, ItemembeddingDataset
 from trainers import UPTRecTrainer
+from trainers_2 import UPTRecTrainer_pre
 from models import UPTRec
 from utils import *
 
@@ -66,7 +67,9 @@ def main():
     parser.add_argument("--mlp", action="store_true", help="adapt mlp for cluster head")    
     parser.add_argument("--ncl", action="store_true", help="non negative vector for similarity")   
     parser.add_argument("--simclr", action="store_true", help="non negative vector for similarity")   
-    parser.add_argument("--bi_direction", action="store_true", help="bi-directional attention mask")   
+    parser.add_argument("--bi_direction", action="store_true", help="bi-directional attention mask") 
+
+    parser.add_argument("--pre_train", action="store_true", help="pre-training for cluster-attention &  fine-tuning for contrastive learning ")  
     parser.add_argument("--fine_tune", action="store_true", help="pre-training for cluster-attention &  fine-tuning for contrastive learning ")   
 
 
@@ -301,7 +304,10 @@ def main():
     item_sampler = SequentialSampler(item_dataset)
     item_dataloader = DataLoader(item_dataset, sampler=item_sampler, batch_size=args.batch_size)
 
-    trainer = UPTRecTrainer(model, train_dataloader, cluster_dataloader, eval_dataloader, test_dataloader,item_dataloader, args)
+    if args.pre_train or args.fine_tune:
+        trainer = UPTRecTrainer_pre(model, train_dataloader, cluster_dataloader, eval_dataloader, test_dataloader,item_dataloader, args)
+    else:
+        trainer = UPTRecTrainer(model, train_dataloader, cluster_dataloader, eval_dataloader, test_dataloader,item_dataloader, args)
     
     if args.do_eval:
         trainer.args.train_matrix = test_rating_matrix
@@ -331,13 +337,14 @@ def main():
 
             # evaluate on NDCG@20
             scores, _ = trainer.valid(epoch, full_sort=True)
-            
             early_stopping(np.array(scores[-1:]), trainer.model)
-            
+        
             if early_stopping.early_stop:
                 save_epoch = epoch
                 print("Early stopping")
                 break
+
+
             if args.wandb == True:
                 wandb.log({
                     "HIT@5": scores[0],
