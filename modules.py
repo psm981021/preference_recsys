@@ -9,6 +9,7 @@ from fast_cluster import compute_hashes, clustered_aggregate, clustered_broadcas
 import matplotlib.pyplot as plt
 import seaborn as sns
 import random
+import loralib as lora
 
 
 class SupConLoss(nn.Module):
@@ -452,7 +453,6 @@ class Clustered_Attention_Chunking(nn.Module):
         self.args =args
         self.attention = SelfAttention(args)
         self.LayerNorm = LayerNorm(args.hidden_size, eps=1e-12)
-        pass
 
     def forward(self, seq, attention_mask, cluster_id = None):
 
@@ -540,9 +540,13 @@ class SelfAttention(nn.Module):
         self.attention_head_size = int(args.hidden_size / args.num_attention_heads)
         self.all_head_size = self.num_attention_heads * self.attention_head_size
 
-        self.query = nn.Linear(args.hidden_size, self.all_head_size)
+        # self.query = nn.Linear(args.hidden_size, self.all_head_size)
+        self.query = lora.Linear(args.hidden_size, self.all_head_size, r=16)
+
         self.key = nn.Linear(args.hidden_size, self.all_head_size)
-        self.value = nn.Linear(args.hidden_size, self.all_head_size)
+
+        # self.value = nn.Linear(args.hidden_size, self.all_head_size)
+        self.value = lora.Linear(args.hidden_size, self.all_head_size , r=16)
 
         self.attn_dropout = nn.Dropout(args.attention_probs)
 

@@ -13,10 +13,9 @@ import torch
 import argparse
 import time
 import pandas as pd
-
-
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 import torch.nn as nn
+import loralib as lora
 
 from Datasets import RecWithContrastiveLearningDataset, SASRecDataset, ItemembeddingDataset
 from trainers import UPTRecTrainer
@@ -67,6 +66,9 @@ def main():
     parser.add_argument("--mlp", action="store_true", help="adapt mlp for cluster head")    
     parser.add_argument("--ncl", action="store_true", help="non negative vector for similarity")   
     parser.add_argument("--simclr", action="store_true", help="non negative vector for similarity")   
+    parser.add_argument("--bi_direction", action="store_true", help="bi-directional attention mask")   
+    parser.add_argument("--fine_tune", action="store_true", help="pre-training for cluster-attention &  fine-tuning for contrastive learning ")   
+
 
     parser.add_argument(
         "--attention_type",
@@ -214,6 +216,8 @@ def main():
     if args.embedding:
         embedding_path = os.path.join(args.output_dir, "embedding")
         check_path(embedding_path)
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
+    args.cuda_condition = torch.cuda.is_available() and not args.no_cuda
 
     try:
         args.data_file = f'{args.data_dir}/{args.data_name}/{args.data_name}_seq.txt'
@@ -225,36 +229,27 @@ def main():
     args.item_size = max_item + 2
     args.mask_id = max_item + 1
 
-    # os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
-
     if args.description:
         description_embeddings = pd.read_csv('/home/seongbeom/paper/preference_rec/data/2014/Beauty/Beauty_embeddings.csv')
         description_embeddings = description_embeddings.sort_values(by='asin')
         description_embeddings = torch.tensor(description_embeddings.drop(columns=['asin']).values, dtype=torch.float32)
-    
         model = UPTRec(args=args, description_embedding = description_embeddings)
     else:
         model =UPTRec(args=args)
 
-    # if args.use_multi_gpu and torch.cuda.device_count() > 1:
-    #     args.device_ids = list(map(int, args.multi_devices.split(',')))
-    #     args.device = torch.device(f"cuda:{args.device_ids[0]}")  # Use the first device for primary
-    #     model = nn.DataParallel(model, device_ids=args.device_ids)  # Wrap the model with DataParallel
-    #     print(f"Using {len(args.device_ids)} GPUs: {args.device_ids}")
-    # else:
-    
-    args.device = torch.device(f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu")
-    model = model.to(args.device)
 
-    args.cuda_condition = torch.cuda.is_available() and not args.no_cuda
-    print("Using Cuda:", torch.cuda.is_available())
+    if args.use_multi_gpu and torch.cuda.device_count() > 1:
+        args.device_ids = list(map(int, args.multi_devices.split(',')))
+        args.device = torch.device(f"cuda:{args.device_ids[0]}")  # Use the first device for primary
+        model = nn.DataParallel(model, device_ids=args.device_ids)  # Wrap the model with DataParallel
+        print(f"Using {len(args.device_ids)} GPUs: {args.device_ids}")
         
     # user_seq, max_item, valid_rating_matrix, test_rating_matrix = get_user_seqs(args.data_file)
 
     item_ids = torch.arange(0, args.item_size-1, dtype=torch.long).to(torch.device("cuda" if args.cuda_condition else "cpu"))
 
     # save model args
-    args_str = f"{args.model_name}-{args.data_name}-{args.model_idx}-{args.num_intent_clusters}-{args.batch_size}"
+    args_str = f"{args.model_idx}-{args.num_intent_clusters}-{args.batch_size}"
     args.log_file = os.path.join(args.output_dir, args_str + ".txt")
     show_args_info(args,args.log_file)
 
@@ -265,12 +260,24 @@ def main():
     checkpoint = args_str + ".pt"
     args.checkpoint_path = os.path.join(args.output_dir, checkpoint)
     if os.path.exists(args.checkpoint_path):
+        if args.fine_tune:
+            model.load_state_dict(torch.load(args.checkpoint_path), strict=False)
+            
+            checkpoint = args_str + "_fine_tune.pt"
+            args.checkpoint_path = os.path.join(args.output_dir, checkpoint)
+            lora.mark_only_lora_as_trainable(model)
+            args.log_file = os.path.join(args.output_dir, args_str + "_fine_tune.txt")
+
+            with open(args.log_file, "a") as f:
+                f.write("------------------------------LoRA Fine Tuning------------------------------ \n")
         with open(args.log_file, "a") as f:
             f.write("------------------------------ Continue Training ------------------------------ \n")
         
     else:
         with open(args.log_file, "a") as f:
             f.write(str(args) + "\n")
+
+
 
     # training data for node classification
 

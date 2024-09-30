@@ -24,6 +24,7 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from sklearn.decomposition import TruncatedSVD
 import wandb
+import loralib as lora
 
 class Trainer:
     def __init__(self, model, train_dataloader, cluster_dataloader, eval_dataloader, test_dataloader,item_dataloader, args):
@@ -31,7 +32,7 @@ class Trainer:
         self.args = args
         self.cuda_condition = torch.cuda.is_available() and not self.args.no_cuda
         self.device = torch.device("cuda" if self.cuda_condition else "cpu")
-        self.args.device = self.device
+        # self.device = torch.device(f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu")
         self.model = model
 
         self.num_intent_clusters = [int(i) for i in self.args.num_intent_clusters.split(",")]
@@ -463,10 +464,10 @@ class UPTRecTrainer(Trainer):
                 rec_cf_data_iter = tqdm(enumerate(cluster_dataloader), total=len(cluster_dataloader))
                 
                 for i, (rec_batch, _, _) in rec_cf_data_iter:
-                    
+                   
                     rec_batch = tuple(t.to(self.device) for t in rec_batch)
                     _, input_ids, target_pos, target_neg, _ = rec_batch
-
+                    
                     if self.args.context == "encoder":
                         sequence_output = self.model(input_ids,self.args)
                         
@@ -579,8 +580,7 @@ class UPTRecTrainer(Trainer):
                 else:
                     recommendation_output = self.model(input_ids,self.args)
                     
-                rec_loss = self.cross_entropy(recommendation_output, target_pos, target_neg)
-
+                rec_loss = self.cross_entropy(recommendation_output, target_pos, target_neg)                
 
                 # attention map visualization
                 # if self.args.attention_map == True and epoch % self.args.visualization_epoch == 0 and i in [0,10,20]:
@@ -650,7 +650,7 @@ class UPTRecTrainer(Trainer):
                             )
                             cl_losses.append(self.args.intent_cf_weight * cl_loss3)
 
-                    elif self.args.contrast_type == "Item-Level":
+                    elif self.args.contrast_type == "Item-Level" and self.args.fine_tune:
 
                         if epoch >= self.args.warm_up_epoches:
                             
@@ -732,7 +732,7 @@ class UPTRecTrainer(Trainer):
                                 cl_losses.append(ce_loss * self.args.intent_cf_weight * 0.1)
                             
                             
-                    elif self.args.contrast_type == "User":
+                    elif self.args.contrast_type == "User" and self.args.fine_tune:
                         cl_loss1 = self._instance_wsie_one_pair_contrastive_learning(
                                 cl_batch, intent_ids=seq_class_label_batches
                             )
@@ -795,7 +795,7 @@ class UPTRecTrainer(Trainer):
                             ce_loss = cross_entropy_loss_fn(intent_1_logits, intent_2_labels) * 0.00001
                             cl_losses.append(ce_loss * self.args.intent_cf_weight)
 
-                    elif self.args.contrast_type == "Item-User":
+                    elif self.args.contrast_type == "Item-User" and self.args.fine_tune:
                         if epoch >= self.args.warm_up_epoches:
                             if self.args.seq_representation_type == "mean":
                                 sequence_output = torch.mean(recommendation_output, dim=1, keepdim=False)

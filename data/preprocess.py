@@ -343,12 +343,12 @@ def ml_generate_data(path):
     write_seq_sample(User,'Ml-1m')
 
 amazon = ['Beauty', 'Toys_and_Games', 'Video_Games','Sports_and_Outdoors']
-for i in amazon:
-    Amazon_generate_data(i)
+# for i in amazon:
+#     Amazon_generate_data(i)
 
 
 #steam_generate_data('/Users/sb/Desktop/project/preference_rec/data/australian_user_reviews.json.gz') #using version 1 review data
-#ml_generate_data('/Users/sb/Desktop/project/preference_rec/data/ml-1m/ratings.dat')  #m1-1m
+ml_generate_data('/home/sb/data/ml-20m.inter')  #m1-1m
     
 # import IPython; IPython.embed(colors='Linux');exit(1);
 

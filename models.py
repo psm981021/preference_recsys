@@ -61,19 +61,6 @@ class KMeans(object):
         # convert to cuda Tensors for broadcast
         centroids = torch.Tensor(centroids).to(self.device)
         self.centroids = nn.functional.normalize(centroids, p=2, dim=1)
-
-    # def train(self, x):
-    #     # trian to get centroids
-    #     if x.shape[0] > self.num_cluster:
-    #         self.clus.train(x, self.index)
-    #         centroids = faiss.vector_to_array(self.clus.centroids).reshape(self.num_cluster, self.hidden_size)
-
-    #         self.index.reset()
-    #         self.index.add(centroids)
-
-    #         centroids = torch.Tensor(centroids).to(self.device)
-    #         self.centroids = nn.functional.normalize(centroids, p=2, dim=1)
-
             
     def query(self, x):
         # self.index.add(x)
@@ -156,15 +143,15 @@ class UPTRec(nn.Module):
         subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1)  # torch.uint8
         subsequent_mask = (subsequent_mask == 0).unsqueeze(1)
         subsequent_mask = subsequent_mask.long()
-
+ 
         if self.args.cuda_condition:
-            device = input_ids.device
+            subsequent_mask = subsequent_mask.cuda()
 
-        subsequent_mask = subsequent_mask.to(device)
         extended_attention_mask = extended_attention_mask * subsequent_mask
-        extended_attention_mask = extended_attention_mask.to(device)#to(dtype=next(self.parameters()).dtype)# fp16 compatibility          
-        extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
-
+        extended_attention_mask = extended_attention_mask.to(dtype=next(self.parameters()).dtype)# fp16 compatibility   
+        if not self.args.bi_direction:  
+            extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
+        
         sequence_emb = self.add_position_embedding(input_ids,description)
         
         item_encoded_layers = self.item_encoder(sequence_emb, extended_attention_mask,args,cluster_id, output_all_encoded_layers=True)

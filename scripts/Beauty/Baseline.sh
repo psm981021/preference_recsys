@@ -1,6 +1,56 @@
 
-python main.py --model_name="UPTRec" --data_name="Beauty"  --output_dir="output_custom/Beauty/Baseline" \
-    --model_idx="UPTRec_Baseline" \
-    --contrast_type="None" --seq_representation_type="concatenate" \
-    --num_intent_clusters=16 --gpu_id=0 \
-    --epochs=3500  --patience=100 --do_eval --embedding \
+python main.py \
+    --model_name UPTRec \
+    --data_name Beauty  \
+    --data_dir data \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type Base \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 1 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Ablation/Beauty/LoRA/1 \
+    --model_idx Mean\
+    --contrast_type None \
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 10\
+    --intent_cf_weight  1\
+    --cf_weight 0 \
+    --cluster_value 0.3 \
+    
+python main.py \
+    --model_name UPTRec \
+    --data_name Beauty  \
+    --data_dir data \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type Cluster \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 1 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Ablation/Beauty/LoRA/1 \
+    --model_idx Mean\
+    --contrast_type Item-Level \
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 10\
+    --intent_cf_weight  1\
+    --cf_weight 0 \
+    --cluster_value 0.3 \
+    --simclr \
+    --fine_tune \
+
+# scripts/Beauty/Baseline.sh
