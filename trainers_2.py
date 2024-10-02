@@ -25,6 +25,7 @@ from sklearn.manifold import TSNE
 from sklearn.decomposition import TruncatedSVD
 import wandb
 import loralib as lora
+from torch.cuda.amp import autocast
 
 class Trainer:
     def __init__(self, model, train_dataloader, cluster_dataloader, eval_dataloader, test_dataloader,item_dataloader, args):
@@ -32,7 +33,7 @@ class Trainer:
         self.args = args
         self.cuda_condition = torch.cuda.is_available() and not self.args.no_cuda
         self.device = torch.device("cuda" if self.cuda_condition else "cpu")
-        # self.device = torch.device(f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu")
+        self.device= args.device
         self.model = model
 
         self.num_intent_clusters = [int(i) for i in self.args.num_intent_clusters.split(",")]
@@ -247,8 +248,6 @@ class Trainer:
         plt.close()
         
 
-
-
     def embedding_plot(self,epoch,i, sequence_context, intent_ids ):
         """
         Plots the embeddings using t-SNE for visualization
@@ -360,13 +359,10 @@ class UPTRecTrainer_pre(Trainer):
         cl_output_slice_1 = cl_output_slice[1]
 
         if self.args.mlp:
-
-            try:
-                cl_output_slice_0 = self.projection_user(cl_output_slice[0])
-                cl_output_slice_1 = self.projection_user(cl_output_slice[1])
-            except:
-                import IPython;IPython.embed(colors='Linux');exit(1);
+            cl_output_slice_0 = self.projection_user(cl_output_slice[0])
+            cl_output_slice_1 = self.projection_user(cl_output_slice[1])
         
+
         if self.args.de_noise:
             if self.args.simclr:
                 cl_loss = self.simclr_criterion('user', cl_output_slice_0, cl_output_slice_1, intent_ids = intent_ids)
@@ -504,12 +500,9 @@ class UPTRecTrainer_pre(Trainer):
                     rec_batch = tuple(t.to(self.device) for t in rec_batch)
                     _, input_ids, target_pos, target_neg, _ = rec_batch
                     
-                    if self.args.context == "encoder":
-                        sequence_output,_ = self.model(input_ids,self.args)
-                        
-                    if self.args.context == "item_embedding":
-                        sequence_output,_ = self.model.item_embeddings(input_ids)
-
+                    
+                    sequence_output,_ = self.model(input_ids,self.args)
+                    
                     sequence_context_item = sequence_output.view(self.args.batch_size*self.args.max_seq_length,-1)
                     sequence_context_user = sequence_output.view(self.args.batch_size,-1)
           
@@ -522,7 +515,6 @@ class UPTRecTrainer_pre(Trainer):
                         sequence_context_user = sequence_context_user.detach().cpu().numpy()
                         sequence_context_item = sequence_context_item.detach().cpu().numpy()
                         
-
                     # sequence_context_item = self.projection_item(sequence_context_item).detach().cpu().numpy()
                     # sequence_context_user = self.projection_user(sequence_context_user).detach().cpu().numpy()
                     
@@ -600,21 +592,23 @@ class UPTRecTrainer_pre(Trainer):
                     ### MLM Learning ###
 
                     masker = Masking(self.args, gamma=0.15)
-                    masked_input_ids = []
-                    mlm_labels = []
-                    for seq in input_ids:
-                        masked_seq, labels = masker(seq.cpu().numpy())
-                        masked_input_ids.append(torch.tensor(masked_seq, dtype=torch.long))
-                        mlm_labels.append(torch.tensor(labels, dtype=torch.long))
+                    # masked_input_ids = []
+                    # mlm_labels = []
+                    # for seq in input_ids:
+                    #     masked_seq, labels = masker(seq.cpu().numpy())
+                    #     masked_input_ids.append(torch.tensor(masked_seq, dtype=torch.long))
+                    #     mlm_labels.append(torch.tensor(labels, dtype=torch.long))
 
-                    masked_input_ids = torch.stack(masked_input_ids).to(self.device)
-                    mlm_labels = torch.stack(mlm_labels).to(self.device)
+                    # masked_input_ids = torch.stack(masked_input_ids).to(self.device)
+                    # mlm_labels = torch.stack(mlm_labels).to(self.device)
+
+                    masked_input_ids, mlm_labels = masker.mask_batch(input_ids)
                     sequence_output, prediction_scores = self.model(masked_input_ids, self.args,intent_ids)
 
+                    _, prediction_scores = self.model(masked_input_ids, self.args,intent_ids)
                     mlm_loss_fct = nn.CrossEntropyLoss(ignore_index=-100)
                     mlm_loss = mlm_loss_fct(prediction_scores.view(-1, self.args.item_size), mlm_labels.view(-1))
-
-
+   
                 else:
                     rec_loss = self.cross_entropy(recommendation_output, target_pos, target_neg)           
 
@@ -676,7 +670,6 @@ class UPTRecTrainer_pre(Trainer):
                 joint_loss.backward()
                 self.optim.step()
                 joint_avg_loss += joint_loss.item()
-                
 
             # end of for statements in model training
 
@@ -736,6 +729,7 @@ class UPTRecTrainer_pre(Trainer):
 
             with open(self.args.log_file, "a") as f:
                 f.write(str(post_fix) + "\n")
+                
 
         else: # for valid and test
             rec_data_iter = tqdm(enumerate(dataloader), total=len(dataloader))
@@ -799,9 +793,10 @@ class UPTRecTrainer_pre(Trainer):
                 answer_list = None
                 print("Model Eval ")
                 joint_avg_loss = 0.0
+                ml_avg_loss = 0.0
                 # -------------perfrom valid, test on cluster-attention-------------- #
                 for i, (batch,cl_batches) in rec_data_iter:
-
+                    
                     batch = tuple(t.to(self.device) for t in batch)
                     user_ids, input_ids, target_pos, target_neg, answers = batch
 
@@ -831,76 +826,57 @@ class UPTRecTrainer_pre(Trainer):
                         recommend_output_ ,_= self.model(input_ids,self.args,intent_ids)
                     
                     else:
-                        recommend_output_,_ = self.model(input_ids, self.args)
-
-                    recommend_output = recommend_output_[:, -1, :]
-
-                    ## Pre-training Stage ##
-                    # if self.args.fine_tune:
-                    #     cl_losses = []
+                        recommend_output_ ,_ = self.model(input_ids, self.args)
                         
-                    #     for cl_batch in cl_batches:
-                    #         ## Only implement Item-Level Contrastive Learning
-                    #         if epoch >= self.args.warm_up_epoches:
-                    #             if self.args.seq_representation_type == "mean":
-                    #                 sequence_context = torch.mean(recommend_output_, dim=2, keepdim=False).view(recommend_output_.shape[0],-1)
-                    #                 sequence_output = sequence_context.view(self.args.batch_size*self.args.max_seq_length, -1).detach().cpu().numpy()  
+                    # Pre-training Stage ##
+                    if self.args.pre_train:
 
-                    #         for cluster in self.item_clusters:
-                    #             seq2intents = []
-                    #             intent_ids = []
-                    #             densitys = []
-                    #             intent_id, seq2intent,density = cluster.query(sequence_output)
-                    #             seq2intents.append(seq2intent)
-                    #             intent_ids.append(intent_id)
-                    #             densitys.append(density)
+                        masker = Masking(self.args, gamma=0.15)
+                        # masked_input_ids = []
+                        # mlm_labels = []
+                        # for seq in input_ids:
+                        #     masked_seq, labels = masker(seq.cpu().numpy())
+                        #     masked_input_ids.append(torch.tensor(masked_seq, dtype=torch.long))
+                        #     mlm_labels.append(torch.tensor(labels, dtype=torch.long))
 
-                    #         if self.args.cluster_temperature:
-                    #             cl_loss3 = self.pcl_item_pair_contrastive_learning(
-                    #                 cl_batch, intents=seq2intents, intent_ids=intent_ids,temperature=densitys
-                    #             )
-                    #         else: 
-                    #             cl_loss3 = self.pcl_item_pair_contrastive_learning(
-                    #                 cl_batch, intents=seq2intents, intent_ids=intent_ids
-                    #             )
-                    #         cl_losses.append(self.args.intent_cf_weight * cl_loss3)
+                        # masked_input_ids = torch.stack(masked_input_ids).to(self.device)
+                        # mlm_labels = torch.stack(mlm_labels).to(self.device)
 
-                    #     joint_loss = 0
-                    #     if self.args.contrast_type in ["IntentCL", "Hybrid", "Item-Level", "Item-User", "Item-description", "User"]:
-                    #         for cl_loss in cl_losses:
-                    #             joint_loss += cl_loss
+                        masked_input_ids, mlm_labels = masker.mask_batch(input_ids)
+                        _, prediction_scores = self.model(masked_input_ids, self.args,intent_ids)
 
-                    #     joint_avg_loss += joint_loss.item()
-                    #     post_fix = {
-                    #         "Epoch": epoch,
-                    #         "Contrastive Loss": "{:.6f}".format(joint_avg_loss / len(rec_data_iter)),
-                    #     }
-                    #     print(post_fix)
-                    #     return -(joint_avg_loss / len(rec_data_iter))
-
-                    # recommendation results
-                    rating_pred = self.predict_full(recommend_output)
-
-                    rating_pred = rating_pred.cpu().data.numpy().copy()
-                    batch_user_index = user_ids.cpu().numpy()
-                    
-                    rating_pred[self.args.train_matrix[batch_user_index].toarray() > 0] = 0
-                    # reference: https://stackoverflow.com/a/23734295, https://stackoverflow.com/a/20104162
-                    # argpartition T: O(n)  argsort O(nlogn)
-                    # ind = np.argpartition(rating_pred, -20)[:, -20:]
-                    ind = np.argpartition(rating_pred, -40)[:, -40:]
-                    arr_ind = rating_pred[np.arange(len(rating_pred))[:, None], ind]
-                    arr_ind_argsort = np.argsort(arr_ind)[np.arange(len(rating_pred)), ::-1]
-                    batch_pred_list = ind[np.arange(len(rating_pred))[:, None], arr_ind_argsort]
-
-                    if i == 0:
-                        pred_list = batch_pred_list
-                        answer_list = answers.cpu().data.numpy()
+                        mlm_loss_fct = nn.CrossEntropyLoss(ignore_index=-100)
+                        mlm_loss = mlm_loss_fct(prediction_scores.view(-1, self.args.item_size), mlm_labels.view(-1))
+                        ml_avg_loss += mlm_loss
                     else:
-                        pred_list = np.append(pred_list, batch_pred_list, axis=0)
-                        answer_list = np.append(answer_list, answers.cpu().data.numpy(), axis=0)
-            
-                return self.get_full_sort_score(epoch, answer_list, pred_list)
+                        recommend_output = recommend_output_[:, -1, :]
+
+                        # recommendation results
+                        rating_pred = self.predict_full(recommend_output)
+
+                        rating_pred = rating_pred.cpu().data.numpy().copy()
+                        batch_user_index = user_ids.cpu().numpy()
+                        
+                        rating_pred[self.args.train_matrix[batch_user_index].toarray() > 0] = 0
+                        # reference: https://stackoverflow.com/a/23734295, https://stackoverflow.com/a/20104162
+                        # argpartition T: O(n)  argsort O(nlogn)
+                        # ind = np.argpartition(rating_pred, -20)[:, -20:]
+                        ind = np.argpartition(rating_pred, -40)[:, -40:]
+                        arr_ind = rating_pred[np.arange(len(rating_pred))[:, None], ind]
+                        arr_ind_argsort = np.argsort(arr_ind)[np.arange(len(rating_pred)), ::-1]
+                        batch_pred_list = ind[np.arange(len(rating_pred))[:, None], arr_ind_argsort]
+
+                        if i == 0:
+                            pred_list = batch_pred_list
+                            answer_list = answers.cpu().data.numpy()
+                        else:
+                            pred_list = np.append(pred_list, batch_pred_list, axis=0)
+                            answer_list = np.append(answer_list, answers.cpu().data.numpy(), axis=0)
+     
+                if self.args.pre_train:
+                    return mlm_avg_loss/len(rec_data_iter)
+                else:
+                    return self.get_full_sort_score(epoch, answer_list, pred_list)
 
             else:
                 for i, batch in rec_data_iter:

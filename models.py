@@ -129,7 +129,11 @@ class UPTRec(nn.Module):
         else:
             item_embeddings = self.item_embeddings(sequence)
         position_embeddings = self.position_embeddings(position_ids)
-        sequence_emb = item_embeddings + position_embeddings
+        
+        if self.args.position_encoding_false:
+            sequence_emb = item_embeddings
+        else:
+            sequence_emb = item_embeddings + position_embeddings
         sequence_emb = self.LayerNorm(sequence_emb)
         sequence_emb = self.dropout(sequence_emb)
 
@@ -149,7 +153,7 @@ class UPTRec(nn.Module):
             subsequent_mask = subsequent_mask.cuda()
 
         extended_attention_mask = extended_attention_mask * subsequent_mask
-        extended_attention_mask = extended_attention_mask.to(dtype=next(self.parameters()).dtype)# fp16 compatibility   
+        extended_attention_mask = extended_attention_mask#.to(dtype=next(.parameters()).dtype)# fp16 compatibility   
         if not self.args.bi_direction:  
             extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
         

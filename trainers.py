@@ -340,7 +340,7 @@ class UPTRecTrainer(Trainer):
         cl_batch = torch.cat(inputs, dim=0)
         cl_batch = cl_batch.to(self.device)
     
-        cl_sequence_output = self.model(cl_batch,self.args)
+        cl_sequence_output,_ = self.model(cl_batch,self.args)
 
         if self.args.seq_representation_type == "mean":
             
@@ -383,11 +383,11 @@ class UPTRecTrainer(Trainer):
         inputs[1] =inputs[1].to(self.device)
 
         if self.args.description:
-            cl_sequence_output_view_1 = self.model(inputs[0],self.args,description='description')
-            cl_sequence_output_view_2 = self.model(inputs[1],self.args,description='description')
+            cl_sequence_output_view_1,_ = self.model(inputs[0],self.args,description='description')
+            cl_sequence_output_view_2,_ = self.model(inputs[1],self.args,description='description')
         else:
-            cl_sequence_output_view_1 = self.model(inputs[0],self.args,intent_ids)
-            cl_sequence_output_view_2 = self.model(inputs[1],self.args,intent_ids)
+            cl_sequence_output_view_1,_ = self.model(inputs[0],self.args,intent_ids)
+            cl_sequence_output_view_2,_ = self.model(inputs[1],self.args,intent_ids)
 
         if self.args.seq_representation_type == 'mean':
             
@@ -467,10 +467,10 @@ class UPTRecTrainer(Trainer):
                     _, input_ids, target_pos, target_neg, _ = rec_batch
                     
                     if self.args.context == "encoder":
-                        sequence_output = self.model(input_ids,self.args)
+                        sequence_output,_ = self.model(input_ids,self.args)
                         
                     if self.args.context == "item_embedding":
-                        sequence_output = self.model.item_embeddings(input_ids)
+                        sequence_output,_ = self.model.item_embeddings(input_ids)
 
                     sequence_context_item = sequence_output.view(self.args.batch_size*self.args.max_seq_length,-1)
                     sequence_context_user = sequence_output.view(self.args.batch_size,-1)
@@ -547,7 +547,7 @@ class UPTRecTrainer(Trainer):
 
                 if self.args.attention_type in ["Cluster"] and epoch >= self.args.warm_up_epoches:
                     if self.args.context == "encoder":
-                        sequence_context = self.model(input_ids,self.args)
+                        sequence_context,_ = self.model(input_ids,self.args)
                     if self.args.context == "item_embedding":
                         sequence_context = self.model.item_embeddings(input_ids)
                     
@@ -573,10 +573,10 @@ class UPTRecTrainer(Trainer):
                 
                 if self.args.attention_type == "Cluster" and epoch >= self.args.warm_up_epoches:
                     
-                    recommendation_output = self.model(input_ids,self.args,intent_ids)
+                    recommendation_output,_ = self.model(input_ids,self.args,intent_ids)
                     
                 else:
-                    recommendation_output = self.model(input_ids,self.args)
+                    recommendation_output,_ = self.model(input_ids,self.args)
                     
                 rec_loss = self.cross_entropy(recommendation_output, target_pos, target_neg)                
 
@@ -689,8 +689,8 @@ class UPTRecTrainer(Trainer):
                                 input_1 = cl_batch[0].to(self.device)
                                 input_2 = cl_batch[1].to(self.device)
 
-                                cl_output_1 = self.model(input_1,self.args, intent_ids)
-                                cl_output_2 = self.model(input_2,self.args, intent_ids)
+                                cl_output_1,_ = self.model(input_1,self.args, intent_ids)
+                                cl_output_2,_ = self.model(input_2,self.args, intent_ids)
                                 # cl_output_1 = self.model(input_1,self.args, intent_ids).view(recommendation_output.shape[0]*self.args.max_seq_length, -1).detach().cpu().numpy()
                                 # cl_output_2 = self.model(input_2,self.args, intent_ids).view(recommendation_output.shape[0]*self.args.max_seq_length, -1).detach().cpu().numpy()
                                 if self.args.seq_representation_type == "mean":
@@ -767,10 +767,10 @@ class UPTRecTrainer(Trainer):
                         
                         if self.args.cluster_prediction:
                             cl_1 =cl_batch[0].to(self.device)
-                            cl_1_output = self.model(cl_1,self.args).view(cl_1.shape[0], -1).detach().cpu().numpy()
+                            cl_1_output,_ = self.model(cl_1,self.args).view(cl_1.shape[0], -1).detach().cpu().numpy()
 
                             cl_2 =cl_batch[1].to(self.device)
-                            cl_2_output = self.model(cl_2,self.args).view(cl_2.shape[0], -1).detach().cpu().numpy()
+                            cl_2_output,_ = self.model(cl_2,self.args).view(cl_2.shape[0], -1).detach().cpu().numpy()
 
                             for cluster in self.clusters:
                                 seq2intents = []
@@ -852,7 +852,7 @@ class UPTRecTrainer(Trainer):
                     elif self.args.contrast_type == "Item-description":
                         if epoch >= self.args.warm_up_epoches:
 
-                            description_output = self.model(input_ids,self.args,description='description')
+                            description_output, _ = self.model(input_ids,self.args,description='description')
                             description_view = description_output.view(self.args.batch_size,-1)
 
                             align_loss = (recommendation_output.view(self.args.batch_size,-1) - description_view).norm(dim=1).pow(2).mean()
@@ -968,7 +968,7 @@ class UPTRecTrainer(Trainer):
                             _, input_ids, target_pos, target_neg, _ = rec_batch
 
                             if self.args.context == "encoder":
-                                sequence_output = self.model(input_ids,self.args)
+                                sequence_output, _ = self.model(input_ids,self.args)
                             if self.args.context == "item_embedding":
                                 sequence_output = self.model.item_embeddings(input_ids)
                                     
@@ -1020,7 +1020,7 @@ class UPTRecTrainer(Trainer):
                     if self.args.attention_type in ["Cluster"] and epoch >= self.args.warm_up_epoches:
 
                         if self.args.context == "encoder":
-                            sequence_context = self.model(input_ids,self.args)
+                            sequence_context, _ = self.model(input_ids,self.args)
                         if self.args.context == "item_embedding":
                             sequence_context = self.model.item_embeddings(input_ids)
 
@@ -1040,10 +1040,10 @@ class UPTRecTrainer(Trainer):
                             seq2intents.append(seq2intent)
                             intent_ids.append(intent_id)
                             densitys.append(density)
-                        recommend_output = self.model(input_ids,self.args,intent_ids)
+                        recommend_output,_ = self.model(input_ids,self.args,intent_ids)
                     
                     else:
-                        recommend_output = self.model(input_ids, self.args)
+                        recommend_output,_ = self.model(input_ids, self.args)
                         
                     recommend_output = recommend_output[:, -1, :]
 

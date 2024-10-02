@@ -45,6 +45,12 @@ def show_args_info(args, log_file=None):
                 print(f"{arg:<30} : {value:>35}")
             except:
                 import IPython; IPython.embed(colors='Linux');exit(1);
+def set_device(args):
+    if not torch.cuda.is_available() or args.no_cuda:
+        return torch.device('cpu')
+    if args.use_multi_gpu:
+        return torch.device(f"cuda:{args.multi_devices.split(',')[0]}")  # Default to first GPU in list
+    return torch.device(f"cuda:{args.gpu_id}")
 
 
 def main():
@@ -210,6 +216,7 @@ def main():
     parser.add_argument("--adam_beta2", type=float, default=0.999, help="adam second beta value")
 
     parser.add_argument('--use_multi_gpu', action='store_true', help='use multiple gpus', default=False)
+    parser.add_argument('--position_encoding_false', action='store_true', help='deactivate position encoding', default=False)
     parser.add_argument('--multi_devices', type=str, default='0,1', help='device ids of multile gpus')
 
     args = parser.parse_args()
@@ -219,7 +226,7 @@ def main():
     if args.embedding:
         embedding_path = os.path.join(args.output_dir, "embedding")
         check_path(embedding_path)
-    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
+    
     args.cuda_condition = torch.cuda.is_available() and not args.no_cuda
 
     try:
@@ -232,6 +239,8 @@ def main():
     args.item_size = max_item + 2
     args.mask_id = max_item + 1
 
+    args.device = set_device(args)
+
     if args.description:
         description_embeddings = pd.read_csv('/home/seongbeom/paper/preference_rec/data/2014/Beauty/Beauty_embeddings.csv')
         description_embeddings = description_embeddings.sort_values(by='asin')
@@ -240,13 +249,12 @@ def main():
     else:
         model =UPTRec(args=args)
 
-
+    import IPython; IPython.embed(colors='Linux');exit(1);
+        
     if args.use_multi_gpu and torch.cuda.device_count() > 1:
         args.device_ids = list(map(int, args.multi_devices.split(',')))
-        args.device = torch.device(f"cuda:{args.device_ids[0]}")  # Use the first device for primary
-        model = nn.DataParallel(model, device_ids=args.device_ids)  # Wrap the model with DataParallel
-        print(f"Using {len(args.device_ids)} GPUs: {args.device_ids}")
-        
+        model = nn.DataParallel(model, device_ids=args.device_ids)
+
     # user_seq, max_item, valid_rating_matrix, test_rating_matrix = get_user_seqs(args.data_file)
 
     item_ids = torch.arange(0, args.item_size-1, dtype=torch.long).to(torch.device("cuda" if args.cuda_condition else "cpu"))
@@ -290,15 +298,15 @@ def main():
 
     train_dataset = RecWithContrastiveLearningDataset(args, user_seq[: int(len(user_seq) * args.training_data_ratio)], data_type="train")
     train_sampler = RandomSampler(train_dataset)
-    train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.batch_size, drop_last=True)
+    train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.batch_size, drop_last=True ,num_workers=4, pin_memory=True)
 
     eval_dataset = RecWithContrastiveLearningDataset(args, user_seq, data_type="valid")
     eval_sampler = SequentialSampler(eval_dataset)
-    eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.batch_size, drop_last=True)
+    eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.batch_size, drop_last=True, num_workers=4, pin_memory=True)
 
     test_dataset = RecWithContrastiveLearningDataset(args, user_seq, data_type="test")
     test_sampler = SequentialSampler(test_dataset)
-    test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.batch_size, drop_last=True)
+    test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.batch_size, drop_last=True, num_workers=4, pin_memory=True)
 
     item_dataset = ItemembeddingDataset(item_ids)
     item_sampler = SequentialSampler(item_dataset)
@@ -324,7 +332,7 @@ def main():
 
         start_time = time.time()
         print(f"Train UPTRec")
-        early_stopping = EarlyStopping(args.log_file,args.checkpoint_path, args.patience, verbose=True)
+        early_stopping = EarlyStopping(args,args.log_file,args.checkpoint_path, args.patience, verbose=True)
         if os.path.exists(args.checkpoint_path):
             print("Load pth")
             trainer.load(args.checkpoint_path)
@@ -336,14 +344,18 @@ def main():
             trainer.train(epoch)
 
             # evaluate on NDCG@20
-            scores, _ = trainer.valid(epoch, full_sort=True)
-            early_stopping(np.array(scores[-1:]), trainer.model)
-        
+            if args.pre_train:
+                scores = trainer.valid(epoch, full_sort=True)
+                print(f"[Eval] MLM loss: {scores:.6f}")                
+                early_stopping([scores.detach().cpu().numpy()], trainer.model)
+            else:
+                scores, _ = trainer.valid(epoch, full_sort=True)
+                early_stopping(np.array(scores[-1:]), trainer.model)
+            
             if early_stopping.early_stop:
                 save_epoch = epoch
                 print("Early stopping")
                 break
-
 
             if args.wandb == True:
                 wandb.log({

@@ -424,7 +424,7 @@ def ndcg_k(actual, predicted, topk):
 class EarlyStopping:
     """Early stops the training if validation loss doesn't improve after a given patience."""
 
-    def __init__(self,log_file,checkpoint_path, patience=7, verbose=False, delta=0):
+    def __init__(self,args, log_file,checkpoint_path, patience=7, verbose=False, delta=0):
         """
         Args:
             patience (int): How long to wait after last time validation loss improved.
@@ -434,6 +434,7 @@ class EarlyStopping:
             delta (float): Minimum change in the monitored quantity to qualify as an improvement.
                             Default: 0
         """
+        self.args = args
         self.checkpoint_path = checkpoint_path
         self.log_file = log_file
         self.patience = patience
@@ -444,10 +445,15 @@ class EarlyStopping:
         self.delta = delta
 
     def compare(self, score):
-        for i in range(len(score)):
-            if score[i] > self.best_score[i] + self.delta:
-                return False
-        return True
+        if self.args.pre_train:
+            if np.mean(score) > np.mean(self.best_score) + self.delta:
+                return True
+            return False
+        else:
+            for i in range(len(score)):
+                if score[i] > self.best_score[i] + self.delta:
+                    return True
+            return False
 
     def __call__(self, score, model):
         # score HIT@10 NDCG@10
@@ -546,45 +552,63 @@ class Mask(object):
             copied_sequence[idx] = mask_value
         return copied_sequence
     
-class Masking(object):
-    """Randomly mask tokens in a sequence for MLM."""
+# class Masking(object):
+#     """Randomly mask tokens in a sequence for MLM."""
 
+#     def __init__(self, args, gamma=0.15):
+#         self.args = args
+#         self.gamma = gamma  # Fraction of tokens to mask (15% is standard)
+
+#     def __call__(self, sequence):
+#         # Make a deep copy to avoid modifying the original sequence
+#         copied_sequence = copy.deepcopy(sequence)
+#         labels = copy.deepcopy(sequence)
+#         sequence_length = len(copied_sequence)
+
+#         # Calculate the number of tokens to mask
+#         mask_num = max(1, int(self.gamma * sequence_length))
+
+#         # Randomly select indices to mask
+#         mask_indices = random.sample(range(sequence_length), k=mask_num)
+
+#         for idx in range(sequence_length):
+#             if idx in mask_indices:
+#                 rand = random.random()
+#                 if rand < 0.8:
+#                     # 80% replace with mask token
+#                     copied_sequence[idx] = self.args.mask_id
+#                 elif rand < 0.9:
+#                     # 10% replace with a random token ID
+#                     copied_sequence[idx] = random.randint(0, self.args.item_size - 1)
+#                 else:
+#                     # 10% keep the original token
+#                     pass
+#                 # Keep the original token as the label
+#                 labels[idx] = sequence[idx]
+#             else:
+#                 # Do not compute loss on unmasked tokens
+#                 labels[idx] = -100  # Use -100 to ignore in loss computation
+
+#         return copied_sequence, labels
+
+class Masking:
     def __init__(self, args, gamma=0.15):
         self.args = args
-        self.gamma = gamma  # Fraction of tokens to mask (15% is standard)
+        self.gamma = gamma
 
-    def __call__(self, sequence):
-        # Make a deep copy to avoid modifying the original sequence
-        copied_sequence = copy.deepcopy(sequence)
-        labels = copy.deepcopy(sequence)
-        sequence_length = len(copied_sequence)
+    def mask_batch(self, input_ids):
+        # input_ids: [batch_size, seq_len]
+        batch_size, seq_len = input_ids.size()
+        masked_input_ids = input_ids.clone()
+        mlm_labels = torch.full_like(input_ids, -100)
 
-        # Calculate the number of tokens to mask
-        mask_num = max(1, int(self.gamma * sequence_length))
+        # 마스킹할 위치를 랜덤하게 선택
+        mask_positions = torch.bernoulli(torch.full((batch_size, seq_len), self.gamma)).bool()
+        mlm_labels[mask_positions] = input_ids[mask_positions]
+        masked_input_ids[mask_positions] = self.args.mask_id  # 마스크 토큰 ID로 대체
 
-        # Randomly select indices to mask
-        mask_indices = random.sample(range(sequence_length), k=mask_num)
-
-        for idx in range(sequence_length):
-            if idx in mask_indices:
-                rand = random.random()
-                if rand < 0.8:
-                    # 80% replace with mask token
-                    copied_sequence[idx] = self.args.mask_id
-                elif rand < 0.9:
-                    # 10% replace with a random token ID
-                    copied_sequence[idx] = random.randint(0, self.args.item_size - 1)
-                else:
-                    # 10% keep the original token
-                    pass
-                # Keep the original token as the label
-                labels[idx] = sequence[idx]
-            else:
-                # Do not compute loss on unmasked tokens
-                labels[idx] = -100  # Use -100 to ignore in loss computation
-
-        return copied_sequence, labels
-
+        return masked_input_ids, mlm_labels
+    
 class Reorder(object):
     """Randomly shuffle a continuous sub-sequence"""
 

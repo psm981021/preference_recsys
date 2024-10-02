@@ -576,8 +576,9 @@ class SelfAttention(nn.Module):
         new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
         x = x.view(*new_x_shape)
         return x.permute(0, 2, 1, 3)
+    
 
-    def forward(self, input_tensor, attention_mask, intent_id = None, key_chunk =None):
+    def forward(self, input_tensor, attention_mask, key_chunk =None):
         
         if key_chunk is not None:
             mix_query = self.query(input_tensor)
@@ -613,28 +614,6 @@ class SelfAttention(nn.Module):
             # [batch_size 1 1 seq_len]
             
             attention_scores = attention_scores + attention_mask
-             
-            if intent_id is not None:
-                
-                intent_id = intent_id.unsqueeze(-1)
-                mask = torch.eq(intent_id,intent_id.transpose(1,2)).long().unsqueeze(1)#.to(self.device)
-                mask = mask.repeat(1, attention_scores.shape[1], 1, 1) 
-                cluster_attention_output = attention_scores.masked_fill(mask == 0, float('-inf'))
-
-                # Normalize the attention scores to probabilities.
-                attention_probs = nn.Softmax(dim=-1)(cluster_attention_output)
-                # This is actually dropping out entire tokens to attend to, which might
-                # seem a bit unusual, but is taken from the original Transformer paper.
-                # Fixme
-                attention_probs = self.attn_dropout(attention_probs)
-                context_layer = torch.matmul(attention_probs, value_layer)
-                context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
-                new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
-                context_layer = context_layer.view(*new_context_layer_shape)
-                hidden_states = self.dense(context_layer)
-                hidden_states = self.out_dropout(hidden_states)
-                
-                hidden_states_cluster = self.LayerNorm(hidden_states + input_tensor)
 
         # Normalize the attention scores to probabilities.
         attention_probs = nn.Softmax(dim=-1)(attention_scores)
@@ -653,10 +632,7 @@ class SelfAttention(nn.Module):
             
         attention_map = torch.mean(attention_probs, dim=1) 
         
-        if intent_id is not None:
-            return hidden_states, hidden_states_cluster
-        else:
-            return hidden_states
+        return hidden_states
 
 class Intermediate(nn.Module):
     def __init__(self, args):

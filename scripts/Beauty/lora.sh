@@ -12,7 +12,7 @@ python main.py \
     --visualization_epoch 20 \
     --patience 30 \
     --embedding \
-    --output_dir Ablation/Beauty/LoRA/4 \
+    --output_dir Ablation/Beauty/LoRA/5 \
     --model_idx Mean\
     --contrast_type Item-Level \
     --warm_up_epoches 0\
@@ -22,6 +22,7 @@ python main.py \
     --intent_cf_weight 1\
     --cf_weight 0 \
     --cluster_value 0.3 \
+    --simclr \
     --pre_train \
 
 python main.py \
@@ -38,7 +39,7 @@ python main.py \
     --visualization_epoch 20 \
     --patience 30 \
     --embedding \
-    --output_dir Ablation/Beauty/LoRA/4 \
+    --output_dir Ablation/Beauty/LoRA/5 \
     --model_idx Mean\
     --contrast_type Item-Level \
     --warm_up_epoches 0\
@@ -48,6 +49,7 @@ python main.py \
     --intent_cf_weight 1\
     --cf_weight 0 \
     --cluster_value 0.3 \
+    --simclr \
     --fine_tune \
 
 # scripts/Beauty/lora.sh
