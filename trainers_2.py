@@ -33,8 +33,11 @@ class Trainer:
         self.args = args
         self.cuda_condition = torch.cuda.is_available() and not self.args.no_cuda
         self.device = torch.device("cuda" if self.cuda_condition else "cpu")
-        self.device= args.device
-        self.model = model
+        # self.device= args.device
+        self.model =model
+        if self.args.use_multi_gpu:
+            self.model = self.model.module
+        
 
         self.num_intent_clusters = [int(i) for i in self.args.num_intent_clusters.split(",")]
         self.num_user_intent_clusters = [int(i) for i in self.args.num_user_intent_clusters.split(",")]
@@ -792,8 +795,8 @@ class UPTRecTrainer_pre(Trainer):
                 
                 answer_list = None
                 print("Model Eval ")
-                joint_avg_loss = 0.0
-                ml_avg_loss = 0.0
+                joint_avg_loss = 0.0                
+                mlm_avg_loss = 0.0
                 # -------------perfrom valid, test on cluster-attention-------------- #
                 for i, (batch,cl_batches) in rec_data_iter:
                     
@@ -847,7 +850,7 @@ class UPTRecTrainer_pre(Trainer):
 
                         mlm_loss_fct = nn.CrossEntropyLoss(ignore_index=-100)
                         mlm_loss = mlm_loss_fct(prediction_scores.view(-1, self.args.item_size), mlm_labels.view(-1))
-                        ml_avg_loss += mlm_loss
+                        mlm_avg_loss += mlm_loss.item()
                     else:
                         recommend_output = recommend_output_[:, -1, :]
 

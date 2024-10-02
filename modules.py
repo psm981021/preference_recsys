@@ -317,37 +317,30 @@ class NCELoss(nn.Module):
                     sim12 = F.relu(torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_two)) /  self.temperature
                 else:
                     
-                    batch_sample_one = batch_sample_one.reshape(-1,E)
-                    batch_sample_two = batch_sample_two.reshape(-1,E)
+                    sim11 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_one) / self.temperature
+                    sim22 = torch.einsum('bij,bkj->bik', batch_sample_two, batch_sample_two) / self.temperature
+                    sim12 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_two) / self.temperature
 
-                    sim11 = torch.matmul(batch_sample_one,batch_sample_one.T) / self.temperature
-                    sim22 = torch.matmul(batch_sample_two,batch_sample_two.T) / self.temperature
-                    sim12 = torch.matmul(batch_sample_one,batch_sample_two.T) / self.temperature
-                    
-                    # sim11 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_one) / self.temperature
-                    # sim22 = torch.einsum('bij,bkj->bik', batch_sample_two, batch_sample_two) / self.temperature
-                    # sim12 = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_two) / self.temperature
-
-            # batch_size, max_seq, _ = sim11.shape
+            batch_size, max_seq, _ = sim11.shape
             # max_seq, _ = sim11.shape
 
-            # d = sim12.shape[-1]
+            d = sim12.shape[-1]
             # Mask out self-contrast (diagonal elements) and same-intent pairs if intent_ids is provided
             if intent_ids is not None:
-                # intent = intent_ids.unsqueeze(-1)
-                intent = intent_ids.reshape(-1)
+                intent = intent_ids.unsqueeze(-1)
+                # intent = intent_ids.reshape(-1)
 
-                # mask_11_22 = torch.eq(intent,intent.transpose(1,2)).long().to(self.device)
+                mask_11_22 = torch.eq(intent,intent.transpose(1,2)).long().to(self.device)
                 # mask_11_22 = torch.eq(intent,intent.T).long().to(self.device)
-                mask_11_22 = torch.eq(intent.unsqueeze(0), intent.unsqueeze(1)).long().to(self.device)
-
+                # mask_11_22 = torch.eq(intent.unsqueeze(0), intent.unsqueeze(1)).long().to(self.device)
+                
                 sim11[mask_11_22 == 1] = float('-inf')
                 sim22[mask_11_22 == 1] = float('-inf')
 
-                # eye_metrix = torch.eye(max_seq, dtype=torch.long).repeat(batch_size,1,1).to(self.device)
+                eye_metrix = torch.eye(max_seq, dtype=torch.long).repeat(batch_size,1,1).to(self.device)
                 # eye_metrix = torch.eye(max_seq, dtype=torch.long).to(self.device)
                 N = B * C
-                eye_metrix = torch.eye(N, dtype=torch.long).to(self.device)
+                # eye_metrix = torch.eye(N, dtype=torch.long).to(self.device)
 
                 # # mask[eye_metrix == 1] = 0
                 mask_11_22[eye_metrix == 1] = 0
@@ -363,10 +356,10 @@ class NCELoss(nn.Module):
 
             logits = torch.cat([raw_scores1, raw_scores2], dim=-2)
 
-            # labels = torch.arange(2 * B, dtype=torch.long, device=logits.device)
-            labels = torch.arange(2 * N, dtype=torch.long, device=logits.device)
-            # labels = labels.unsqueeze(0).repeat(batch_size, 1) 
-
+            labels = torch.arange(2 * d, dtype=torch.long, device=logits.device)
+            # labels = torch.arange(2 * N, dtype=torch.long, device=logits.device)
+            # labels = labels.unsqueeze(0).repeat(batch_size,1,1) 
+            labels = labels.repeat(batch_size,1) 
 
         else:
             if density is not None:
@@ -418,8 +411,11 @@ class NCELoss(nn.Module):
             raw_scores2 = torch.cat([sim22, sim12.transpose(-1, -2)], dim=-1) # negative
             logits = torch.cat([raw_scores1, raw_scores2], dim=-2)
             labels = torch.arange(2 * d, dtype=torch.long, device=logits.device)
-        
-        nce_loss = self.criterion(logits, labels)
+            
+        try:
+            nce_loss = self.criterion(logits, labels)
+        except:
+            import IPython; IPython.embed(colors='Linux');exit(1);
         return nce_loss
     
 class AlignmentLossWithSinkhorn(nn.Module):
@@ -576,7 +572,6 @@ class SelfAttention(nn.Module):
         new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
         x = x.view(*new_x_shape)
         return x.permute(0, 2, 1, 3)
-    
 
     def forward(self, input_tensor, attention_mask, key_chunk =None):
         
@@ -612,7 +607,7 @@ class SelfAttention(nn.Module):
             attention_scores = attention_scores / math.sqrt(self.attention_head_size)
             # [batch_size heads seq_len seq_len] scores
             # [batch_size 1 1 seq_len]
-            
+
             attention_scores = attention_scores + attention_mask
 
         # Normalize the attention scores to probabilities.

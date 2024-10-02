@@ -45,13 +45,13 @@ def show_args_info(args, log_file=None):
                 print(f"{arg:<30} : {value:>35}")
             except:
                 import IPython; IPython.embed(colors='Linux');exit(1);
-def set_device(args):
-    if not torch.cuda.is_available() or args.no_cuda:
-        return torch.device('cpu')
-    if args.use_multi_gpu:
-        return torch.device(f"cuda:{args.multi_devices.split(',')[0]}")  # Default to first GPU in list
-    return torch.device(f"cuda:{args.gpu_id}")
 
+def setup_device(gpu_id, use_cuda):
+    if not torch.cuda.is_available() or not use_cuda:
+        print("CUDA not available, using CPU")
+        return torch.device('cpu')
+    print(f"Using CUDA on GPU {gpu_id}")
+    return torch.device(f'cuda:{gpu_id}')
 
 def main():
 
@@ -239,7 +239,6 @@ def main():
     args.item_size = max_item + 2
     args.mask_id = max_item + 1
 
-    args.device = set_device(args)
 
     if args.description:
         description_embeddings = pd.read_csv('/home/seongbeom/paper/preference_rec/data/2014/Beauty/Beauty_embeddings.csv')
@@ -248,13 +247,12 @@ def main():
         model = UPTRec(args=args, description_embedding = description_embeddings)
     else:
         model =UPTRec(args=args)
-
-    import IPython; IPython.embed(colors='Linux');exit(1);
-        
+    args.device = setup_device(args.gpu_id, not args.no_cuda)
     if args.use_multi_gpu and torch.cuda.device_count() > 1:
         args.device_ids = list(map(int, args.multi_devices.split(',')))
         model = nn.DataParallel(model, device_ids=args.device_ids)
-
+    else:
+        model = model.to(args.device)
     # user_seq, max_item, valid_rating_matrix, test_rating_matrix = get_user_seqs(args.data_file)
 
     item_ids = torch.arange(0, args.item_size-1, dtype=torch.long).to(torch.device("cuda" if args.cuda_condition else "cpu"))
@@ -347,10 +345,12 @@ def main():
             if args.pre_train:
                 scores = trainer.valid(epoch, full_sort=True)
                 print(f"[Eval] MLM loss: {scores:.6f}")                
-                early_stopping([scores.detach().cpu().numpy()], trainer.model)
+                early_stopping([scores], trainer.model)
             else:
                 scores, _ = trainer.valid(epoch, full_sort=True)
-                early_stopping(np.array(scores[-1:]), trainer.model)
+
+                # early_stopping(np.array(scores[-1:]), trainer.model)
+                early_stopping(np.array(scores[-3:-2]), trainer.model)
             
             if early_stopping.early_stop:
                 save_epoch = epoch
@@ -395,10 +395,10 @@ def main():
             wandb.finish()
 
         # convert cluster reassignment 
-        if len(args.user_list) > 0:
-            user_array = np.concatenate([item.numpy().astype(int) for item in args.user_list], axis=1)
-            csv_file_name = f"{args.output_dir}/{args.model_idx}_cluster_reassignment.csv"
-            np.savetxt(csv_file_name, user_array, delimiter=",", fmt='%d')
+        # if len(args.user_list) > 0:
+        #     user_array = np.concatenate([item.numpy().astype(int) for item in args.user_list], axis=1)
+        #     csv_file_name = f"{args.output_dir}/{args.model_idx}_cluster_reassignment.csv"
+        #     np.savetxt(csv_file_name, user_array, delimiter=",", fmt='%d')
 
 main()
 

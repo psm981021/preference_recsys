@@ -128,6 +128,7 @@ class UPTRec(nn.Module):
             item_embeddings = self.transform_layer(item_embeddings)
         else:
             item_embeddings = self.item_embeddings(sequence)
+
         position_embeddings = self.position_embeddings(position_ids)
         
         if self.args.position_encoding_false:
@@ -143,18 +144,20 @@ class UPTRec(nn.Module):
     def forward(self, input_ids, args, cluster_id =None, description=None):
         attention_mask = (input_ids > 0).long()
         extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)  # torch.int64
+
         max_len = attention_mask.size(-1)
         attn_shape = (1, max_len, max_len)
         subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1)  # torch.uint8
         subsequent_mask = (subsequent_mask == 0).unsqueeze(1)
         subsequent_mask = subsequent_mask.long()
- 
+
         if self.args.cuda_condition:
             subsequent_mask = subsequent_mask.cuda()
-
+        
         extended_attention_mask = extended_attention_mask * subsequent_mask
         extended_attention_mask = extended_attention_mask#.to(dtype=next(.parameters()).dtype)# fp16 compatibility   
-        if not self.args.bi_direction:  
+
+        if not self.args.bi_direction:
             extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
         
         sequence_emb = self.add_position_embedding(input_ids,description)

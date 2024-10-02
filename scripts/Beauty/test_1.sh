@@ -9,7 +9,7 @@ python main.py \
     --de_noise \
     --batch_size 256 \
     --epochs 2000 \
-    --gpu_id 0 \
+    --gpu_id 1 \
     --visualization_epoch 20 \
     --patience 30 \
     --embedding \
@@ -23,7 +23,6 @@ python main.py \
     --intent_cf_weight 1\
     --cf_weight 0 \
     --cluster_value 0.3 \
-    --simclr \
     --position_encoding_false
 
 # ./scripts/Beauty/test_1.sh 

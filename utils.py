@@ -452,8 +452,8 @@ class EarlyStopping:
         else:
             for i in range(len(score)):
                 if score[i] > self.best_score[i] + self.delta:
-                    return True
-            return False
+                    return False
+            return True
 
     def __call__(self, score, model):
         # score HIT@10 NDCG@10
