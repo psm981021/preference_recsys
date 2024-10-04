@@ -370,7 +370,8 @@ class UPTRecTrainer(Trainer):
 
 
     def pcl_item_pair_contrastive_learning(self, inputs, intents, intent_ids,temperature=None):
-
+        
+        
         cl_intents = intents[0].view(self.args.batch_size,self.args.max_seq_length,-1) # B x C x E
         cl_intent_ids = intent_ids[0].view(self.args.batch_size, -1) # B x C
 

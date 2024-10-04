@@ -13,7 +13,7 @@ python main.py \
     --visualization_epoch 20 \
     --patience 30 \
     --embedding \
-    --output_dir Ablation/Beauty/Item_level/10 \
+    --output_dir Ablation/Beauty/Item_level/12 \
     --model_idx Mean\
     --contrast_type Item-Level \
     --warm_up_epoches 0\
@@ -22,7 +22,6 @@ python main.py \
     --num_intent_clusters 10\
     --intent_cf_weight 1\
     --cf_weight 0 \
-    --cluster_value 0.3 \
-    --position_encoding_false
+    --cluster_value 0.3
 
 # ./scripts/Beauty/test_1.sh 

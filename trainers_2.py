@@ -32,7 +32,9 @@ class Trainer:
 
         self.args = args
         self.cuda_condition = torch.cuda.is_available() and not self.args.no_cuda
-        self.device = torch.device("cuda" if self.cuda_condition else "cpu")
+        # self.device = torch.device("cuda" if self.cuda_condition else "cpu")
+        self.device = torch.device(f"cuda:{args.gpu_id}" if torch.cuda.is_available() and not args.no_cuda else "cpu")
+        
         # self.device= args.device
         self.model =model
         if self.args.use_multi_gpu:

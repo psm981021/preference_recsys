@@ -247,7 +247,9 @@ def main():
         model = UPTRec(args=args, description_embedding = description_embeddings)
     else:
         model =UPTRec(args=args)
+        
     args.device = setup_device(args.gpu_id, not args.no_cuda)
+    
     if args.use_multi_gpu and torch.cuda.device_count() > 1:
         args.device_ids = list(map(int, args.multi_devices.split(',')))
         model = nn.DataParallel(model, device_ids=args.device_ids)

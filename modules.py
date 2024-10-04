@@ -228,7 +228,9 @@ class SimCLR(nn.Module):
                     sim = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_two) / density.unsqueeze(-1) 
             else:
                 if self.args.ncl: # use Negative Contrastive Learnning  #https://github.com/PKU-ML/non_neg/tree/main
-                    sim = F.relu(torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_two)) / self.temperature
+                    sim = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_two) / self.temperature
+                    sim = F.relu(sim).detach() + F.gelu(sim) - F.gelu(sim).detach()
+
                 else:
                     sim = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_two) / self.temperature
 
@@ -292,8 +294,8 @@ class NCELoss(nn.Module):
         # sim12 = self.cossim(batch_sample_one.unsqueeze(-2), batch_sample_two.unsqueeze(-3)) / self.temperature
 
         # check validity
-        # batch_sample_one = F.normalize(batch_sample_one, p=2, dim=1)
-        # batch_sample_two = F.normalize(batch_sample_two, p=2, dim=1)
+        batch_sample_one = F.normalize(batch_sample_one, p=2, dim=1)
+        batch_sample_two = F.normalize(batch_sample_two, p=2, dim=1)
         
         
         if self.args.contrast_type in ['Item-User','Item-Level', 'Item-description'] and level == 'item':
