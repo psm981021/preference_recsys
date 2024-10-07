@@ -150,6 +150,7 @@ class PCLoss(nn.Module):
         self.args = args
         self.criterion = NCELoss(args,temperature, device)
         self.simclr_criterion = SimCLR(args,temperature, device)
+        self.infonce = InfoNCE(args, temperature, device)
        
 
     def forward(self,level,batch_sample_one, batch_sample_two, intents, intent_ids,temperature=None):
@@ -165,6 +166,9 @@ class PCLoss(nn.Module):
             if self.args.simclr:
                 pos_one_item_compare_loss = self.simclr_criterion(level,batch_sample_one, intents, intent_ids=intent_ids, density=temperature)
                 pos_two_item_compare_loss = self.simclr_criterion(level,batch_sample_two, intents, intent_ids=intent_ids, density=temperature)
+            elif self.args.infonce:
+                pos_one_item_compare_loss = self.infonce(level,batch_sample_one, intents, intent_ids=intent_ids, density=temperature)
+                pos_two_item_compare_loss = self.infonce(level,batch_sample_two, intents, intent_ids=intent_ids, density=temperature)
             else:
                 
                 pos_one_item_compare_loss = self.criterion(level,batch_sample_one, intents, intent_ids=intent_ids, density=temperature)
@@ -274,6 +278,43 @@ class SimCLR(nn.Module):
         loss = -(torch.mean(torch.log(pos /(pos+neg))))
         return loss
         
+class InfoNCE(nn.Module):
+
+    def __init__(self, args, temperature, device):
+        super(InfoNCE, self).__init__()
+        self.device= device
+        self.args = args
+        self.criterion = nn.CrossEntropyLoss().to(self.device)
+        self.temperature = temperature
+    
+    def forward(self, level, batch_sample_one, batch_sample_two, intent_ids = None, density = None):
+        eps =1e-8
+        batch_sample_one = F.normalize(batch_sample_one, p=2, dim=1)
+        batch_sample_two = F.normalize(batch_sample_two, p=2, dim=1)
+
+        B,C,E = batch_sample_one.shape
+        N = 2 * B
+
+        batch_sample_one = batch_sample_one
+        batch_sample_two = batch_sample_two
+
+        sim  = torch.einsum('bij,bkj->bik', batch_sample_one, batch_sample_two)
+
+        if intent_ids is not None:
+            intent = intent_ids.unsqueeze(-1)
+            pos_mask = torch.eq(intent,intent.transpose(1,2)).long().to(self.device)
+            neg_mask = (1-pos_mask).long().to(self.device)
+        else:
+            pos_mask = torch.eye(C, dtype=torch.long).to(self.device)
+            neg_mask = (1-pos_mask).long().to(self.device)  
+        pos = torch.clamp(torch.sum(sim * pos_mask, 1), min=eps)
+        neg = torch.clamp(torch.sum(sim * neg_mask, 1), min=eps)
+
+        loss = -(torch.mean(torch.log(pos /(pos+neg))))
+
+        return loss
+
+
 class NCELoss(nn.Module):
     """
     Eq. (12): L_{NCE}

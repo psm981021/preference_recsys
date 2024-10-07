@@ -72,7 +72,8 @@ def main():
     parser.add_argument("--cluster_temperature", action="store_true", help="use density as cluster temperature")
     parser.add_argument("--mlp", action="store_true", help="adapt mlp for cluster head")    
     parser.add_argument("--ncl", action="store_true", help="non negative vector for similarity")   
-    parser.add_argument("--simclr", action="store_true", help="non negative vector for similarity")   
+    parser.add_argument("--simclr", action="store_true", help="non negative vector for similarity")
+    parser.add_argument("--infonce", action="store_true", help="non negative vector for similarity")     
     parser.add_argument("--bi_direction", action="store_true", help="bi-directional attention mask") 
 
     parser.add_argument("--pre_train", action="store_true", help="pre-training for cluster-attention &  fine-tuning for contrastive learning ")  
@@ -220,7 +221,8 @@ def main():
     parser.add_argument('--multi_devices', type=str, default='0,1', help='device ids of multile gpus')
 
     args = parser.parse_args()
-
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
+    
     set_seed(args.seed)
     check_path(args.output_dir)
     if args.embedding:
@@ -248,13 +250,13 @@ def main():
     else:
         model =UPTRec(args=args)
         
-    args.device = setup_device(args.gpu_id, not args.no_cuda)
+    # args.device = setup_device(args.gpu_id, not args.no_cuda)
     
-    if args.use_multi_gpu and torch.cuda.device_count() > 1:
-        args.device_ids = list(map(int, args.multi_devices.split(',')))
-        model = nn.DataParallel(model, device_ids=args.device_ids)
-    else:
-        model = model.to(args.device)
+    # if args.use_multi_gpu and torch.cuda.device_count() > 1:
+    #     args.device_ids = list(map(int, args.multi_devices.split(',')))
+    #     model = nn.DataParallel(model, device_ids=args.device_ids)
+    # else:
+    #     model = model.to(args.device)
     # user_seq, max_item, valid_rating_matrix, test_rating_matrix = get_user_seqs(args.data_file)
 
     item_ids = torch.arange(0, args.item_size-1, dtype=torch.long).to(torch.device("cuda" if args.cuda_condition else "cpu"))

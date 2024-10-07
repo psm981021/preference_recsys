@@ -13,7 +13,7 @@ python main.py \
     --visualization_epoch 20 \
     --patience 30 \
     --embedding \
-    --output_dir Ablation/Beauty/Item_level/12 \
+    --output_dir Ablation/Beauty/Item_level/SimCLR/Mean \
     --model_idx Mean\
     --contrast_type Item-Level \
     --warm_up_epoches 0\
@@ -22,6 +22,149 @@ python main.py \
     --num_intent_clusters 10\
     --intent_cf_weight 1\
     --cf_weight 0 \
-    --cluster_value 0.3
+    --cluster_value 0.3\
+    --simclr \
+
+python main.py \
+    --model_name UPTRec \
+    --data_name Beauty  \
+    --data_dir data/ \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type Cluster \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 1 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Ablation/Beauty/Item_level/SimCLR/MLP \
+    --model_idx Mean\
+    --contrast_type Item-Level \
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 10\
+    --intent_cf_weight 1\
+    --cf_weight 0 \
+    --cluster_value 0.3\
+    --simclr \
+    --mlp
+
+python main.py \
+    --model_name UPTRec \
+    --data_name Beauty  \
+    --data_dir data/ \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type Cluster \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 1 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Ablation/Beauty/Item_level/SimCLR/NCL \
+    --model_idx Mean\
+    --contrast_type Item-Level \
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 10\
+    --intent_cf_weight 1\
+    --cf_weight 0 \
+    --cluster_value 0.3\
+    --simclr \
+    --ncl
+
+python main.py \
+    --model_name UPTRec \
+    --data_name Beauty  \
+    --data_dir data/ \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type Cluster \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 1 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Ablation/Beauty/Item_level/SimCLR/Cluster_Prediction \
+    --model_idx Mean\
+    --contrast_type Item-Level \
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 10\
+    --intent_cf_weight 1\
+    --cf_weight 0 \
+    --cluster_value 0.3\
+    --simclr \
+    --cluster_prediction
+
+python main.py \
+    --model_name UPTRec \
+    --data_name Beauty  \
+    --data_dir data/ \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type Cluster \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 1 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Ablation/Beauty/Item_level/SimCLR/cluster_temperature \
+    --model_idx Mean\
+    --contrast_type Item-Level \
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 10\
+    --intent_cf_weight 1\
+    --cf_weight 0 \
+    --cluster_value 0.3\
+    --simclr \
+    --cluster_temperature
+
+
+python main.py \
+    --model_name UPTRec \
+    --data_name Beauty  \
+    --data_dir data/ \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type Cluster \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 1 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Ablation/Beauty/Item_level/SimCLR/cluster_temperature_prediction \
+    --model_idx Mean\
+    --contrast_type Item-Level \
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 10\
+    --intent_cf_weight 1\
+    --cf_weight 0 \
+    --cluster_value 0.3\
+    --simclr \
+    --cluster_temperature \
+    --cluster_prediction
 
 # ./scripts/Beauty/test.sh 

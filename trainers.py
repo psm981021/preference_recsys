@@ -371,8 +371,11 @@ class UPTRecTrainer(Trainer):
 
     def pcl_item_pair_contrastive_learning(self, inputs, intents, intent_ids,temperature=None):
         
-        
-        cl_intents = intents[0].view(self.args.batch_size,self.args.max_seq_length,-1) # B x C x E
+        if self.args.batch_size != len(intents):
+            cl_intents = intents[0].view(self.args.batch_size,self.args.max_seq_length,-1) # B x C x E
+        elif self.args.batch_size == len(intents):
+            cl_intents = torch.mean(intents, dim=2, keepdim=False).view(intents.shape[0],self.args.max_seq_length,-1)
+
         cl_intent_ids = intent_ids[0].view(self.args.batch_size, -1) # B x C
 
         if temperature is not None:
@@ -677,13 +680,16 @@ class UPTRecTrainer(Trainer):
 
                             if self.args.cluster_temperature:
                                 cl_loss3 = self.pcl_item_pair_contrastive_learning(
-                                    cl_batch, intents=seq2intents, intent_ids=intent_ids,temperature=densitys
+                                    cl_batch, intents=recommendation_output, intent_ids=intent_ids,temperature=densitys
                                 )
                             else: 
+                                # cl_loss3 = self.pcl_item_pair_contrastive_learning(
+                                #     cl_batch, intents=seq2intents, intent_ids=intent_ids
+                                # )
+
                                 cl_loss3 = self.pcl_item_pair_contrastive_learning(
-                                    cl_batch, intents=seq2intents, intent_ids=intent_ids
+                                    cl_batch, intents=recommendation_output, intent_ids=intent_ids
                                 )
-                            
                             cl_losses.append(self.args.intent_cf_weight * cl_loss3)
                             
                             if self.args.cluster_prediction:

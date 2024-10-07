@@ -10,11 +10,11 @@ python main.py \
     --de_noise \
     --batch_size 256 \
     --epochs 2000 \
-    --gpu_id 1 \
+    --gpu_id 0 \
     --visualization_epoch 20 \
     --patience 30 \
     --embedding \
-    --output_dir Ablation/Beauty/Item_level/11 \
+    --output_dir Ablation/Beauty/Item_level/14 \
     --model_idx Mean\
     --contrast_type Item-Level \
     --warm_up_epoches 0\
@@ -24,8 +24,7 @@ python main.py \
     --intent_cf_weight 1\
     --cf_weight 0 \
     --cluster_value 0.3 \
-    --position_encoding_false \
-    --bi_direction \
+    --infonce
 
 
 # scripts/Beauty/0.sh
