@@ -57,10 +57,11 @@ class SupConLoss(nn.Module):
         elif intents is None and mask is None:
             mask = torch.eye(batch_size, dtype=torch.float32).to(self.device)
         elif intents is not None:
-            intents = intents.contiguous().view(-1, 1)
+            intents = intents.unsqueeze(-1)
+            
             if intents.shape[0] != batch_size:
                 raise ValueError("Num of labels does not match num of features")
-            mask = torch.eq(intents, intents.T).float().to(self.device)
+            mask = torch.eq(intents, intents.transpose(1,2)).float().to(self.device)
         else:
             mask = mask.float().to(self.device)
 
@@ -76,6 +77,7 @@ class SupConLoss(nn.Module):
             raise ValueError("Unknown mode: {}".format(self.contrast_mode))
 
         # compute logits
+        import IPython; IPython.embed(colors='Linux');exit(1);
         anchor_dot_contrast = torch.div(torch.matmul(anchor_feature, contrast_feature.T), self.temperature)
         # for numerical stability
         logits_max, _ = torch.max(anchor_dot_contrast, dim=1, keepdim=True)
@@ -151,7 +153,7 @@ class PCLoss(nn.Module):
         self.criterion = NCELoss(args,temperature, device)
         self.simclr_criterion = SimCLR(args,temperature, device)
         self.infonce = InfoNCE(args, temperature, device)
-       
+        self.supcon =SupConLoss(temperature, device)
 
     def forward(self,level,batch_sample_one, batch_sample_two, intents, intent_ids,temperature=None):
         """
@@ -166,9 +168,15 @@ class PCLoss(nn.Module):
             if self.args.simclr:
                 pos_one_item_compare_loss = self.simclr_criterion(level,batch_sample_one, intents, intent_ids=intent_ids, density=temperature)
                 pos_two_item_compare_loss = self.simclr_criterion(level,batch_sample_two, intents, intent_ids=intent_ids, density=temperature)
+            
             elif self.args.infonce:
                 pos_one_item_compare_loss = self.infonce(level,batch_sample_one, intents, intent_ids=intent_ids, density=temperature)
                 pos_two_item_compare_loss = self.infonce(level,batch_sample_two, intents, intent_ids=intent_ids, density=temperature)
+            
+            elif self.args.supcon:
+                pos_one_item_compare_loss = self.supcon(batch_sample_one, intents=intent_ids)
+                pos_two_item_compare_loss = self.supcon(batch_sample_two, intents=intent_ids)    
+            
             else:
                 
                 pos_one_item_compare_loss = self.criterion(level,batch_sample_one, intents, intent_ids=intent_ids, density=temperature)
@@ -178,6 +186,8 @@ class PCLoss(nn.Module):
             mean_pcl_loss += pos_two_item_compare_loss
             
             mean_pcl_loss /= 2 
+            if self.args.batch_mean:
+                mean_pcl_loss /= self.args.batch_size
             
         else:
             # do de-noise
