@@ -354,9 +354,9 @@ class UPTRecTrainer(Trainer):
         cl_output_slice_0 = cl_output_slice[0]
         cl_output_slice_1 = cl_output_slice[1]
 
-        if self.args.mlp:
-            cl_output_slice_0 = self.projection_user(cl_output_slice[0])
-            cl_output_slice_1 = self.projection_user(cl_output_slice[1])
+        
+        cl_output_slice_0 = self.projection_user(cl_output_slice[0])
+        cl_output_slice_1 = self.projection_user(cl_output_slice[1])
 
         
         if self.args.de_noise:
@@ -394,11 +394,8 @@ class UPTRecTrainer(Trainer):
             cl_sequence_output_view_2,_ = self.model(inputs[1],self.args,intent_ids)
 
         if self.args.seq_representation_type == 'mean':
-            
             cl_sequence_output_view_1 = torch.mean(cl_sequence_output_view_1, dim=2,keepdim=False).view(cl_sequence_output_view_1.shape[0],self.args.max_seq_length,-1)
             cl_sequence_output_view_2 = torch.mean(cl_sequence_output_view_2, dim=2,keepdim=False ).view(cl_sequence_output_view_2.shape[0],self.args.max_seq_length,-1)
-        
-        if self.args.mlp:
             cl_sequence_output_view_1 = self.projection_item(cl_sequence_output_view_1.view(cl_sequence_output_view_1.shape[0]*self.args.max_seq_length,-1)).view(self.args.batch_size, self.args.max_seq_length,-1)
             cl_sequence_output_view_2 = self.projection_item(cl_sequence_output_view_2.view(cl_sequence_output_view_1.shape[0]*self.args.max_seq_length,-1)).view(self.args.batch_size, self.args.max_seq_length,-1)
         
@@ -435,9 +432,8 @@ class UPTRecTrainer(Trainer):
         cl_output_slice_0 = cl_output_slice[0]
         cl_output_slice_1 = cl_output_slice[1]
 
-        if self.args.mlp:
-            cl_output_slice_0 = self.projection_user(cl_output_slice[0])
-            cl_output_slice_1 = self.projection_user(cl_output_slice[1])      
+        cl_output_slice_0 = self.projection_user(cl_output_slice[0])
+        cl_output_slice_1 = self.projection_user(cl_output_slice[1])      
             
 
         #PCLoss
@@ -470,12 +466,9 @@ class UPTRecTrainer(Trainer):
                     rec_batch = tuple(t.to(self.device) for t in rec_batch)
                     _, input_ids, target_pos, target_neg, _ = rec_batch
                     
-                    if self.args.context == "encoder":
-                        sequence_output,_ = self.model(input_ids,self.args)
-                        
-                    if self.args.context == "item_embedding":
-                        sequence_output,_ = self.model.item_embeddings(input_ids)
-
+                    
+                    sequence_output,_ = self.model(input_ids,self.args)
+        
                     sequence_context_item = sequence_output.view(self.args.batch_size*self.args.max_seq_length,-1)
                     sequence_context_user = sequence_output.view(self.args.batch_size,-1)
           
@@ -484,6 +477,9 @@ class UPTRecTrainer(Trainer):
                 
                         sequence_context_user = torch.mean(sequence_output, dim=1, keepdim=False).view(sequence_output.shape[0],-1)
                         sequence_context_item = torch.mean(sequence_output, dim=2, keepdim=False).view(sequence_output.shape[0]*self.args.max_seq_length,-1)
+                        
+                        sequence_context_item = self.projection_item(sequence_context_item)
+                        sequence_context_user = self.projection_user(sequence_context_user)
 
                         sequence_context_user = sequence_context_user.detach().cpu().numpy()
                         sequence_context_item = sequence_context_item.detach().cpu().numpy()
@@ -504,7 +500,7 @@ class UPTRecTrainer(Trainer):
                 for i, cluster in tqdm(enumerate(self.clusters), total=len(self.clusters)):
                     cluster.train(kmeans_training_data)
                     self.clusters[i] = cluster
-                
+
                 # clean memory
                 del kmeans_training_data
 
@@ -559,6 +555,7 @@ class UPTRecTrainer(Trainer):
 
                     if self.args.seq_representation_type == "mean":
                         sequence_context = torch.mean(sequence_context, dim=2, keepdim=False).view(sequence_context.shape[0]*self.args.max_seq_length,-1)
+                        sequence_context = self.projection_item(sequence_context)
                         sequence_context = sequence_context.detach().cpu().numpy()                
 
                     for cluster in self.item_clusters:
@@ -653,88 +650,87 @@ class UPTRecTrainer(Trainer):
                             cl_losses.append(self.args.intent_cf_weight * cl_loss3)
 
                     elif self.args.contrast_type == "Item-Level":
-
-                        if epoch >= self.args.warm_up_epoches:
                             
-                            cl_loss1 = self._instance_wsie_one_pair_contrastive_learning(
-                                    cl_batch, intent_ids=seq_class_label_batches
-                                )
-                            cl_losses.append(self.args.cf_weight * cl_loss1)
+                        cl_loss1 = self._instance_wsie_one_pair_contrastive_learning(
+                                cl_batch, intent_ids=seq_class_label_batches
+                            )
+                        cl_losses.append(self.args.cf_weight * cl_loss1)
 
+                        if self.args.seq_representation_type == "mean":
+                            
+                            sequence_context = torch.mean(recommendation_output, dim=2, keepdim=False).view(recommendation_output.shape[0]*self.args.max_seq_length,-1)
+                            sequence_context = self.projection_item(sequence_context)
+                            sequence_output = sequence_context.view(self.args.batch_size*self.args.max_seq_length, -1).detach().cpu().numpy()                
+                        
+                        # sequence_output = self.projection_item(recommendation_output.view(recommendation_output.shape[0]*self.args.max_seq_length, -1)).detach().cpu().numpy()
+                        # sequence_output = recommendation_output.view(recommendation_output.shape[0]*self.args.max_seq_length, -1).detach().cpu().numpy()
+                        
+                        for cluster in self.item_clusters:
+                            seq2intents = []
+                            intent_ids = []
+                            densitys = []
+                            intent_id, seq2intent,density = cluster.query(sequence_output)
+                            seq2intents.append(seq2intent)
+                            intent_ids.append(intent_id)
+                            densitys.append(density)
+
+                        if self.args.cluster_temperature:
+                            cl_loss3 = self.pcl_item_pair_contrastive_learning(
+                                cl_batch, intents=recommendation_output, intent_ids=intent_ids,temperature=densitys
+                            )
+                        else: 
+                            # cl_loss3 = self.pcl_item_pair_contrastive_learning(
+                            #     cl_batch, intents=seq2intents, intent_ids=intent_ids
+                            # )
+
+                            cl_loss3 = self.pcl_item_pair_contrastive_learning(
+                                cl_batch, intents=recommendation_output, intent_ids=intent_ids
+                            )
+                        cl_losses.append(self.args.intent_cf_weight * cl_loss3)
+                        
+                        if self.args.cluster_prediction:
+                            input_1 = cl_batch[0].to(self.device)
+                            input_2 = cl_batch[1].to(self.device)
+
+                            cl_output_1,_ = self.model(input_1,self.args, intent_ids)
+                            cl_output_2,_ = self.model(input_2,self.args, intent_ids)
+                            # cl_output_1 = self.model(input_1,self.args, intent_ids).view(recommendation_output.shape[0]*self.args.max_seq_length, -1).detach().cpu().numpy()
+                            # cl_output_2 = self.model(input_2,self.args, intent_ids).view(recommendation_output.shape[0]*self.args.max_seq_length, -1).detach().cpu().numpy()
                             if self.args.seq_representation_type == "mean":
-                                
-                                sequence_context = torch.mean(recommendation_output, dim=2, keepdim=False).view(recommendation_output.shape[0],-1)
-                                sequence_output = sequence_context.view(self.args.batch_size*self.args.max_seq_length, -1).detach().cpu().numpy()                
-                            
-                            # sequence_output = self.projection_item(recommendation_output.view(recommendation_output.shape[0]*self.args.max_seq_length, -1)).detach().cpu().numpy()
-                            # sequence_output = recommendation_output.view(recommendation_output.shape[0]*self.args.max_seq_length, -1).detach().cpu().numpy()
-                            
+                                cl_output_1 = torch.mean(cl_output_1, dim=2, keepdim=False).view(recommendation_output.shape[0],-1)
+                                cl_output_1 = cl_output_1.view(self.args.batch_size*self.args.max_seq_length, -1).detach().cpu().numpy()  
+
+                                cl_output_2 = torch.mean(cl_output_2, dim=2, keepdim=False).view(recommendation_output.shape[0],-1)
+                                cl_output_2 = cl_output_2.view(self.args.batch_size*self.args.max_seq_length, -1).detach().cpu().numpy()
+                            else:
+                                cl_output_1 = cl_output_1.view(recommendation_output.shape[0]*self.args.max_seq_length, -1).detach().cpu().numpy()
+                                cl_output_2 = cl_output_2.view(recommendation_output.shape[0]*self.args.max_seq_length, -1).detach().cpu().numpy() 
+
+                            ce_loss = 0
                             for cluster in self.item_clusters:
-                                seq2intents = []
-                                intent_ids = []
-                                densitys = []
-                                intent_id, seq2intent,density = cluster.query(sequence_output)
-                                seq2intents.append(seq2intent)
-                                intent_ids.append(intent_id)
-                                densitys.append(density)
-
-                            if self.args.cluster_temperature:
-                                cl_loss3 = self.pcl_item_pair_contrastive_learning(
-                                    cl_batch, intents=recommendation_output, intent_ids=intent_ids,temperature=densitys
-                                )
-                            else: 
-                                # cl_loss3 = self.pcl_item_pair_contrastive_learning(
-                                #     cl_batch, intents=seq2intents, intent_ids=intent_ids
-                                # )
-
-                                cl_loss3 = self.pcl_item_pair_contrastive_learning(
-                                    cl_batch, intents=recommendation_output, intent_ids=intent_ids
-                                )
-                            cl_losses.append(self.args.intent_cf_weight * cl_loss3)
+                                
+                                intent_ids_1 = []
+                                intent_ids_2 = []
+                                intent_id, seq2intent,density = cluster.query(cl_output_1)
+                                intent_ids_1.append(intent_id)
+                                intent_id, seq2intent,density = cluster.query(cl_output_2)
+                                intent_ids_2.append(intent_id)
                             
-                            if self.args.cluster_prediction:
-                                input_1 = cl_batch[0].to(self.device)
-                                input_2 = cl_batch[1].to(self.device)
+                            
+                            cross_entropy_loss_fn = nn.CrossEntropyLoss()
+                            intent_1_logits = intent_ids_1[0].float().unsqueeze(0) 
+                            intent_2_logits = intent_ids_2[0].float().unsqueeze(0) 
+                            intent_labels = intent_ids[0].float().unsqueeze(0)
+                            
+                            ce_loss_1 = cross_entropy_loss_fn(intent_1_logits, intent_labels) 
+                            ce_loss_1 /= int(self.args.max_seq_length) * int(self.args.batch_size)
+                            ce_loss_2 = cross_entropy_loss_fn(intent_2_logits, intent_labels)
+                            ce_loss_2 /= int(self.args.max_seq_length)  * int(self.args.batch_size)
 
-                                cl_output_1,_ = self.model(input_1,self.args, intent_ids)
-                                cl_output_2,_ = self.model(input_2,self.args, intent_ids)
-                                # cl_output_1 = self.model(input_1,self.args, intent_ids).view(recommendation_output.shape[0]*self.args.max_seq_length, -1).detach().cpu().numpy()
-                                # cl_output_2 = self.model(input_2,self.args, intent_ids).view(recommendation_output.shape[0]*self.args.max_seq_length, -1).detach().cpu().numpy()
-                                if self.args.seq_representation_type == "mean":
-                                    cl_output_1 = torch.mean(cl_output_1, dim=2, keepdim=False).view(recommendation_output.shape[0],-1)
-                                    cl_output_1 = cl_output_1.view(self.args.batch_size*self.args.max_seq_length, -1).detach().cpu().numpy()  
+                            ce_loss = (ce_loss_1 + ce_loss_2 ) /2
 
-                                    cl_output_2 = torch.mean(cl_output_2, dim=2, keepdim=False).view(recommendation_output.shape[0],-1)
-                                    cl_output_2 = cl_output_2.view(self.args.batch_size*self.args.max_seq_length, -1).detach().cpu().numpy()
-                                else:
-                                    cl_output_1 = cl_output_1.view(recommendation_output.shape[0]*self.args.max_seq_length, -1).detach().cpu().numpy()
-                                    cl_output_2 = cl_output_2.view(recommendation_output.shape[0]*self.args.max_seq_length, -1).detach().cpu().numpy() 
-
-                                ce_loss = 0
-                                for cluster in self.item_clusters:
-                                    
-                                    intent_ids_1 = []
-                                    intent_ids_2 = []
-                                    intent_id, seq2intent,density = cluster.query(cl_output_1)
-                                    intent_ids_1.append(intent_id)
-                                    intent_id, seq2intent,density = cluster.query(cl_output_2)
-                                    intent_ids_2.append(intent_id)
-                                
-                                
-                                cross_entropy_loss_fn = nn.CrossEntropyLoss()
-                                intent_1_logits = intent_ids_1[0].float().unsqueeze(0) 
-                                intent_2_logits = intent_ids_2[0].float().unsqueeze(0) 
-                                intent_labels = intent_ids[0].float().unsqueeze(0)
-                                
-                                ce_loss_1 = cross_entropy_loss_fn(intent_1_logits, intent_labels) 
-                                ce_loss_1 /= int(self.args.max_seq_length) * int(self.args.batch_size)
-                                ce_loss_2 = cross_entropy_loss_fn(intent_2_logits, intent_labels)
-                                ce_loss_2 /= int(self.args.max_seq_length)  * int(self.args.batch_size)
-
-                                ce_loss = (ce_loss_1 + ce_loss_2 ) /2
-
-                                # cl_losses.append(ce_loss)
-                                cl_losses.append(ce_loss * self.args.intent_cf_weight * 0.1)
+                            # cl_losses.append(ce_loss)
+                            cl_losses.append(ce_loss * self.args.intent_cf_weight * 0.1)
                             
                             
                     elif self.args.contrast_type == "User":
@@ -1026,10 +1022,8 @@ class UPTRecTrainer(Trainer):
 
                     if self.args.attention_type in ["Cluster"] and epoch >= self.args.warm_up_epoches:
 
-                        if self.args.context == "encoder":
-                            sequence_context, _ = self.model(input_ids,self.args)
-                        if self.args.context == "item_embedding":
-                            sequence_context = self.model.item_embeddings(input_ids)
+                        sequence_context, _ = self.model(input_ids,self.args)
+
 
                         if self.args.seq_representation_type == "mean":
                             sequence_context = torch.mean(sequence_context, dim=2, keepdim=False).view(sequence_context.shape[0],-1)
