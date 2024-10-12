@@ -531,6 +531,35 @@ class Crop(object):
             cropped_seq = copied_sequence[start_index : start_index + sub_seq_length]
             return cropped_seq
 
+class SlideWindow:        
+    def init(self, start_pos=0):
+        self.start_pos = start_pos
+
+    def __call__(self, seq):
+        """
+        seq:                    (Iterable) the interaction sequence.
+        ts:                     (Iterable) the interaction timestamp sequence.
+        =========
+        **kwargs:
+        start_pos:              (int) the start position for subset split.
+        end_pos:                (int) the end position for subset split.
+        window_length:          (int) the length of the windows
+        """
+        start_pos = 0
+        window_length = 1
+        end_pos = len(seq)
+
+        if window_length > end_pos + 1 - start_pos:
+            return [], []
+        elif window_length == end_pos + 1 - start_pos:
+            return [copy.deepcopy(seq)]
+
+        aug_seqs = []
+
+        for idx in range(end_pos + 1 - start_pos - window_length):
+            aug_seqs.append(seq[idx : idx + window_length])
+
+        return aug_seqs
 
 class Mask(object):
     """Randomly mask k items given a sequence"""

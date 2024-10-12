@@ -466,8 +466,10 @@ class UPTRecTrainer(Trainer):
                     rec_batch = tuple(t.to(self.device) for t in rec_batch)
                     _, input_ids, target_pos, target_neg, _ = rec_batch
                     
-                    
-                    sequence_output,_ = self.model(input_ids,self.args)
+                    if self.args.context == 'encoder':
+                        sequence_output,_ = self.model(input_ids,self.args)
+                    elif self.args.context =='item_embedding':
+                        sequence_output = self.model.item_embeddings(input_ids)
         
                     sequence_context_item = sequence_output.view(self.args.batch_size*self.args.max_seq_length,-1)
                     sequence_context_user = sequence_output.view(self.args.batch_size,-1)
@@ -650,7 +652,7 @@ class UPTRecTrainer(Trainer):
                             cl_losses.append(self.args.intent_cf_weight * cl_loss3)
 
                     elif self.args.contrast_type == "Item-Level":
-                            
+                        
                         cl_loss1 = self._instance_wsie_one_pair_contrastive_learning(
                                 cl_batch, intent_ids=seq_class_label_batches
                             )

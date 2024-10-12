@@ -47,8 +47,11 @@ def write_mapping_sample(User, dataset_name):
     f.close()
 
 
-def write_seq(User, dataset_name):
-    f = open(f'{dataset_name}_seq.txt','w')
+def write_seq(User, dataset_name,k):
+    if k==5:
+        f = open(f'5core/{dataset_name}.txt','w')
+    elif k ==10:
+        f = open(f'10core/{dataset_name}.txt','w')
     for user in User.keys():
         f.write('%d '%(user))
         for i in User[user]:
@@ -226,7 +229,7 @@ def steam_large(file_path):
     get_stats(usernum,itemnum,User,Item)
 
 
-def Amazon_generate_data(dataset_name):
+def Amazon_generate_data(dataset_name, k_core):
     countU = defaultdict(lambda: 0)
     countP = defaultdict(lambda: 0)
 
@@ -255,7 +258,7 @@ def Amazon_generate_data(dataset_name):
         rev = l['reviewerID']
         time = l['unixReviewTime']
 
-        if countU[rev] < 5 or countP[asin] < 5:
+        if countU[rev] < k_core or countP[asin] < k_core:
             continue
 
         if rev in usermap:
@@ -283,13 +286,13 @@ def Amazon_generate_data(dataset_name):
     
 
     get_stats(usernum,itemnum,User,Item,dataset_name)
-    write_mapping_sample(User, dataset_name)
-    write_mapping(User,dataset_name)
-    write_seq(User,dataset_name)
-    write_seq_sample(User,dataset_name)
+    # write_mapping_sample(User, dataset_name)
+    # write_mapping(User,dataset_name)
+    write_seq(User,dataset_name,k_core)
+    # write_seq_sample(User,dataset_name)
 
 
-def ml_generate_data(path):
+def ml_generate_data(path, k_core):
 
     countU = defaultdict(lambda: 0)
     countP = defaultdict(lambda: 0)
@@ -312,7 +315,7 @@ def ml_generate_data(path):
         line +=1
         user_id, movie_id, rating, timestamp = row[0].split('::')
         
-        if countU[user_id] < 5 or countP[movie_id] < 5:
+        if countU[user_id] < k_core or countP[movie_id] < k_core:
             continue
         if user_id in usermap:
             userid = usermap[user_id]
@@ -338,17 +341,23 @@ def ml_generate_data(path):
 
     get_stats(usernum,itemnum,User,Item,'Ml-1m')
     write_mapping_sample(User,'Ml-1m')
-    write_mapping(User,'Ml-1m')
+    # write_mapping(User,'Ml-1m')
     write_seq(User,'Ml-1m')
     write_seq_sample(User,'Ml-1m')
 
-amazon = ['Beauty', 'Toys_and_Games', 'Video_Games','Sports_and_Outdoors']
-# for i in amazon:
-#     Amazon_generate_data(i)
+# amazon = ['Baby','Clothing_Shoes_and_Jewelry',
+#           'Electronics','Grocery_and_Gourmet_Food',
+#            'Home_and_Kitchen','Movies_and_TV','Toys_and_Games', 'Video_Games','Sports_and_Outdoors',
+#            'Tools_and_Home_Improvement',]
+amazon = ['Beauty']
+k_core = 5
+
+for i in amazon:
+    Amazon_generate_data(i,k_core)
 
 
 #steam_generate_data('/Users/sb/Desktop/project/preference_rec/data/australian_user_reviews.json.gz') #using version 1 review data
-ml_generate_data('/home/sb/data/ml-20m.inter')  #m1-1m
+# ml_generate_data('/home/sb/data/ml-20m.inter',k_core)  #m1-1m
     
 # import IPython; IPython.embed(colors='Linux');exit(1);
 

@@ -585,8 +585,7 @@ class UPTRecTrainer_pre(Trainer):
                 else:
                     recommendation_output,_ = self.model(input_ids,self.args)
 
-                if self.args.pre_train:
-                    rec_loss = 0
+                if self.args.fine_tune:
 
                     ### MLM Learning ###
 
@@ -607,7 +606,6 @@ class UPTRecTrainer_pre(Trainer):
                     mlm_loss_fct = nn.CrossEntropyLoss(ignore_index=-100)
                     mlm_loss = mlm_loss_fct(prediction_scores.view(-1, self.args.item_size), mlm_labels.view(-1))
    
-                else:
                     rec_loss = self.cross_entropy(recommendation_output, target_pos, target_neg)           
 
                 
@@ -616,7 +614,7 @@ class UPTRecTrainer_pre(Trainer):
                     
                 for cl_batch in cl_batches:
                     
-                    if self.args.pre_train: ## Item-Level CL
+                    if self.args.fine_tune: ## Item-Level CL
 
                         if epoch >= self.args.warm_up_epoches:
                             
@@ -690,19 +688,21 @@ class UPTRecTrainer_pre(Trainer):
                         cl_losses.append(self.args.intent_cf_weight * cl_loss3)
                     
                             
-                if self.args.pre_train:
+                if self.args.fine_tune:
                     joint_loss = mlm_loss * 1
+                    joint_loss += self.args.rec_weight * rec_loss
                     if self.args.contrast_type in ["IntentCL", "Hybrid", "Item-Level","Item-User","Item-description","User"]:
                         for cl_loss in cl_losses:
                             joint_loss += cl_loss 
                     mlm_avg_loss += mlm_loss.item()
-                    
-                elif self.args.fine_tune:
-                    joint_loss = self.args.rec_weight * rec_loss
-                    if self.args.contrast_type in ["IntentCL", "Hybrid", "Item-Level","Item-User","Item-description","User"]:
-                        for cl_loss in cl_losses:
-                            joint_loss += cl_loss 
                     rec_avg_loss += rec_loss.item()
+                    
+                # elif self.args.fine_tune:
+                #     joint_loss = self.args.rec_weight * rec_loss
+                #     if self.args.contrast_type in ["IntentCL", "Hybrid", "Item-Level","Item-User","Item-description","User"]:
+                #         for cl_loss in cl_losses:
+                #             joint_loss += cl_loss 
+                #     rec_avg_loss += rec_loss.item()
 
                 self.optim.zero_grad()
                 joint_loss.backward()
@@ -737,9 +737,10 @@ class UPTRecTrainer_pre(Trainer):
                 
             elif self.args.contrast_type in ["Hybrid","IntentCL","Item-Level","Item-User","Item-description","User"]:
                 
-                if self.args.pre_train:
+                if self.args.fine_tune:
                     post_fix = {
                         "epoch": epoch,
+                        "rec_avg_loss": "{:.6}".format(rec_avg_loss / len(rec_cf_data_iter)),
                         "mlm_avg_loss": "{:.6}".format(mlm_avg_loss / len(rec_cf_data_iter)),
                         "joint_avg_loss": "{:.6f}".format(joint_avg_loss / len(rec_cf_data_iter)),
                         "NMI_cluster_reassignment": "{:.6f}".format(nmi_assignment_score / len(rec_cf_data_iter)),

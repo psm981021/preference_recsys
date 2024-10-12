@@ -19,6 +19,7 @@ class RecWithContrastiveLearningDataset(Dataset):
             "mask": Mask(self.args, gamma=args.gamma),
             "reorder": Reorder(beta=args.beta),
             "random": Random(self.args, tao=args.tao, gamma=args.gamma, beta=args.beta),
+            "slide":SlideWindow()
         }
         if self.args.augment_type not in self.augmentations:
             raise ValueError(f"augmentation type: '{self.args.augment_type}' is invalided")
