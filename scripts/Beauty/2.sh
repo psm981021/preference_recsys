@@ -1,138 +1,289 @@
 
 python main.py \
-    --model_name UPTRec \
-    --data_name Beauty  \
-    --data_dir data/ \
+    --model_name CLARRec \
+    --data_name Baby  \
+    --data_dir data/10core \
     --context encoder \
     --seq_representation_type mean \
-    --attention_type Cluster \
+    --attention_type None \
     --cluster_joint \
     --de_noise \
     --batch_size 256 \
     --epochs 2000 \
-    --gpu_id 1 \
+    --gpu_id 0 \
     --visualization_epoch 20 \
     --patience 30 \
     --embedding \
-    --output_dir Ablation/Beauty/Item_level/Max_seq/10 \
-    --model_idx Mean\
-    --contrast_type Item-Level \
+    --output_dir Main_Table/10core/SASRec/Baby \
+    --model_idx Mean \
+    --contrast_type None \
     --warm_up_epoches 0\
     --rec_weight 1 \
     --temperature 1 \
-    --num_intent_clusters 5\
-    --intent_cf_weight 1\
+    --num_intent_clusters 2\
+    --intent_cf_weight 1.2\
     --cf_weight 0 \
-    --cluster_value 0.3\
-    --max_seq_length 10\
+    --cluster_value 0.3 \
 
 python main.py \
-    --model_name UPTRec \
-    --data_name Beauty  \
-    --data_dir data/ \
+    --model_name CLARRec \
+    --data_name Clothing_Shoes_and_Jewelry  \
+    --data_dir data/10core \
     --context encoder \
     --seq_representation_type mean \
-    --attention_type Cluster \
+    --attention_type None \
     --cluster_joint \
     --de_noise \
     --batch_size 256 \
     --epochs 2000 \
-    --gpu_id 1 \
+    --gpu_id 0 \
     --visualization_epoch 20 \
     --patience 30 \
     --embedding \
-    --output_dir Ablation/Beauty/Item_level/Max_seq/20 \
-    --model_idx Mean\
-    --contrast_type Item-Level \
+    --output_dir Main_Table/10core/SASRec/Clothing_Shoes_and_Jewelry \
+    --model_idx Mean \
+    --contrast_type None\
     --warm_up_epoches 0\
     --rec_weight 1 \
     --temperature 1 \
-    --num_intent_clusters 5\
-    --intent_cf_weight 1\
+    --num_intent_clusters 2\
+    --intent_cf_weight 1.2\
     --cf_weight 0 \
-    --cluster_value 0.3\
-    --max_seq_length 20\
+    --cluster_value 0.3 \
 
 python main.py \
-    --model_name UPTRec \
+    --model_name CLARRec \
     --data_name Beauty  \
-    --data_dir data/ \
+    --data_dir data/10core \
     --context encoder \
     --seq_representation_type mean \
-    --attention_type Cluster \
+    --attention_type None \
     --cluster_joint \
     --de_noise \
     --batch_size 256 \
     --epochs 2000 \
-    --gpu_id 1 \
+    --gpu_id 0 \
     --visualization_epoch 20 \
     --patience 30 \
     --embedding \
-    --output_dir Ablation/Beauty/Item_level/Max_seq/30 \
-    --model_idx Mean\
-    --contrast_type Item-Level \
+    --output_dir Main_Table/10core/SASRec/Beauty \
+    --model_idx Mean \
+    --contrast_type None\
     --warm_up_epoches 0\
     --rec_weight 1 \
     --temperature 1 \
-    --num_intent_clusters 5\
-    --intent_cf_weight 1\
+    --num_intent_clusters 2\
+    --intent_cf_weight 1.2\
     --cf_weight 0 \
-    --cluster_value 0.3\
-    --max_seq_length 30 \
+    --cluster_value 0.3 \
 
 python main.py \
-    --model_name UPTRec \
-    --data_name Beauty  \
-    --data_dir data/ \
+    --model_name CLARRec \
+    --data_name Grocery_and_Gourmet_Food  \
+    --data_dir data/10core \
     --context encoder \
     --seq_representation_type mean \
-    --attention_type Cluster \
+    --attention_type None \
     --cluster_joint \
     --de_noise \
     --batch_size 256 \
     --epochs 2000 \
-    --gpu_id 1 \
+    --gpu_id 0 \
     --visualization_epoch 20 \
     --patience 30 \
     --embedding \
-    --output_dir Ablation/Beauty/Item_level/Max_seq/40 \
-    --model_idx Mean\
-    --contrast_type Item-Level \
+    --output_dir Main_Table/10core/SASRec/Grocery_and_Gourmet_Food \
+    --model_idx Mean \
+    --contrast_type None\
     --warm_up_epoches 0\
     --rec_weight 1 \
     --temperature 1 \
-    --num_intent_clusters 5\
-    --intent_cf_weight 1\
+    --num_intent_clusters 2\
+    --intent_cf_weight 1.2\
     --cf_weight 0 \
-    --cluster_value 0.3\
-    --max_seq_length 40\
+    --cluster_value 0.3 \
 
 python main.py \
-    --model_name UPTRec \
-    --data_name Beauty  \
-    --data_dir data/ \
+    --model_name CLARRec \
+    --data_name Home_and_Kitchen  \
+    --data_dir data/10core \
     --context encoder \
     --seq_representation_type mean \
-    --attention_type Cluster \
+    --attention_type None \
     --cluster_joint \
     --de_noise \
     --batch_size 256 \
     --epochs 2000 \
-    --gpu_id 1 \
+    --gpu_id 0 \
     --visualization_epoch 20 \
     --patience 30 \
     --embedding \
-    --output_dir Ablation/Beauty/Item_level/Max_seq/50 \
-    --model_idx Mean\
-    --contrast_type Item-Level \
+    --output_dir Main_Table/10core/SASRec/Home_and_Kitchen \
+    --model_idx Mean \
+    --contrast_type None\
     --warm_up_epoches 0\
     --rec_weight 1 \
     --temperature 1 \
-    --num_intent_clusters 5\
-    --intent_cf_weight 1\
+    --num_intent_clusters 2\
+    --intent_cf_weight 1.2\
     --cf_weight 0 \
-    --cluster_value 0.3\
-    --max_seq_length 50\
+    --cluster_value 0.3 \
 
+python main.py \
+    --model_name CLARRec \
+    --data_name Toys_and_Games  \
+    --data_dir data/10core \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type None \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 0 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Main_Table/10core/SASRec/Toys_and_Games \
+    --model_idx Mean \
+    --contrast_type None\
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 2\
+    --intent_cf_weight 1.2\
+    --cf_weight 0 \
+    --cluster_value 0.3 \
+
+python main.py \
+    --model_name CLARRec \
+    --data_name Video_Games  \
+    --data_dir data/10core \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type None \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 0 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Main_Table/10core/SASRec/Video_Games \
+    --model_idx Mean \
+    --contrast_type None\
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 2\
+    --intent_cf_weight 1.2\
+    --cf_weight 0 \
+    --cluster_value 0.3 \
+
+python main.py \
+    --model_name CLARRec \
+    --data_name Sports_and_Outdoors  \
+    --data_dir data/10core \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type None \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 0 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Main_Table/10core/SASRec/Sports_and_Outdoors \
+    --model_idx Mean \
+    --contrast_type None\
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 2\
+    --intent_cf_weight 1.2\
+    --cf_weight 0 \
+    --cluster_value 0.3 \
+
+python main.py \
+    --model_name CLARRec \
+    --data_name Tools_and_Home_Improvement  \
+    --data_dir data/10core \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type None \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 0 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Main_Table/10core/SASRec/Tools_and_Home_Improvement \
+    --model_idx Mean \
+    --contrast_type None\
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 2\
+    --intent_cf_weight 1.2\
+    --cf_weight 0 \
+    --cluster_value 0.3 \
+
+
+python main.py \
+    --model_name CLARRec \
+    --data_name Electronics  \
+    --data_dir data/10core \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type None \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 0 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Main_Table/10core/SASRec/Electronics \
+    --model_idx Mean \
+    --contrast_type None\
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 2\
+    --intent_cf_weight 1.2\
+    --cf_weight 0 \
+    --cluster_value 0.3 \
+
+python main.py \
+    --model_name CLARRec \
+    --data_name Movies_and_TV  \
+    --data_dir data/10core \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type None \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 0 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Main_Table/10core/SASRec/Movies_and_TV \
+    --model_idx Mean \
+    --contrast_type None\
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 2\
+    --intent_cf_weight 1.2\
+    --cf_weight 0 \
+    --cluster_value 0.3 \
 
 # scripts/Beauty/2.sh

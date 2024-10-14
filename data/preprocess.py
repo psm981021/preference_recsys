@@ -30,8 +30,11 @@ def getDF(path):
 #df = getDF('reviews_Video_Games.json.gz')
 
 
-def write_mapping(User, dataset_name):
-    f = open(f'{dataset_name}.txt','w')
+def write_mapping(User, dataset_name,k):
+    if k==5:
+        f = open(f'5core/{dataset_name}.txt','w')
+    elif k ==10:
+        f = open(f'10core/{dataset_name}.txt','w')
     for user in User.keys():
         for i in User[user]:
             f.write('%d %d\n' %(user, i[1]))
@@ -287,7 +290,7 @@ def Amazon_generate_data(dataset_name, k_core):
 
     get_stats(usernum,itemnum,User,Item,dataset_name)
     # write_mapping_sample(User, dataset_name)
-    # write_mapping(User,dataset_name)
+    # write_mapping(User,dataset_name,k_core)
     write_seq(User,dataset_name,k_core)
     # write_seq_sample(User,dataset_name)
 
@@ -345,15 +348,90 @@ def ml_generate_data(path, k_core):
     write_seq(User,'Ml-1m')
     write_seq_sample(User,'Ml-1m')
 
-# amazon = ['Baby','Clothing_Shoes_and_Jewelry',
-#           'Electronics','Grocery_and_Gourmet_Food',
-#            'Home_and_Kitchen','Movies_and_TV','Toys_and_Games', 'Video_Games','Sports_and_Outdoors',
-#            'Tools_and_Home_Improvement',]
-amazon = ['Beauty']
-k_core = 5
+def Amazon_generate_data_rec(dataset_name, k_core):
+    countU = defaultdict(lambda: 0)  # 사용자 리뷰 수 카운트
+    countP = defaultdict(lambda: 0)  # 아이템 리뷰 수 카운트
+
+    usermap = dict()
+    usernum = 0
+    itemmap = dict() 
+    itemnum = 0
+    User = dict()
+    Item = dict()
+    
+    # 리뷰 데이터 파일 경로
+    data_path = 'reviews_' + dataset_name + '_5.json.gz'
+
+    # 1차로 각 사용자와 아이템의 리뷰 수를 계산
+    for l in parse(data_path):
+        asin = l['asin']  # item ID
+        rev = l['reviewerID']  # user ID
+        countU[rev] += 1
+        countP[asin] += 1
+
+    # 2차로 k-core 조건에 맞는 사용자와 아이템만 처리
+    for l in parse(data_path):
+        asin = l['asin']
+        rev = l['reviewerID']
+        time = l['unixReviewTime']
+
+        # k-core 기준에 맞지 않으면 건너뜀
+        if countU[rev] < k_core or countP[asin] < k_core:
+            continue
+
+        # 유저 ID 매핑
+        if rev in usermap:
+            userid = usermap[rev]
+        else:
+            usernum += 1
+            userid = usernum
+            usermap[rev] = userid
+            User[userid] = []
+
+        # 아이템 ID 매핑 (아이템 ID는 2부터 시작)
+        if asin in itemmap:
+            itemid = itemmap[asin]
+        else:
+            itemnum += 1
+            itemid = itemnum + 1  # item ID는 2부터 시작
+            itemmap[asin] = itemid
+            Item[itemid] = []
+
+        # 아이템과 유저 상호작용 저장
+        Item[itemid].append(userid)
+        User[userid].append([time, itemid])
+
+
+    user_ids = list(User.keys())
+
+    # 각 유저의 리뷰를 시간 순으로 정렬
+    for userid in user_ids:
+        # 시간 순으로 정렬
+        User[userid].sort(key=lambda x: x[0])
+
+        # 유저의 상호작용 길이가 최소 요구되는 길이 (min_interactions) 이상인지 확인
+        if len(User[userid]) < 5:
+            # 상호작용이 최소 요구 길이 미만이면 해당 유저를 제거
+            del User[userid]
+
+    # 데이터 통계 출력
+    get_stats(usernum, itemnum, User, Item, dataset_name)
+
+    # 시간 순으로 정렬된 유저 데이터를 파일로 저장
+    write_seq(User, dataset_name, k_core)
+
+
+
+amazon = ['Baby','Clothing_Shoes_and_Jewelry','Beauty',
+          'Electronics','Grocery_and_Gourmet_Food',
+           'Home_and_Kitchen','Movies_and_TV','Toys_and_Games', 'Video_Games','Sports_and_Outdoors',
+           'Tools_and_Home_Improvement']
+
+k_core = 10
 
 for i in amazon:
-    Amazon_generate_data(i,k_core)
+    # Amazon_generate_data(i,k_core)
+    Amazon_generate_data_rec(i,k_core)
 
 
 #steam_generate_data('/Users/sb/Desktop/project/preference_rec/data/australian_user_reviews.json.gz') #using version 1 review data
