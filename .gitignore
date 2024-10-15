@@ -15,6 +15,7 @@ data/Beauty_meta.csv
 data/2014/*
 data/5core
 data/10core
+scripts/
 
 #result log
 result_log/

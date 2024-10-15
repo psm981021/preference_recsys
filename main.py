@@ -234,16 +234,12 @@ def main():
     
     args.cuda_condition = torch.cuda.is_available() and not args.no_cuda
 
-    try:
-        args.data_file = f'{args.data_dir}/{args.data_name}/{args.data_name}_seq.txt'
-        user_seq, max_item, valid_rating_matrix, test_rating_matrix = get_user_seqs(args.data_file)
-    except: 
-        args.data_file = f'{args.data_dir}/{args.data_name}.txt'
-        user_seq, max_item, valid_rating_matrix, test_rating_matrix = get_user_seqs(args.data_file)
+
+    args.data_file = f'{args.data_dir}/{args.data_name}.txt'
+    user_seq, max_item, valid_rating_matrix, test_rating_matrix = get_user_seqs(args.data_file)
 
     args.item_size = max_item + 2
     args.mask_id = max_item + 1
-
 
     if args.description:
         description_embeddings = pd.read_csv('/home/seongbeom/paper/preference_rec/data/2014/Beauty/Beauty_embeddings.csv')
@@ -303,20 +299,19 @@ def main():
 
     train_dataset = RecWithContrastiveLearningDataset(args, user_seq[: int(len(user_seq) * args.training_data_ratio)], data_type="train")
     train_sampler = RandomSampler(train_dataset)
-    train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.batch_size, drop_last=True ,num_workers=4, pin_memory=True)
+    train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.batch_size, drop_last=True )
 
     eval_dataset = RecWithContrastiveLearningDataset(args, user_seq, data_type="valid")
     eval_sampler = SequentialSampler(eval_dataset)
-    eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.batch_size, drop_last=True, num_workers=4, pin_memory=True)
+    eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.batch_size, drop_last=True)
 
     test_dataset = RecWithContrastiveLearningDataset(args, user_seq, data_type="test")
     test_sampler = SequentialSampler(test_dataset)
-    test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.batch_size, drop_last=True, num_workers=4, pin_memory=True)
+    test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.batch_size, drop_last=True)
 
     item_dataset = ItemembeddingDataset(item_ids)
     item_sampler = SequentialSampler(item_dataset)
     item_dataloader = DataLoader(item_dataset, sampler=item_sampler, batch_size=args.batch_size)
-
     if args.pre_train or args.fine_tune:
         trainer = UPTRecTrainer_pre(model, train_dataloader, cluster_dataloader, eval_dataloader, test_dataloader,item_dataloader, args)
     else:
