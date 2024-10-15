@@ -445,7 +445,7 @@ class EarlyStopping:
         self.delta = delta
 
     def compare(self, score):
-        if self.args.pre_train:
+        if self.args.fine_tune:
             if np.mean(score) > np.mean(self.best_score) + self.delta:
                 return True
             return False

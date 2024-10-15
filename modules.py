@@ -181,7 +181,7 @@ class PCLoss(nn.Module):
                 
                 pos_one_item_compare_loss = self.criterion(level,batch_sample_one, intents, intent_ids=intent_ids, density=temperature)
                 pos_two_item_compare_loss = self.criterion(level,batch_sample_two, intents, intent_ids=intent_ids, density=temperature)
-
+                
             mean_pcl_loss += pos_one_item_compare_loss
             mean_pcl_loss += pos_two_item_compare_loss
             

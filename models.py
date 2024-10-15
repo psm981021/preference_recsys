@@ -163,11 +163,11 @@ class UPTRec(nn.Module):
         sequence_emb = self.add_position_embedding(input_ids,description)
         
         item_encoded_layers = self.item_encoder(sequence_emb, extended_attention_mask,args,cluster_id, output_all_encoded_layers=True)
-
         sequence_output = item_encoded_layers[-1]
-        
+        invariant_aug = [item_encoded_layers]
+
         prediction_scores = self.lm_head(sequence_output)
-        return sequence_output, prediction_scores
+        return sequence_output, prediction_scores, invariant_aug
 
 
     def init_weights(self, module):

@@ -1,100 +1,238 @@
 
 
-for tao in 0.1 0.3 0.5 0.7
-do
-    python main.py \
-        --model_name UPTRec \
-        --data_name Beauty  \
-        --data_dir data/ \
-        --context encoder \
-        --seq_representation_type mean \
-        --attention_type Cluster \
-        --cluster_joint \
-        --de_noise \
-        --batch_size 256 \
-        --epochs 2000 \
-        --gpu_id 1 \
-        --visualization_epoch 20 \
-        --patience 30 \
-        --embedding \
-        --output_dir Ablation/Beauty/Item_level/Augmentation/Mask_${tao} \
-        --model_idx Mean\
-        --augment_type mask \
-        --tao $tao \
-        --contrast_type Item-Level \
-        --warm_up_epoches 0\
-        --rec_weight 1 \
-        --temperature 1 \
-        --num_intent_clusters 10\
-        --intent_cf_weight 1\
-        --cf_weight 0 \
-        --cluster_value 0.3 \
-        --cluster_prediction
-done
+python main.py \
+    --model_name SASRec \
+    --data_name Beauty  \
+    --data_dir data/5core \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type Base \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 1 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Main_Table/5core/Beauty/SASRec \
+    --model_idx Mean\
+    --contrast_type None \
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 2\
+    --intent_cf_weight 1\
+    --cf_weight 0 \
+    --cluster_value 0.3\
 
-for beta in 0.1 0.2 0.3 0.4
-do
-    python main.py \
-        --model_name UPTRec \
-        --data_name Beauty  \
-        --data_dir data/ \
-        --context encoder \
-        --seq_representation_type mean \
-        --attention_type Cluster \
-        --cluster_joint \
-        --de_noise \
-        --batch_size 256 \
-        --epochs 2000 \
-        --gpu_id 0 \
-        --visualization_epoch 20 \
-        --patience 30 \
-        --embedding \
-        --output_dir Ablation/Beauty/Item_level/Augmentation/Reorder_${beta} \
-        --model_idx Mean\
-        --augment_type mask \
-        --beta $beta \
-        --contrast_type Item-Level \
-        --warm_up_epoches 0\
-        --rec_weight 1 \
-        --temperature 1 \
-        --num_intent_clusters 10\
-        --intent_cf_weight 1\
-        --cf_weight 0 \
-        --cluster_value 0.3 \
-        --cluster_prediction
-done
+python main.py \
+    --model_name SASRec \
+    --data_name Clothing_Shoes_and_Jewerly  \
+    --data_dir data/5core \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type Base \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 1 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Main_Table/5core/Clothing_Shoes_and_Jewerly/SASRec \
+    --model_idx Mean\
+    --contrast_type None \
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 2\
+    --intent_cf_weight 1\
+    --cf_weight 0 \
+    --cluster_value 0.3\
+
+python main.py \
+    --model_name SASRec \
+    --data_name Electronics  \
+    --data_dir data/5core \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type Base \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 1 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Main_Table/5core/Electronics/SASRec \
+    --model_idx Mean\
+    --contrast_type None \
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 2\
+    --intent_cf_weight 1\
+    --cf_weight 0 \
+    --cluster_value 0.3\
+
+python main.py \
+    --model_name SASRec \
+    --data_name Grocery_and_Gourmet_Food  \
+    --data_dir data/5core \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type Base \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 1 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Main_Table/5core/Grocery_and_Gourmet_Food/SASRec \
+    --model_idx Mean\
+    --contrast_type None \
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 2\
+    --intent_cf_weight 1\
+    --cf_weight 0 \
+    --cluster_value 0.3\
+
+python main.py \
+    --model_name SASRec \
+    --data_name Home_and_Kitchen  \
+    --data_dir data/5core \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type Base \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 1 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Main_Table/5core/Home_and_Kitchen/SASRec \
+    --model_idx Mean\
+    --contrast_type None \
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 2\
+    --intent_cf_weight 1\
+    --cf_weight 0 \
+    --cluster_value 0.3\
+
+python main.py \
+    --model_name SASRec \
+    --data_name Sports_and_Outdoors  \
+    --data_dir data/5core \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type Base \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 1 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Main_Table/5core/Sports_and_Outdoors/SASRec \
+    --model_idx Mean\
+    --contrast_type None \
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 2\
+    --intent_cf_weight 1\
+    --cf_weight 0 \
+    --cluster_value 0.3\
+
+python main.py \
+    --model_name SASRec \
+    --data_name Tools_and_Home_Improvement  \
+    --data_dir data/5core \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type Base \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 1 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Main_Table/5core/Tools_and_Home_Improvement/SASRec \
+    --model_idx Mean\
+    --contrast_type None \
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 2\
+    --intent_cf_weight 1\
+    --cf_weight 0 \
+    --cluster_value 0.3\
+
+python main.py \
+    --model_name SASRec \
+    --data_name Toys_and_Games  \
+    --data_dir data/5core \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type Base \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 1 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Main_Table/5core/Toys_and_Games/SASRec \
+    --model_idx Mean\
+    --contrast_type None \
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 2\
+    --intent_cf_weight 1\
+    --cf_weight 0 \
+    --cluster_value 0.3\
 
 
-for beta in 0.1 0.2 0.3 0.4
-do
-    python main.py \
-        --model_name UPTRec \
-        --data_name Beauty  \
-        --data_dir data/ \
-        --context encoder \
-        --seq_representation_type mean \
-        --attention_type Cluster \
-        --cluster_joint \
-        --de_noise \
-        --batch_size 256 \
-        --epochs 2000 \
-        --gpu_id 0 \
-        --visualization_epoch 20 \
-        --patience 30 \
-        --embedding \
-        --output_dir Ablation/Beauty/Item_level/Augmentation/Reorder_${beta} \
-        --model_idx Mean\
-        --augment_type mask \
-        --beta $beta \
-        --contrast_type Item-Level \
-        --warm_up_epoches 0\
-        --rec_weight 1 \
-        --temperature 1 \
-        --num_intent_clusters 10\
-        --intent_cf_weight 1\
-        --cf_weight 0 \
-        --cluster_value 0.3 \
-        --cluster_prediction
-done
+python main.py \
+    --model_name SASRec \
+    --data_name Video_Games  \
+    --data_dir data/5core \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type Base \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 1 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Main_Table/5core/Video_Games/SASRec \
+    --model_idx Mean\
+    --contrast_type None \
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 2\
+    --intent_cf_weight 1\
+    --cf_weight 0 \
+    --cluster_value 0.3\
 
 # scripts/Beauty/3.sh

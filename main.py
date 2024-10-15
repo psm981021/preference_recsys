@@ -80,7 +80,8 @@ def main():
 
     parser.add_argument("--pre_train", action="store_true", help="pre-training for cluster-attention &  fine-tuning for contrastive learning ")  
     parser.add_argument("--fine_tune", action="store_true", help="pre-training for cluster-attention &  fine-tuning for contrastive learning ")   
-
+    parser.add_argument("--invariant_augment", action="store_true", help="invariant augmentation for Contrastive Learning")  
+    
 
     parser.add_argument(
         "--attention_type",
@@ -348,7 +349,7 @@ def main():
             trainer.train(epoch)
 
             # evaluate on NDCG@20
-            if args.pre_train:
+            if args.fine_tune:
                 scores = trainer.valid(epoch, full_sort=True)
                 print(f"[Eval] MLM loss: {scores:.6f}")                
                 early_stopping([scores], trainer.model)

@@ -1,20 +1,20 @@
 python main.py \
-    --model_name UPTRec \
+    --model_name CLARRec \
     --data_name Beauty  \
     --data_dir data/5core \
-    --context item_embedding \
+    --context encoder \
     --seq_representation_type mean \
     --attention_type Cluster \
     --cluster_joint \
     --de_noise \
     --batch_size 256 \
     --epochs 2000 \
-    --gpu_id 1 \
+    --gpu_id 0 \
     --visualization_epoch 20 \
     --patience 30 \
     --embedding \
-    --output_dir Ablation/Beauty/Item_level/26 \
-    --model_idx Mean \
+    --output_dir Main_Table/5core/Beauty/Cluster_Attention/K:2 \
+    --model_idx Mean\
     --contrast_type Item-Level \
     --warm_up_epoches 0\
     --rec_weight 1 \
@@ -22,7 +22,224 @@ python main.py \
     --num_intent_clusters 2\
     --intent_cf_weight 1\
     --cf_weight 0 \
-    --cluster_value 0.3 \
-    --cluster_prediction
+    --cluster_value 0.3\
+    --cluster_prediction \
+
+python main.py \
+    --model_name CLARRec \
+    --data_name Clothing_Shoes_and_Jewerly  \
+    --data_dir data/5core \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type Cluster \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 0 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Main_Table/5core/Clothing_Shoes_and_Jewerly/Cluster_Attention/K:2 \
+    --model_idx Mean\
+    --contrast_type Item-Level \
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 2\
+    --intent_cf_weight 1\
+    --cf_weight 0 \
+    --cluster_value 0.3\
+    --cluster_prediction \
+
+python main.py \
+    --model_name CLARRec \
+    --data_name Electronics  \
+    --data_dir data/5core \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type Cluster \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 0 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Main_Table/5core/Electronics/Cluster_Attention/K:2 \
+    --model_idx Mean\
+    --contrast_type Item-Level \
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 2\
+    --intent_cf_weight 1\
+    --cf_weight 0 \
+    --cluster_value 0.3\
+    --cluster_prediction \
+
+python main.py \
+    --model_name CLARRec \
+    --data_name Grocery_and_Gourmet_Food  \
+    --data_dir data/5core \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type Cluster \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 0 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Main_Table/5core/Grocery_and_Gourmet_Food/Cluster_Attention/K:2 \
+    --model_idx Mean\
+    --contrast_type Item-Level \
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 2\
+    --intent_cf_weight 1\
+    --cf_weight 0 \
+    --cluster_value 0.3\
+    --cluster_prediction \
+
+python main.py \
+    --model_name CLARRec \
+    --data_name Home_and_Kitchen  \
+    --data_dir data/5core \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type Cluster \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 0 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Main_Table/5core/Home_and_Kitchen/Cluster_Attention/K:2 \
+    --model_idx Mean\
+    --contrast_type Item-Level \
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 2\
+    --intent_cf_weight 1\
+    --cf_weight 0 \
+    --cluster_value 0.3\
+    --cluster_prediction \
+
+python main.py \
+    --model_name CLARRec \
+    --data_name Sports_and_Outdoors  \
+    --data_dir data/5core \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type Cluster \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 0 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Main_Table/5core/Sports_and_Outdoors/Cluster_Attention/K:2 \
+    --model_idx Mean\
+    --contrast_type Item-Level \
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 2\
+    --intent_cf_weight 1\
+    --cf_weight 0 \
+    --cluster_value 0.3\
+    --cluster_prediction \
+
+python main.py \
+    --model_name CLARRec \
+    --data_name Tools_and_Home_Improvement  \
+    --data_dir data/5core \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type Cluster \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 0 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Main_Table/5core/Tools_and_Home_Improvement/Cluster_Attention/K:2 \
+    --model_idx Mean\
+    --contrast_type Item-Level \
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 2\
+    --intent_cf_weight 1\
+    --cf_weight 0 \
+    --cluster_value 0.3\
+    --cluster_prediction \
+
+python main.py \
+    --model_name CLARRec \
+    --data_name Toys_and_Games  \
+    --data_dir data/5core \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type Cluster \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 0 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Main_Table/5core/Toys_and_Games/Cluster_Attention/K:2 \
+    --model_idx Mean\
+    --contrast_type Item-Level \
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 2\
+    --intent_cf_weight 1\
+    --cf_weight 0 \
+    --cluster_value 0.3\
+    --cluster_prediction \
+
+
+python main.py \
+    --model_name CLARRec \
+    --data_name Video_Games  \
+    --data_dir data/5core \
+    --context encoder \
+    --seq_representation_type mean \
+    --attention_type Cluster \
+    --cluster_joint \
+    --de_noise \
+    --batch_size 256 \
+    --epochs 2000 \
+    --gpu_id 0 \
+    --visualization_epoch 20 \
+    --patience 30 \
+    --embedding \
+    --output_dir Main_Table/5core/Video_Games/Cluster_Attention/K:2 \
+    --model_idx Mean\
+    --contrast_type Item-Level \
+    --warm_up_epoches 0\
+    --rec_weight 1 \
+    --temperature 1 \
+    --num_intent_clusters 2\
+    --intent_cf_weight 1\
+    --cf_weight 0 \
+    --cluster_value 0.3\
+    --cluster_prediction \
 
 # scripts/Beauty/0.sh
