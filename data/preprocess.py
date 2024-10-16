@@ -422,11 +422,12 @@ def Amazon_generate_data_rec(dataset_name, k_core):
 
 
 
-amazon = ['Baby','Clothing_Shoes_and_Jewelry','Beauty',
-          'Electronics','Grocery_and_Gourmet_Food',
-           'Home_and_Kitchen','Movies_and_TV','Toys_and_Games', 'Video_Games','Sports_and_Outdoors',
-           'Tools_and_Home_Improvement']
+# amazon = ['Baby','Clothing_Shoes_and_Jewelry','Beauty',
+#           'Electronics','Grocery_and_Gourmet_Food',
+#            'Home_and_Kitchen','Movies_and_TV','Toys_and_Games', 'Video_Games','Sports_and_Outdoors',
+#            'Tools_and_Home_Improvement']
 
+amazon = ['Clothing_Shoes_and_Jewelry']
 k_core = 10
 
 for i in amazon:

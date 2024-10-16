@@ -45,7 +45,8 @@ class Trainer:
                 cluster = KMeans(
                     num_cluster=num_intent_cluster,
                     seed=self.args.seed,
-                    hidden_size=1,
+                    # hidden_size=1,
+                    hidden_size=self.args.hidden_size * 4,
                     temperature= args.temperature,
                     gpu_id=self.args.gpu_id,
                     device=self.device,
@@ -98,9 +99,11 @@ class Trainer:
             )
             self.projection_item = nn.Sequential(
                 nn.Linear(1, self.args.batch_size, bias=False),
+                # nn.Linear(self.args.hidden_size, self.args.batch_size, bias=False),
                 nn.BatchNorm1d(self.args.batch_size),
                 nn.ReLU(inplace=True),
-                nn.Linear(self.args.batch_size, 1, bias=True),
+                # nn.Linear(self.args.batch_size, 1, bias=True),
+                nn.Linear(self.args.batch_size, self.args.hidden_size*4, bias=True),
             )
             
         else:
@@ -699,10 +702,13 @@ class UPTRecTrainer(Trainer):
 
 
                             if self.args.seq_representation_type == "mean":
-                                cl_output_1 = torch.mean(cl_output_1, dim=2, keepdim=False).view(recommendation_output.shape[0],-1)
+                                cl_output_1 = torch.mean(cl_output_1, dim=2, keepdim=False).view(recommendation_output.shape[0]*self.args.max_seq_length,-1)
+                                cl_output_1 = self.projection_item(cl_output_1)
                                 cl_output_1 = cl_output_1.view(self.args.batch_size*self.args.max_seq_length, -1).detach().cpu().numpy()  
+                                
 
-                                cl_output_2 = torch.mean(cl_output_2, dim=2, keepdim=False).view(recommendation_output.shape[0],-1)
+                                cl_output_2 = torch.mean(cl_output_2, dim=2, keepdim=False).view(recommendation_output.shape[0]*self.args.max_seq_length,-1)
+                                cl_output_2 = self.projection_item(cl_output_2)
                                 cl_output_2 = cl_output_2.view(self.args.batch_size*self.args.max_seq_length, -1).detach().cpu().numpy()
                             else:
                                 cl_output_1 = cl_output_1.view(recommendation_output.shape[0]*self.args.max_seq_length, -1).detach().cpu().numpy()
@@ -984,9 +990,12 @@ class UPTRecTrainer(Trainer):
                                 sequence_context_user = torch.mean(sequence_output, dim=1, keepdim=False).view(sequence_output.shape[0],-1)
                                 sequence_context_item = torch.mean(sequence_output, dim=2, keepdim=False).view(sequence_output.shape[0]*self.args.max_seq_length,-1)
 
+                                sequence_context_item = self.projection_item(sequence_context_item)
+                                sequence_context_user = self.projection_user(sequence_context_user)
+                                
                                 sequence_context_user = sequence_context_user.detach().cpu().numpy()
                                 sequence_context_item = sequence_context_item.detach().cpu().numpy()
-                                
+    
                         
                             kmeans_training_data.append(sequence_context_user)
                             kmeans_training_data_item.append(sequence_context_item)
@@ -1028,8 +1037,9 @@ class UPTRecTrainer(Trainer):
 
 
                         if self.args.seq_representation_type == "mean":
-                            sequence_context = torch.mean(sequence_context, dim=2, keepdim=False).view(sequence_context.shape[0],-1)
-                            sequence_context = sequence_context.view(self.args.batch_size*self.args.max_seq_length, -1).detach().cpu().numpy()   
+                            sequence_context = torch.mean(sequence_context, dim=2, keepdim=False).view(sequence_context.shape[0]*self.args.max_seq_length,-1)
+                            # sequence_context = sequence_context.view(self.args.batch_size*self.args.max_seq_length, -1)  
+                            sequence_context = self.projection_item(sequence_context).view(sequence_context.shape[0],-1).detach().cpu().numpy() 
                         
                         # sequence_context = sequence_context.view(sequence_context.shape[0], -1).detach().cpu().numpy()
                         # sequence_context = sequence_context.view(self.args.batch_size*self.args.max_seq_length,-1).detach().cpu().numpy()
