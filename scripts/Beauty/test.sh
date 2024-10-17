@@ -13,8 +13,8 @@ python main.py \
     --visualization_epoch 20 \
     --patience 30 \
     --embedding \
-    --output_dir Ablation/Beauty/Item_level/21\
-    --model_idx Mean \
+    --output_dir Ablation/Beauty/Item_level/test\
+    --model_idx Mesadasdansadasdsa \
     --contrast_type Item-Level \
     --warm_up_epoches 0\
     --rec_weight 1 \

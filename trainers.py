@@ -45,8 +45,8 @@ class Trainer:
                 cluster = KMeans(
                     num_cluster=num_intent_cluster,
                     seed=self.args.seed,
-                    # hidden_size=1,
-                    hidden_size=self.args.hidden_size * 4,
+                    hidden_size=1,
+                    # hidden_size=self.args.hidden_size,
                     temperature= args.temperature,
                     gpu_id=self.args.gpu_id,
                     device=self.device,
@@ -99,11 +99,11 @@ class Trainer:
             )
             self.projection_item = nn.Sequential(
                 nn.Linear(1, self.args.batch_size, bias=False),
-                # nn.Linear(self.args.hidden_size, self.args.batch_size, bias=False),
+                
                 nn.BatchNorm1d(self.args.batch_size),
                 nn.ReLU(inplace=True),
-                # nn.Linear(self.args.batch_size, 1, bias=True),
-                nn.Linear(self.args.batch_size, self.args.hidden_size*4, bias=True),
+                nn.Linear(self.args.batch_size, 1, bias=True),
+                # nn.Linear(self.args.batch_size, self.args.hidden_size, bias=True),
             )
             
         else:
