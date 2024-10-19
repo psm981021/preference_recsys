@@ -23,8 +23,6 @@ from trainers_2 import UPTRecTrainer_pre
 from models import UPTRec
 from utils import *
 
-import wandb
-
 def show_args_info(args, log_file=None):
     print("Arguments:")
     for arg in vars(args):

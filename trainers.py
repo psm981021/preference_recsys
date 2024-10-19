@@ -23,7 +23,6 @@ import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from sklearn.decomposition import TruncatedSVD
-import wandb
 import loralib as lora
 
 class Trainer:

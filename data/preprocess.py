@@ -231,6 +231,17 @@ def steam_large(file_path):
 
     get_stats(usernum,itemnum,User,Item)
 
+def write_inter_format(User, itemmap, dataset_name):
+    with open(f'{dataset_name}.inter', 'w', encoding='utf-8') as f:
+        # 헤더 작성
+        f.write('user_id:token\titem_id:token\ttimestamp:float\n')
+        
+        
+        for user_id, interactions in User.items():
+            # import IPython; IPython.embed(colors='Linux');exit(1);
+            for interaction in interactions:
+                time_stamp, item_id = interaction
+                f.write(f'{user_id}\t{item_id}\t{time_stamp}\n')
 
 def Amazon_generate_data(dataset_name, k_core):
     countU = defaultdict(lambda: 0)
@@ -419,6 +430,7 @@ def Amazon_generate_data_rec(dataset_name, k_core):
 
     # 시간 순으로 정렬된 유저 데이터를 파일로 저장
     write_seq(User, dataset_name, k_core)
+    write_inter_format(User, itemmap, dataset_name)
 
 
 
@@ -427,7 +439,7 @@ def Amazon_generate_data_rec(dataset_name, k_core):
 #            'Home_and_Kitchen','Movies_and_TV','Toys_and_Games', 'Video_Games','Sports_and_Outdoors',
 #            'Tools_and_Home_Improvement']
 
-amazon = ['Clothing_Shoes_and_Jewelry']
+amazon = ['Sports_and_Outdoors','Clothing_Shoes_and_Jewelry','Video_Games','Tools_and_Home_Improvement']
 k_core = 10
 
 for i in amazon:

@@ -43,9 +43,5 @@ topk: [5,10,15,20]
 valid_metric: 'NDCG@10' 
 
 
-
-# model config
-hidden_size: 64
-n_layers: 2
-hidden_act: 'gelu'
-loss_type: 'CE'
+### Model 
+k: 200

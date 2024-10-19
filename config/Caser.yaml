@@ -1,39 +1,29 @@
 
-#----enviroment settings-----
-use_gpu: True
-gpu_id: 1
-save_dataset: False
-seed: 1
-
-#----data settings----
-#MovieLens, Amzaon
-
 data_path: dataset/
 field_seperator: "\t"
 USER_ID_FIELD: user_id
 ITEM_ID_FIELD: item_id
-
 # ITEM_ID_FIELD: product_id
 TIME_FIELD: timestamp
 load_col:
     inter: [user_id, item_id, timestamp]
 
 MAX_ITEM_LIST_LENGTH: 50
-rm_dup_inter: first
 
-filter_inter_by_user_or_item: True
-user_inter_num_interval: "[5,200)"
-item_inter_num_interval: "[5,inf)"
+### ----Filtering----- ###
+user_inter_num_interval: "[0,inf)"
+item_inter_num_interval: "[0,inf)"
 
 # ------Training and evaluation-------
 epochs: 500
-train_batch_size: 512
-eval_batch_size: 512
+train_batch_size: 256
+eval_batch_size: 256
 learner: adam
 learning_rate: 0.001 
 train_neg_sample_args: ~
 stopping_step: 40
 eval_step: 1
+
 
 eval_args:
     group_by: user
@@ -44,11 +34,11 @@ metrics: ['NDCG', 'Hit']
 topk: [5,10,15,20]
 valid_metric: 'NDCG@10' 
 
-# model config
+
+# ------ Model Config -------
 hidden_size: 64
 n_layers: 2
 hidden_act: 'relu'
 loss_type: 'BPR'
 train_neg_sample_args: {'distribution': 'uniform', 'sample_num': 1}
-
 reproducibility: False
