@@ -1,3 +1,10 @@
+#----enviroment settings-----
+use_gpu: True
+gpu_id: 1
+save_dataset: True
+seed: 1
+
+#----data settings----
 
 data_path: dataset/
 field_seperator: "\t"
@@ -8,7 +15,8 @@ TIME_FIELD: timestamp
 load_col:
     inter: [user_id, item_id, timestamp]
 
-MAX_ITEM_LIST_LENGTH: 50
+MAX_ITEM_LIST_LENGTH: 200
+filter_inter_by_user_or_item: False
 
 ### ----Filtering----- ###
 user_inter_num_interval: "[0,inf)"
@@ -23,7 +31,7 @@ learning_rate: 0.001
 train_neg_sample_args: ~
 stopping_step: 40
 eval_step: 1
-
+loss_decimal_place: 6
 
 eval_args:
     group_by: user

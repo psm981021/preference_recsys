@@ -166,8 +166,8 @@ class UPTRec(nn.Module):
         sequence_output = item_encoded_layers[-1]
         invariant_aug = [item_encoded_layers]
 
-        prediction_scores = self.lm_head(sequence_output)
-        return sequence_output, prediction_scores, invariant_aug
+        # prediction_scores = self.lm_head(sequence_output)
+        return sequence_output, invariant_aug
 
 
     def init_weights(self, module):

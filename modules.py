@@ -77,7 +77,7 @@ class SupConLoss(nn.Module):
             raise ValueError("Unknown mode: {}".format(self.contrast_mode))
 
         # compute logits
-        import IPython; IPython.embed(colors='Linux');exit(1);
+        
         anchor_dot_contrast = torch.div(torch.matmul(anchor_feature, contrast_feature.T), self.temperature)
         # for numerical stability
         logits_max, _ = torch.max(anchor_dot_contrast, dim=1, keepdim=True)
@@ -465,10 +465,8 @@ class NCELoss(nn.Module):
             logits = torch.cat([raw_scores1, raw_scores2], dim=-2)
             labels = torch.arange(2 * d, dtype=torch.long, device=logits.device)
             
-        try:
-            nce_loss = self.criterion(logits, labels)
-        except:
-            import IPython; IPython.embed(colors='Linux');exit(1);
+        nce_loss = self.criterion(logits, labels)
+
         return nce_loss
     
 class AlignmentLossWithSinkhorn(nn.Module):
@@ -557,10 +555,12 @@ class Clustered_Attention_Chunking(nn.Module):
 
             #use chunking
             start_idx = i * chunk_size
-            end_idx = min((i + 1) * chunk_size, N)
-
+            # end_idx = min((i + 1) * chunk_size, N)
+            # end_idx = min((i + 1) * chunk_size, C)
+            end_idx = C if (i == int(self.args.num_intent_clusters) - 1) else min((i + 1) * chunk_size, C)
             key_start_idx = max((i - 1) * chunk_size, 0)
-            key_end_idx = min(((i + 1) * chunk_size if i > 1 else 2*chunk_size), N)
+            # key_end_idx = min(((i + 1) * chunk_size if i > 1 else 2*chunk_size), N)
+            key_end_idx = min(((i + 1) * chunk_size if i > 1 else 2*chunk_size), C)
         
             query_chunk_seq = seq_sorted[:,start_idx:end_idx, :]
             key_chunk_seq = seq_sorted[:,key_start_idx:key_end_idx, :]

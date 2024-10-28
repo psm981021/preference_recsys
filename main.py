@@ -75,6 +75,7 @@ def main():
     parser.add_argument("--supcon", action="store_true", help="Use Supcon for CL learning")     
     parser.add_argument("--bi_direction", action="store_true", help="bi-directional attention mask") 
     parser.add_argument("--batch_mean", action="store_true", help="Batch mean when computing NCE") 
+    parser.add_argument("--centroid", action="store_true", help="Contrast agaisnt Cluster Centroid in Item-CL, if not contrast against encoder representation") 
 
     parser.add_argument("--pre_train", action="store_true", help="pre-training for cluster-attention &  fine-tuning for contrastive learning ")  
     parser.add_argument("--fine_tune", action="store_true", help="pre-training for cluster-attention &  fine-tuning for contrastive learning ")   

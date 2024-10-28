@@ -1,6 +1,6 @@
 #----enviroment settings-----
 use_gpu: True
-gpu_id: 1
+gpu_id: 0
 save_dataset: True
 seed: 1
 
@@ -44,4 +44,4 @@ valid_metric: 'NDCG@10'
 
 
 ### Model 
-k: 200
+k: 100

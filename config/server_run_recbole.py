@@ -10,25 +10,39 @@ datasets = ['Amazon_Clothing_Shoes_and_Jewelry','Amazon_Sports_and_Outdoors','Am
 
 
 ### BERT4Rec ### 
-# for dataset in datasets:
-#     run_recbole(model='BERT4Rec', dataset=dataset, config_file_list=['BERT4Rec.yaml'])
+
+# run_recbole(model='BERT4Rec', dataset='Amazon_Clothing_Shoes_and_Jewelry', config_file_list=['BERT4Rec.yaml'])
+# run_recbole(model='BERT4Rec', dataset='Amazon_Sports_and_Outdoors', config_file_list=['BERT4Rec.yaml'])
+# run_recbole(model='BERT4Rec', dataset='Amazon_Tools_and_Home_Improvement', config_file_list=['BERT4Rec.yaml'])
+# run_recbole(model='BERT4Rec', dataset='Amazon_Pet_Supplies', config_file_list=['BERT4Rec.yaml'])
+# run_recbole(model='BERT4Rec', dataset='Ml-1m', config_file_list=['BERT4Rec.yaml'])
 
 
 ### Caser ###
 
-run_recbole(model='Caser', dataset='Amazon_Clothing_Shoes_and_Jewelry', config_file_list=['Caser.yaml'])
-run_recbole(model='Caser', dataset='Amazon_Sports_and_Outdoors', config_file_list=['Caser.yaml'])
-run_recbole(model='Caser', dataset='Amazon_Tools_and_Home_Improvement', config_file_list=['Caser.yaml'])
-run_recbole(model='Caser', dataset='Amazon_Video_Games', config_file_list=['Caser.yaml'])
+# run_recbole(model='Caser', dataset='Amazon_Clothing_Shoes_and_Jewelry', config_file_list=['Caser.yaml'])
+# run_recbole(model='Caser', dataset='Amazon_Sports_and_Outdoors', config_file_list=['Caser.yaml'])
+# run_recbole(model='Caser', dataset='Amazon_Tools_and_Home_Improvement', config_file_list=['Caser.yaml'])
+# run_recbole(model='Caser', dataset='Amazon_Video_Games', config_file_list=['Caser.yaml'])
+# run_recbole(model='Caser', dataset='Amazon_Pet_Supplies', config_file_list=['Caser.yaml'])
+run_recbole(model='Caser', dataset='Ml-1m', config_file_list=['Caser.yaml'])
 
 
-### ADMMSLIM ### 
 
-run_recbole(model='ADMMSLIM', dataset='Amazon_Clothing_Shoes_and_Jewelry', config_file_list=['ADMMSLIM.yaml'])
-run_recbole(model='ADMMSLIM', dataset='Amazon_Sports_and_Outdoors', config_file_list=['ADMMSLIM.yaml'])
-run_recbole(model='ADMMSLIM', dataset='Amazon_Tools_and_Home_Improvement', config_file_list=['ADMMSLIM.yaml'])
-run_recbole(model='ADMMSLIM', dataset='Amazon_Video_Games', config_file_list=['ADMMSLIM.yaml'])
+### GRU4Rec ### 
 
+# run_recbole(model='GRU4Rec', dataset='Amazon_Clothing_Shoes_and_Jewelry', config_file_list=['GRU4Rec.yaml'])
+# run_recbole(model='GRU4Rec', dataset='Amazon_Sports_and_Outdoors', config_file_list=['GRU4Rec.yaml'])
+# run_recbole(model='GRU4Rec', dataset='Amazon_Tools_and_Home_Improvement', config_file_list=['GRU4Rec.yaml'])
+# run_recbole(model='GRU4Rec', dataset='Amazon_Video_Games', config_file_list=['GRU4Rec.yaml'])
+# run_recbole(model='GRU4Rec', dataset='Amazon_Pet_Supplies', config_file_list=['GRU4Rec.yaml'])
+run_recbole(model='GRU4Rec', dataset='Ml-1m', config_file_list=['GRU4Rec.yaml'])
+
+### FEARec ###
+# run_recbole(model='FEARec', dataset='Amazon_Sports_and_Outdoors', config_file_list=['FEARec.yaml'])
+# run_recbole(model='FEARec', dataset='Amazon_Clothing_Shoes_and_Jewelry', config_file_list=['FEARec.yaml'])
+# run_recbole(model='FEARec', dataset='Amazon_Tools_and_Home_Improvement', config_file_list=['FEARec.yaml'])
+# run_recbole(model='FEARec', dataset='Amazon_Video_Games', config_file_list=['FEARec.yaml'])
 
 
 # python server_run_recbole.py

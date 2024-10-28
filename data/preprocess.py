@@ -58,7 +58,11 @@ def write_seq(User, dataset_name,k):
     for user in User.keys():
         f.write('%d '%(user))
         for i in User[user]:
-            f.write('%d ' %(i[1]))
+           
+            try:
+                f.write('%d ' %(i[1]))
+            except:
+                f.write('%s ' %(i[1]))
         f.write('\n')
 
 def write_seq_sample(User, dataset_name):
@@ -191,7 +195,7 @@ def steam_large(file_path):
                 username = re.findall(r'"username": "(.*?)",', l)[0]
             except :
                 username = re.findall(r'"username": u"(.*?)"', l)[0]
-                import IPython; IPython.embed(colors='Linux');exit(1);
+                
             product_id = re.findall(r'"product_id": "(.*?)",', l)
             line +=1
             for item in product_id:
@@ -312,7 +316,9 @@ def ml_generate_data(path, k_core):
     countP = defaultdict(lambda: 0)
 
     for row in csv.reader(open(path,'r',encoding='utf-8')):
-        user_id, movie_id, rating, timestamp = row[0].split('::')
+        
+        # user_id, movie_id, rating, timestamp = row[0].split('::')
+        user_id, movie_id, rating, timestamp = row
         countU[user_id] += 1
         countP[movie_id] += 1
 
@@ -327,8 +333,8 @@ def ml_generate_data(path, k_core):
     for row in csv.reader(open(path,'r',encoding='utf-8')):
        
         line +=1
-        user_id, movie_id, rating, timestamp = row[0].split('::')
-        
+        # user_id, movie_id, rating, timestamp = row[0].split('::')
+        user_id, movie_id, rating, timestamp = row
         if countU[user_id] < k_core or countP[movie_id] < k_core:
             continue
         if user_id in usermap:
@@ -353,11 +359,10 @@ def ml_generate_data(path, k_core):
     for userid in User.keys():
         User[userid].sort(key=lambda x: x[0])
 
-    get_stats(usernum,itemnum,User,Item,'Ml-1m')
-    write_mapping_sample(User,'Ml-1m')
-    # write_mapping(User,'Ml-1m')
-    write_seq(User,'Ml-1m')
-    write_seq_sample(User,'Ml-1m')
+    get_stats(usernum,itemnum,User,Item,'Ml-20m')
+
+    write_seq(User, 'Ml-20m', k_core)
+    write_inter_format(User, itemmap, 'Ml-20m')
 
 def Amazon_generate_data_rec(dataset_name, k_core):
     countU = defaultdict(lambda: 0)  # 사용자 리뷰 수 카운트
@@ -439,7 +444,9 @@ def Amazon_generate_data_rec(dataset_name, k_core):
 #            'Home_and_Kitchen','Movies_and_TV','Toys_and_Games', 'Video_Games','Sports_and_Outdoors',
 #            'Tools_and_Home_Improvement']
 
-amazon = ['Sports_and_Outdoors','Clothing_Shoes_and_Jewelry','Video_Games','Tools_and_Home_Improvement']
+# amazon = ['Sports_and_Outdoors','Clothing_Shoes_and_Jewelry','Video_Games','Tools_and_Home_Improvement']
+amazon = ['Office_Products']
+
 k_core = 10
 
 for i in amazon:
@@ -448,7 +455,7 @@ for i in amazon:
 
 
 #steam_generate_data('/Users/sb/Desktop/project/preference_rec/data/australian_user_reviews.json.gz') #using version 1 review data
-# ml_generate_data('/home/sb/data/ml-20m.inter',k_core)  #m1-1m
+# ml_generate_data('/home/sb/data/ml-20m/ratings.dat',10)  #m1-1m
     
 # import IPython; IPython.embed(colors='Linux');exit(1);
 

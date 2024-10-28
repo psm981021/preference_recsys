@@ -15,8 +15,10 @@ data/Beauty_meta.csv
 data/2014/*
 data/5core
 data/10core
+data/ml-20m
 scripts/*
-
+Best/*
+baseline/*
 #result log
 result_log/
 wandb/
